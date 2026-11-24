@@ -1256,7 +1256,7 @@
         <div class="barra-azioni"><button class="primario" data-azione="kit-crea">🎁 Crea il kit per i giocatori…</button>
           <button data-azione="kit-crea-web">📱 Prepara il kit per tablet e telefoni…</button></div>
         <p class="muto pf-aiuto"><b>Per PC:</b> comparirà la cartella «Cronache del Master - scheda giocatore». Comprimila (tasto destro › Invia a › Cartella compressa) e mandala ai giocatori, o mettila su Google Drive.<br>
-          <b>Per tablet e telefoni (Android, iPhone, iPad):</b> comparirà la cartella «… (tablet e telefoni)», da pubblicare gratis su un sito (es. trascinandola su Netlify Drop, istruzioni nel LEGGIMI). Ai giocatori mandi il link: aprono la scheda e la installano come app con «Aggiungi alla schermata Home»; poi funziona anche senza connessione.<br>
+          <b>Per tablet e telefoni (Android, iPhone, iPad):</b> se la cartella «… (tablet e telefoni)» è già collegata a GitHub, il pulsante la rigenera e carica subito la nuova versione sul sito (il link viene copiato); altrimenti la crea da pubblicare a mano (istruzioni nel LEGGIMI). I giocatori aprono il link e installano la scheda con «Aggiungi alla schermata Home»; poi funziona anche senza connessione e si aggiorna da sola.<br>
           In entrambi i kit i mostri del tuo Manuale dei Mostri non vengono inclusi, e il file della scheda è lo stesso.</p>
       </section>
       <section class="pannello imp-dati">
@@ -1913,12 +1913,23 @@
         if (cartella) toast(`🎁 Kit per i giocatori creato in <b>${esc(cartella)}</b>: comprimi la cartella e mandala ai giocatori`);
       } catch (e) { toast(`Kit non creato: ${esc(e.message)}`, 'errore'); }
     },
-    async 'kit-crea-web'() {
+    async 'kit-crea-web'(el) {
       if (!window.gdr?.creaKitWeb) return;
+      const testo = el.textContent;
+      el.disabled = true;
+      el.textContent = '⏳ Preparo il kit e lo carico su GitHub…';
       try {
-        const cartella = await window.gdr.creaKitWeb();
-        if (cartella) toast(`📱 Kit per tablet e telefoni pronto in <b>${esc(cartella)}</b>: pubblicalo seguendo il LEGGIMI e manda il link ai giocatori`);
-      } catch (e) { toast(`Kit non creato: ${esc(e.message)}`, 'errore'); }
+        const r = await window.gdr.creaKitWeb();
+        if (!r) return;
+        if (r.pubblicato) {
+          try { await navigator.clipboard.writeText(r.sito); } catch { /* appunti non disponibili */ }
+          toast(`📱 ${r.modifiche ? 'Nuova versione caricata su GitHub' : 'Su GitHub c\'era già questa versione'}: <b>${esc(r.sito)}</b> (link copiato). I telefoni la scaricano alla prossima apertura con la connessione; il sito si aggiorna in un paio di minuti.`);
+        } else if (r.errore) {
+          toast(`Kit rigenerato in <b>${esc(r.cartella)}</b>, ma il caricamento su GitHub non è riuscito: ${esc(r.errore)}`, 'errore');
+        } else {
+          toast(`📱 Kit per tablet e telefoni pronto in <b>${esc(r.cartella)}</b>: pubblicalo seguendo il LEGGIMI e manda il link ai giocatori`);
+        }
+      } catch (e) { toast(`Kit non creato: ${esc(e.message)}`, 'errore'); } finally { el.disabled = false; el.textContent = testo; }
     },
     async 'dati-cambia'(el) {
       if (!window.gdr?.cambiaCartella) return;
