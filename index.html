@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' file: blob: https: http:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' file: blob: https: http:; connect-src 'self' https://*.firebasedatabase.app https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com">
   <title>Cronache del Master — Scheda del giocatore</title>
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#18151e">
@@ -81,6 +81,8 @@
   <script src="src/pf2-mostri.js"></script>
   <script src="src/pf2.js"></script>
   <script src="src/sf.js"></script>
+  <script src="src/dal-vivo-config.js"></script>
+  <script src="src/dal-vivo.js"></script>
   <script src="src/giocatore.js"></script>
   <script src="src/pwa.js"></script>
   <script src="src/app.js"></script>

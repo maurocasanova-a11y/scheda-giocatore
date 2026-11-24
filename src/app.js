@@ -86,6 +86,7 @@
   const GIOCATORE = !!window.MODALITA_GIOCATORE && !window.gdr;
   function salva() {
     if (SCHERMO) return;
+    if (GIOCATORE) dvGProgramma(); // scheda collegata dal vivo: la modifica parte anche verso il master
     clearTimeout(timerSalva);
     statoSalvataggio('Salvataggio…');
     timerSalva = setTimeout(async () => {
@@ -1171,6 +1172,8 @@
   // ================= Navigazione e disegno =================
   function render() {
     chiudiSuggerimenti();
+    // Sessione dal vivo rimasta aperta (app riavviata): si torna ad ascoltarla
+    if (!GIOCATORE && !SCHERMO && !dvM.codice && dvAttivo()) { const cv = S.campagne.find((x) => x.dalVivo?.codice); if (cv) dvMAscolta(cv); }
     const hash = location.hash.slice(1) || '/campagne';
     const [percorso, qs = ''] = hash.split('?');
     const q = new URLSearchParams(qs);
@@ -1339,7 +1342,8 @@
     return `<div class="barra-azioni barra-giocatore"><a class="bottone" href="#/giocatore">← I miei personaggi</a>
       <button class="primario" data-azione="pg-esporta" data-id="${p.id}">💾 Salva il file per il master</button>
       <button data-azione="giocatore-carica" title="Carica il file di una scheda (tua o rimandata dal master)">📥 Importa scheda</button>
-      <span class="muto">La scheda resta salvata in questo browser; il file serve per mandarla al master.</span></div>`;
+      <span class="muto">La scheda resta salvata in questo browser; il file serve per mandarla al master.</span></div>
+      ${barraDalVivoGiocatore(p)}`;
   }
   // File della scheda: il personaggio con il regolamento a cui appartiene (senza la campagna)
   function esportaScheda(p) {
@@ -1464,6 +1468,7 @@
     dnd: () => dnd,
     pf2: () => pf2,
     urlMusica: (b) => urlMusica(b),
+    pannelloDalVivo: (c) => pannelloDalVivo(c),
   });
   // Modulo Starfinder (src/sf.js)
   const sf = window.creaSF({
@@ -1503,6 +1508,7 @@
       salva();
       location.hash = `#/campagna/${c.id}/diario`;
     },
+    'dv-collega'(d) { dvGCollega(d.get('codice'), d.get('pg')); },
     'giocatore-nuovo'(d) {
       const nome = d.get('nome').trim();
       if (!nome) return;
@@ -1887,7 +1893,7 @@
         const rc = regolamento(c.regolamentoId);
         if (rc && d.regolamento?.id !== rc.id && (d.regolamento?.scheda || '') !== (rc.scheda || '')
           && !confirm(`La scheda è fatta con «${d.regolamento?.nome}», ma la campagna usa «${rc.nome}». Importarla comunque?`)) return;
-        const nuovo = { ...d.personaggio, campagnaId: c.id, tipo: el.dataset.tipo || d.personaggio.tipo || 'PG', importato: Date.now() };
+        const nuovo = { ...d.personaggio, campagnaId: c.id, tipo: el.dataset.tipo || d.personaggio.tipo || 'PG', importato: Date.now(), idGiocatore: d.personaggio.idGiocatore || d.personaggio.id };
         const stesso = S.personaggi.find((x) => x.campagnaId === c.id && (x.id === nuovo.id || norm(x.nome) === norm(nuovo.nome)));
         if (stesso && confirm(`In questa campagna c'è già «${stesso.nome}». Sostituire la sua scheda con quella del file?\n\nOK = sostituisci · Annulla = aggiungi come personaggio nuovo`)) {
           const id = stesso.id;
@@ -1912,6 +1918,18 @@
         const cartella = await window.gdr.creaKit();
         if (cartella) toast(`🎁 Kit per i giocatori creato in <b>${esc(cartella)}</b>: comprimi la cartella e mandala ai giocatori`);
       } catch (e) { toast(`Kit non creato: ${esc(e.message)}`, 'errore'); }
+    },
+    // Sessione dal vivo
+    async 'dv-scollega'() {
+      const codice = dvG.codice;
+      dvGScollega();
+      try { const io = await DV.mioUid(); await DV.cancella(`sessioni/${codice}/pg/${io}`); } catch { /* sessione già chiusa */ }
+      toast('📡 Scheda scollegata dalla sessione');
+    },
+    'dv-apri'(el) { const c = campagna(el.dataset.camp); if (c) dvMApri(c); },
+    'dv-chiudi'(el) {
+      if (!confirm('Chiudere la sessione dal vivo? I giocatori verranno scollegati e il codice non varrà più.')) return;
+      dvMChiudi();
     },
     async 'kit-crea-web'(el) {
       if (!window.gdr?.creaKitWeb) return;
@@ -2106,9 +2124,222 @@
     setTimeout(() => toast(`🗑 ${messaggio} <button class="btn-piccolo" data-azione="annulla-eliminazione">↩ Annulla</button>`), 50);
   }
 
+  // ================= Sessione dal vivo (src/dal-vivo.js) =================
+  // Il master apre una sessione dal tracker e ottiene un codice; il giocatore lo scrive nella sua scheda (kit) e da lì
+  // ogni modifica della scheda arriva al master in tempo reale. La scheda viaggia intera (come testo JSON): il tracker
+  // la legge come le altre e si aggiorna da solo (PF, incantesimi, risorse…). Gli incantesimi lanciati arrivano come eventi.
+  const DV = window.DalVivo;
+  const dvAttivo = () => !!DV?.configurato();
+  const testoSemplice = (html) => String(html).replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+  // Se si sta scrivendo in un campo, il ridisegno aspetta che il campo perda il fuoco
+  let dvRidisegnoInAttesa = false;
+  function dvRidisegna() {
+    const a = document.activeElement;
+    if (a && a.closest?.('#contenuto') && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) {
+      if (!dvRidisegnoInAttesa) { dvRidisegnoInAttesa = true; a.addEventListener('blur', () => { dvRidisegnoInAttesa = false; setTimeout(render, 0); }, { once: true }); }
+      return;
+    }
+    render();
+  }
+
+  // ---------- Giocatore: collegamento della scheda ----------
+  const CHIAVE_DV_GIOCATORE = 'dal-vivo-giocatore';
+  const dvG = { codice: '', pgId: '', ultimo: '', timer: null, stato: '' };
+  try { Object.assign(dvG, JSON.parse(localStorage.getItem(CHIAVE_DV_GIOCATORE) || '{}')); } catch { /* niente */ }
+  const dvGRicorda = () => { try { localStorage.setItem(CHIAVE_DV_GIOCATORE, JSON.stringify({ codice: dvG.codice, pgId: dvG.pgId })); } catch { /* niente */ } };
+  function dvGScollega(messaggio) {
+    dvG.codice = ''; dvG.pgId = ''; dvG.ultimo = ''; dvG.stato = '';
+    clearTimeout(dvG.timer);
+    dvGRicorda();
+    if (messaggio) toast(messaggio, 'errore');
+    dvRidisegna();
+  }
+  function dvGProgramma() {
+    if (!dvG.codice || !dvAttivo()) return;
+    clearTimeout(dvG.timer);
+    dvG.timer = setTimeout(dvGInvia, 900);
+  }
+  async function dvGInvia(forza = false) {
+    const p = dvG.codice && personaggio(dvG.pgId);
+    if (!p) return;
+    const pers = JSON.parse(JSON.stringify(p));
+    delete pers.campagnaId;
+    const testo = JSON.stringify(pers);
+    if (!forza && testo === dvG.ultimo) return;
+    const r = regDi(p);
+    try {
+      const io = await DV.mioUid();
+      await DV.scrivi(`sessioni/${dvG.codice}/pg/${io}`, { nome: String(p.nome || '?').slice(0, 120), regolamento: { id: r?.id || '', nome: r?.nome || '', scheda: r?.scheda || '' }, pers: testo, aggiornato: DV.ORA });
+      dvG.ultimo = testo;
+      if (dvG.stato !== 'ok') { dvG.stato = 'ok'; aggiornaStatoDv(); }
+    } catch (e) {
+      if (e.stato === 401 || e.stato === 403) dvGScollega(`📡 La sessione <b>${esc(dvG.codice)}</b> è stata chiusa dal master (o il codice non è valido)`);
+      else { dvG.stato = 'errore'; aggiornaStatoDv(); dvG.timer = setTimeout(() => dvGInvia(true), 8000); }
+    }
+  }
+  function aggiornaStatoDv() {
+    const el = $('#dv-stato');
+    if (el) el.outerHTML = statoDvGiocatore();
+  }
+  const statoDvGiocatore = () => `<span id="dv-stato" class="dv-stato ${dvG.stato === 'errore' ? 'errore' : ''}">${dvG.stato === 'errore' ? '🟠 Connessione assente: riprovo…' : dvG.stato === 'ok' ? '🟢 Dal vivo' : '⏳ Collegamento…'} · <b>${esc(dvG.codice)}</b></span>`;
+  function barraDalVivoGiocatore(p) {
+    if (!dvAttivo()) return '';
+    if (dvG.codice && dvG.pgId === p.id) {
+      return `<div class="barra-azioni dv-giocatore">${statoDvGiocatore()}
+        <button class="btn-piccolo" data-azione="dv-scollega">Scollega</button>
+        <span class="muto">Il master vede la scheda in tempo reale.</span></div>`;
+    }
+    return `<form class="riga-form dv-giocatore" data-form="dv-collega" autocomplete="off">
+        <input type="hidden" name="pg" value="${p.id}">
+        <input name="codice" placeholder="Codice del master (es. DRAGO-4821)" autocapitalize="characters" required>
+        <button>📡 Collegati alla sessione</button>
+        ${dvG.codice ? `<span class="muto">Ora è collegato <b>${esc(personaggio(dvG.pgId)?.nome || '')}</b>: collegando questo, l'altro si scollega.</span>` : ''}</form>`;
+  }
+  async function dvGCollega(codice, pgId) {
+    const c = DV.normCodice(codice);
+    if (!/^[A-Z]+-\d{4}$/.test(c)) { toast('Il codice è fatto così: una parola e quattro cifre (es. DRAGO-4821)', 'errore'); return; }
+    try {
+      const aperta = await DV.leggi(`sessioni/${c}/aperta`);
+      if (aperta !== true) throw Object.assign(new Error('chiusa'), { stato: 401 });
+    } catch (e) {
+      toast(e.stato === 401 || e.stato === 403 ? `Nessuna sessione aperta con il codice <b>${esc(c)}</b>: controlla il codice con il master` : `Collegamento non riuscito: ${esc(e.message)}`, 'errore');
+      return;
+    }
+    // Se prima era collegato un altro personaggio, la sua voce nella sessione si sostituisce (una per dispositivo)
+    Object.assign(dvG, { codice: c, pgId, ultimo: '', stato: '' });
+    dvGRicorda();
+    render();
+    await dvGInvia(true);
+    toast(`📡 Collegato alla sessione <b>${esc(c)}</b>: il master vede la tua scheda`);
+  }
+  // Riavvio della scheda: se era collegata, si rimanda subito lo stato attuale
+  if (GIOCATORE && dvG.codice && dvAttivo()) setTimeout(() => dvGInvia(true), 1500);
+
+  // ---------- Master: sessione aperta dal tracker ----------
+  const dvM = { codice: '', campagnaId: '', stop: null, giocatori: {}, visti: {}, eventiVisti: new Set(), errore: '' };
+  async function dvMApri(c) {
+    if (!dvAttivo()) { toast('La sessione dal vivo non è ancora configurata (manca il database Firebase)', 'errore'); return; }
+    if (dvM.codice) await dvMChiudi(false);
+    try {
+      const io = await DV.mioUid();
+      let codice = '';
+      for (let i = 0; i < 6 && !codice; i++) {
+        const prova = DV.codiceNuovo();
+        try { await DV.leggi(`sessioni/${prova}/aperta`); } catch (e) { if (e.stato === 401 || e.stato === 403) codice = prova; else throw e; }
+      }
+      if (!codice) throw new Error('nessun codice libero, riprova');
+      await DV.scrivi(`sessioni/${codice}`, { master: io, aperta: true, campagna: String(c.nome || '').slice(0, 120), creata: DV.ORA });
+      c.dalVivo = { codice, aperta: Date.now() };
+      salva();
+      dvMAscolta(c);
+      toast(`📡 Sessione dal vivo aperta: codice <b>${esc(codice)}</b>`);
+    } catch (e) { toast(`Sessione non aperta: ${esc(e.message)}`, 'errore'); }
+    render();
+  }
+  function dvMAscolta(c) {
+    dvM.stop?.();
+    Object.assign(dvM, { codice: c.dalVivo.codice, campagnaId: c.id, giocatori: {}, visti: {}, eventiVisti: new Set(), errore: '' });
+    dvM.stop = DV.ascolta(`sessioni/${dvM.codice}`, (copia) => dvMElabora(copia), (e) => {
+      dvM.errore = e.message;
+      // Sessione sparita (chiusa da un altro PC o scaduta): si chiude anche qui
+      if (/negato/.test(e.message)) { const cc = campagna(dvM.campagnaId); if (cc) delete cc.dalVivo; dvM.stop?.(); Object.assign(dvM, { codice: '', campagnaId: '', stop: null }); salva(); }
+      dvRidisegna();
+    });
+  }
+  async function dvMChiudi(avvisa = true) {
+    const c = campagna(dvM.campagnaId);
+    const codice = dvM.codice;
+    dvM.stop?.();
+    Object.assign(dvM, { codice: '', campagnaId: '', stop: null, giocatori: {} });
+    if (c) { delete c.dalVivo; salva(); }
+    try { if (codice) await DV.cancella(`sessioni/${codice}`); } catch { /* già chiusa */ }
+    if (avvisa) toast(`📡 Sessione dal vivo <b>${esc(codice)}</b> chiusa: i giocatori non sono più collegati`);
+    render();
+  }
+  function dvMElabora(copia) {
+    const c = campagna(dvM.campagnaId);
+    if (!c || !copia) return;
+    let cambiato = false;
+    const pgCambiati = new Set();
+    for (const [u, g] of Object.entries(copia.pg || {})) {
+      if (!g || typeof g.pers !== 'string') continue;
+      if (dvM.visti[u] === g.aggiornato && dvM.giocatori[u]) continue;
+      let pers;
+      try { pers = JSON.parse(g.pers); } catch { continue; }
+      if (!pers || typeof pers !== 'object') continue;
+      dvM.visti[u] = g.aggiornato;
+      // Il personaggio della campagna: già collegato, importato da questo giocatore, o con lo stesso nome
+      const tra = S.personaggi.filter((x) => x.campagnaId === c.id);
+      let loc = tra.find((x) => x.idGiocatore && x.idGiocatore === pers.id) || tra.find((x) => x.id === pers.id)
+        || tra.find((x) => x.tipo === 'PG' && !x.idGiocatore && norm(x.nome) === norm(pers.nome));
+      if (loc) {
+        const prima = pf1.pfDalVivo(loc.id);
+        const tieni = { id: loc.id, campagnaId: c.id, tipo: loc.tipo, importato: loc.importato, documenti: loc.documenti };
+        const immagine = loc.immagine;
+        for (const k of Object.keys(loc)) delete loc[k];
+        Object.assign(loc, pers, tieni, { idGiocatore: pers.id });
+        if (!loc.immagine && immagine) loc.immagine = immagine;
+        if (!loc.documenti) delete loc.documenti;
+        const dopo = pf1.pfDalVivo(loc.id);
+        if (prima && dopo) {
+          if (prima.pf !== dopo.pf) pf1.annotaDalVivo(c, `❤ ${loc.nome}: PF ${prima.pf} → ${dopo.pf}`);
+          if (prima.ps !== dopo.ps && dopo.psMax) pf1.annotaDalVivo(c, `💠 ${loc.nome}: PS ${prima.ps} → ${dopo.ps}`);
+        }
+      } else {
+        loc = { ...pers, id: uid(), idGiocatore: pers.id, campagnaId: c.id, tipo: 'PG', importato: Date.now() };
+        S.personaggi.push(loc);
+        toast(`📡 <b>${esc(loc.nome)}</b> si è collegato ed è stato aggiunto ai personaggi della campagna`);
+      }
+      if (!dvM.giocatori[u]) pf1.annotaDalVivo(c, `📡 ${loc.nome} è collegato dal vivo`);
+      dvM.giocatori[u] = { nome: loc.nome, pgId: loc.id, aggiornato: g.aggiornato };
+      pgCambiati.add(loc.id);
+      cambiato = true;
+    }
+    // Giocatori che si sono scollegati (voce tolta dalla sessione)
+    for (const u of Object.keys(dvM.giocatori)) if (!copia.pg?.[u]) { delete dvM.giocatori[u]; cambiato = true; }
+    // Eventi (incantesimi lanciati…): nel registro dello scontro e in un avviso, poi si cancellano dal database
+    for (const [k, ev] of Object.entries(copia.eventi || {})) {
+      if (dvM.eventiVisti.has(k)) continue;
+      dvM.eventiVisti.add(k);
+      const chi = dvM.giocatori[ev.uid]?.nome || copia.pg?.[ev.uid]?.nome || 'Un giocatore';
+      pf1.annotaDalVivo(c, `${chi}: ${ev.testo}`);
+      toast(`📡 <b>${esc(chi)}</b>: ${esc(ev.testo)}`);
+      DV.cancella(`sessioni/${dvM.codice}/eventi/${k}`).catch(() => {});
+      cambiato = true;
+    }
+    if (!cambiato) return;
+    salva();
+    const h = location.hash;
+    if (h.includes(c.id) || [...pgCambiati].some((id) => h.includes(id))) dvRidisegna();
+  }
+  // Pannello nel tracker di combattimento
+  function pannelloDalVivo(c) {
+    if (!dvAttivo() || SCHERMO) return '';
+    if (c.dalVivo?.codice && dvM.codice !== c.dalVivo.codice) setTimeout(() => { if (c.dalVivo?.codice && dvM.codice !== c.dalVivo.codice) dvMAscolta(c); }, 0);
+    const attr = `data-camp="${c.id}"`;
+    if (!c.dalVivo?.codice) {
+      return `<div class="dv-master"><button data-azione="dv-apri" ${attr}>📡 Apri sessione dal vivo</button>
+        <span class="muto">I giocatori si collegano dalla loro scheda (kit per tablet e telefoni) con un codice: qui vedi PF, incantesimi e risorse in tempo reale.</span></div>`;
+    }
+    const gg = Object.values(dvM.codice === c.dalVivo.codice ? dvM.giocatori : {});
+    const ora = (t) => (typeof t === 'number' ? new Date(t).toLocaleTimeString('it-IT') : '');
+    return `<div class="dv-master aperta">
+      <div class="dv-codice" title="Detta questo codice ai giocatori">📡 Codice <b>${esc(c.dalVivo.codice)}</b></div>
+      <div class="dv-giocatori">${gg.length ? gg.map((g) => `<a class="chip dv-chip" href="#/personaggio/${g.pgId}">🟢 ${esc(g.nome)} <small>${ora(g.aggiornato)}</small></a>`).join(' ') : '<span class="muto">Nessun giocatore collegato: nella scheda premono «📡 Collegati alla sessione» e scrivono il codice.</span>'}
+        ${dvM.errore ? `<span class="oltre">⚠ ${esc(dvM.errore)}</span>` : ''}</div>
+      <button class="btn-piccolo pericolo" data-azione="dv-chiudi" ${attr}>Chiudi sessione</button>
+    </div>`;
+  }
+
   // ================= Notifiche =================
   let timerToast = null;
   function toast(html, tipo = '') {
+    // Scheda collegata dal vivo: gli incantesimi lanciati e i riposi arrivano anche al master (nel registro dello scontro)
+    if (GIOCATORE && dvG.codice && tipo !== 'errore' && dvAttivo()
+      && ((/^\s*✨/.test(html) && /lanciat|con uno slot|slot del patto/i.test(html)) || /^\s*🌙/.test(html))) {
+      const testo = testoSemplice(html).slice(0, 480);
+      DV.mioUid().then((io) => DV.aggiungi(`sessioni/${dvG.codice}/eventi`, { uid: io, testo, t: DV.ORA })).catch(() => {});
+    }
     const t = $('#toast');
     t.innerHTML = `<div class="toast ${tipo}">${html}</div>`;
     t.classList.add('visibile');

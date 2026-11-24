@@ -6721,6 +6721,7 @@ window.creaPF1 = function creaPF1(ctx) {
         <button data-azione="inc-scena" ${attr} title="Immagine o mappa mostrata sullo schermo dei giocatori sopra l'ordine di iniziativa">🖼 ${inc.scena ? 'Cambia scena' : 'Immagine di scena'}</button>
         ${inc.scena ? `<button class="btn-piccolo" data-azione="inc-scena-x" ${attr} title="Togli l'immagine di scena">× scena</button>` : ''}
       </div>
+      ${ctx.pannelloDalVivo ? ctx.pannelloDalVivo(c) : ''}
       ${sezioneMusica(c, attr)}
       ${sezioneScontro(c, inc, attr)}
       ${pngDa(c).length ? `<div class="inc-pg"><span class="muto">PNG della campagna:</span>
@@ -7792,6 +7793,9 @@ window.creaPF1 = function creaPF1(ctx) {
     vistaTavolo,
     vistaIncontro,
     vistaSchermo,
+    // Sessione dal vivo (app.js): PF del personaggio come li vede il tracker, e una riga nel registro dello scontro in corso
+    pfDalVivo: (pgId) => { try { const i = info({ pgId }); return { pf: i.pf, pfMax: i.pfMax, ps: i.ps, psMax: i.psMax }; } catch { return null; } },
+    annotaDalVivo: (c, testo) => { const inc = c.incontro; if (inc?.fase) annota(inc, testo); },
     vistaGrimorio,
     vistaBreviario,
     migraRegolamento,

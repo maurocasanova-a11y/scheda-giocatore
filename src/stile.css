@@ -1335,6 +1335,19 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
 }
 .logo-versione { font-size: 12px; color: var(--oro); font-weight: 700; vertical-align: super; }
 
+/* ---------- Sessione dal vivo ---------- */
+.dv-giocatore { margin-top: 8px; padding: 8px 10px; border: 1px dashed var(--bordo); border-radius: var(--raggio); }
+.dv-giocatore input[name="codice"] { text-transform: uppercase; max-width: 260px; }
+.dv-stato { font-size: 14px; color: var(--verde); }
+.dv-stato.errore { color: #e0a040; }
+.dv-master { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 10px 0; padding: 8px 12px; border: 1px solid var(--bordo); border-radius: var(--raggio); background: var(--pannello); }
+.dv-master.aperta { border-color: #3d8b5a; background: linear-gradient(135deg, rgba(61, 139, 90, .14), transparent 70%); }
+.dv-codice { font-size: 15px; }
+.dv-codice b { font-size: 22px; letter-spacing: .08em; color: var(--oro); font-family: Consolas, monospace; }
+.dv-giocatori { flex: 1 1 260px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dv-chip small { color: var(--muto); margin-left: 4px; }
+@media print { .dv-master, .dv-giocatore { display: none !important; } }
+
 /* ---------- Scheda del giocatore su tablet e telefoni ---------- */
 .giocatore-installa { border-color: var(--oro-scuro); background: linear-gradient(135deg, rgba(212, 173, 90, .12), transparent 70%); }
 .giocatore-installa p { margin: 0 0 6px; }
