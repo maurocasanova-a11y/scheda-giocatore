@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' file: blob: https: http:">
+  <title>Cronache del Master — Scheda del giocatore</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#18151e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Scheda GdR">
+  <link rel="apple-touch-icon" href="icone/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icone/icona-192.png">
+  <link rel="stylesheet" href="src/caratteri.css">
+  <link rel="stylesheet" href="src/stile.css">
+  <link rel="stylesheet" href="src/tema.css">
+</head>
+<body>
+  <aside id="barra">
+    <a class="logo" href="#/campagne"><span class="logo-icona">⚔</span><span class="logo-testo"><small>Cronache del</small><b>Master <span class="logo-versione">2.0</span></b></span></a>
+    <form id="form-cerca" autocomplete="off">
+      <input id="cerca-globale" type="search" placeholder="Cerca PNG, sessioni, lore…">
+    </form>
+    <nav id="nav">
+      <a href="#/campagne" data-nav="campagne">Campagne</a>
+      <a href="#/regolamenti" data-nav="regolamenti">Regolamenti</a>
+      <a href="#/dadi" data-nav="dadi">Tiradadi</a>
+      <a href="#/cerca" data-nav="cerca">Ricerca</a>
+      <a href="#/impostazioni" data-nav="impostazioni">Impostazioni</a>
+    </nav>
+    <div class="barra-titolo">Le tue campagne</div>
+    <div id="barra-campagne"></div>
+    <div class="barra-piede">
+      <button class="btn-piccolo" data-azione="esporta">Esporta backup</button>
+      <button class="btn-piccolo" data-azione="importa">Importa backup</button>
+      <button class="btn-piccolo" data-azione="apri-cartella">Cartella dati</button>
+      <div id="stato-salvataggio"></div>
+      <div class="proprietario" title="Proprietario dell'applicazione">© Mauro Casanova</div>
+    </div>
+  </aside>
+  <main id="contenuto"></main>
+  <div id="suggerimenti" hidden></div>
+  <div id="toast"></div>
+  <script src="src/regolamenti.js"></script>
+  <script src="src/dadi.js"></script>
+  <script src="src/luoghi.js"></script>
+  <script src="src/pf1-fede.js"></script>
+  <script src="src/pf1-tabelle.js"></script>
+  <script src="src/pf1-progressione.js"></script>
+  <script src="src/pf1-scoperte.js"></script>
+  <script src="src/pf1-fatture.js"></script>
+  <script src="src/pf1-prestigio.js"></script>
+  <script src="src/pf1-mitici.js"></script>
+  <script src="src/pf1-preferite.js"></script>
+  <script src="src/pf1-stirpi.js"></script>
+  <script src="src/pf1-capacita-magiche.js"></script>
+  <script src="src/pf1-creazione-mostri.js"></script>
+  <script src="src/pf1-razze.js"></script>
+  <script src="src/pf1-razze-ts.js"></script>
+  <script src="src/pf1-incantesimi.js"></script>
+  <script src="src/pf1-archetipi.js"></script>
+  <script src="src/pf1-equip.js"></script>
+  <script src="src/pf1-patroni.js"></script>
+  <script src="src/pf1-oggetti.js"></script>
+  <script src="src/pf1-compagni.js"></script>
+  <script src="src/pf1-mostri.js"></script>
+  <script src="src/pf1-talenti-dati.js"></script>
+  <script src="src/pf1-talenti.js"></script>
+  <script src="src/pf1.js"></script>
+  <script src="src/sf-dati.js"></script>
+  <script src="src/sf-contenuti.js"></script>
+  <script src="src/sf-alieni.js"></script>
+  <script src="src/dnd-dati.js"></script>
+  <script src="src/dnd-contenuti.js"></script>
+  <script src="src/dnd-mostri.js"></script>
+  <script src="src/dnd.js"></script>
+  <script src="src/pf2-dati.js"></script>
+  <script src="src/pf2-contenuti.js"></script>
+  <script src="src/pf2-mostri.js"></script>
+  <script src="src/pf2.js"></script>
+  <script src="src/sf.js"></script>
+  <script src="src/giocatore.js"></script>
+  <script src="src/pwa.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

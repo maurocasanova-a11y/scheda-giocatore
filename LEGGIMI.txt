@@ -1,0 +1,40 @@
+CRONACHE DEL MASTER - SCHEDA DEL GIOCATORE PER TABLET E TELEFONI
+================================================================
+
+Questa cartella va messa su un sito (gratis), poi ai giocatori basta il link.
+Su telefono e tablet un file HTML aperto dalla memoria non funziona: serve un indirizzo https.
+
+PUBBLICARE LA CARTELLA (una volta sola, e di nuovo quando aggiorni il kit)
+--------------------------------------------------------------------------
+Modo più semplice - Netlify Drop:
+  1. Vai su https://app.netlify.com/drop e accedi (account gratuito).
+  2. Trascina QUESTA cartella nella pagina.
+  3. Netlify ti dà un indirizzo tipo https://nome-a-caso.netlify.app : è il link da mandare ai giocatori.
+     Per aggiornare: nella pagina del sito, scheda "Deploys", trascina di nuovo la cartella nuova.
+
+In alternativa - GitHub Pages: crea un repository, carica il contenuto di questa cartella
+  e attiva Settings > Pages. L'indirizzo sarà https://<utente>.github.io/<repository>/
+
+INSTALLARE LA SCHEDA (i giocatori)
+----------------------------------
+IMPORTANTE: installate la scheda PRIMA di creare il personaggio. Su iPhone e iPad l'app installata
+e il browser Safari tengono i dati separati.
+
+iPhone / iPad (Safari):
+  apri il link > tasto Condividi (quadrato con la freccia) > "Aggiungi alla schermata Home" > Aggiungi.
+
+Android (Chrome):
+  apri il link > menu (tre puntini) > "Installa app" oppure "Aggiungi a schermata Home".
+
+Dopo la prima apertura la scheda funziona anche senza connessione.
+
+USARE LA SCHEDA
+---------------
+1. Crea il personaggio scegliendo il regolamento della campagna e compila la scheda:
+   i valori si calcolano da soli e tutto resta salvato nel telefono/tablet.
+2. Premi "Salva il file per il master": si apre la condivisione (WhatsApp, email, Drive...)
+   oppure il file "<nome> - scheda.json" finisce nei Download.
+3. Manda quel file al master. Se il master te lo rimanda aggiornato, usa "Importa scheda".
+
+Il file della scheda è lo stesso del kit per PC: si può passare da un dispositivo all'altro con "Importa scheda".
+I mostri del Manuale dei Mostri del master non sono inclusi.

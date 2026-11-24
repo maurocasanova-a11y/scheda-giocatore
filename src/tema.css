@@ -1,0 +1,556 @@
+/* =====================================================================
+   Cronache del Master 2.0 — tema "fantasy scuro"
+   Strato grafico sopra stile.css: pietra e cuoio scuri, cornici d'oro,
+   titoli incisi. Solo per lo schermo (la stampa resta quella di stile.css).
+   ===================================================================== */
+@media screen {
+  :root {
+    --sfondo: #0e0b09;
+    --barra: #120e0b;
+    --pannello: #1a1511;
+    --pannello-2: #221b15;
+    --bordo: #4a3a27;
+    --bordo-chiaro: #6e5634;
+    --testo: #ecdfc4;
+    --muto: #a6927a;
+    --oro: #d8b46a;
+    --oro-chiaro: #f3d898;
+    --oro-scuro: #9c7a3e;
+    --rosso: #d8614f;
+    --verde: #7cbf7a;
+    --viola: #b59be0;
+    --raggio: 4px;
+    --ombra: 0 6px 22px rgba(0, 0, 0, .55);
+    --filo-oro: inset 0 0 0 1px rgba(216, 180, 106, .14), inset 0 1px 0 rgba(255, 236, 190, .06);
+    --metallo: linear-gradient(180deg, #f6dea0 0%, #d8b46a 42%, #a57d38 100%);
+    --cuoio: linear-gradient(180deg, #211a14 0%, #17120e 100%);
+    --titoli: 'Cinzel', 'Trajan Pro', Georgia, serif;
+    --corpo: 'Alegreya', Georgia, 'Times New Roman', serif;
+  }
+
+  /* ---------- Fondo e testo ---------- */
+  body {
+    font: 16px/1.5 var(--corpo);
+    font-variant-numeric: lining-nums tabular-nums;
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(216, 180, 106, .08), transparent 55%),
+      radial-gradient(ellipse at 120% 110%, rgba(120, 40, 30, .12), transparent 50%),
+      repeating-linear-gradient(45deg, rgba(255, 255, 255, .012) 0 2px, transparent 2px 6px),
+      var(--sfondo);
+  }
+  h1, h2, h3, h4, .logo-testo, .schede a, #nav a, .pf-etich, .barra-titolo, .sch-round, .sch-turno-nome, .sch-nome, .info-testa h2 { font-family: var(--titoli); }
+  h1 {
+    font-size: 30px; font-weight: 700; letter-spacing: .04em;
+    background: var(--metallo); -webkit-background-clip: text; background-clip: text; color: transparent;
+    text-shadow: 0 2px 10px rgba(216, 180, 106, .15);
+  }
+  .intest { position: relative; padding-bottom: 14px; }
+  .intest::after {
+    content: ''; position: absolute; left: 0; bottom: 0; width: min(520px, 100%); height: 10px;
+    background:
+      linear-gradient(90deg, transparent, var(--oro-scuro) 12%, var(--oro) 50%, var(--oro-scuro) 88%, transparent) center / 100% 1px no-repeat,
+      radial-gradient(circle, var(--oro) 0 3px, transparent 3.5px) center / 10px 10px no-repeat;
+  }
+  h2 { font-size: 19px; letter-spacing: .05em; color: var(--oro); font-weight: 700; }
+  h3 { font-size: 13px; letter-spacing: .14em; color: var(--oro); font-weight: 700; }
+  h4 { font-family: var(--titoli); letter-spacing: .06em; color: var(--oro-chiaro); font-weight: 500; }
+  a { color: var(--oro-chiaro); }
+  ::selection { background: rgba(216, 180, 106, .35); }
+
+  /* Barre di scorrimento in tono */
+  * { scrollbar-width: thin; scrollbar-color: var(--bordo-chiaro) transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #5c4729, #3a2c1b); border-radius: 6px; border: 2px solid var(--sfondo); }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ---------- Barra laterale ---------- */
+  #barra {
+    background: linear-gradient(180deg, #17120e 0%, #0d0a08 100%);
+    border-right: 1px solid var(--bordo);
+    box-shadow: inset -1px 0 0 rgba(216, 180, 106, .12), 4px 0 18px rgba(0, 0, 0, .5);
+  }
+  .logo { padding-bottom: 14px; margin-bottom: 4px; border-bottom: 1px solid rgba(216, 180, 106, .22); }
+  .logo-icona { font-size: 30px; filter: drop-shadow(0 0 6px rgba(216, 180, 106, .5)); }
+  .logo-testo small { color: var(--muto); letter-spacing: .26em; }
+  .logo-testo b { font-size: 24px; background: var(--metallo); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #nav a { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; padding: 9px 12px; border-radius: 2px; border-left: 2px solid transparent; color: var(--muto); }
+  #nav a:hover { background: rgba(216, 180, 106, .06); color: var(--testo); }
+  #nav a.attiva { background: linear-gradient(90deg, rgba(216, 180, 106, .16), transparent); color: var(--oro-chiaro); border-left-color: var(--oro); }
+  #nav a.attiva::before { content: '◆ '; font-size: 9px; vertical-align: 2px; color: var(--oro); }
+  #barra-campagne a { border-radius: 2px; }
+  #barra-campagne a.attiva { background: linear-gradient(90deg, rgba(216, 180, 106, .12), transparent); color: var(--oro-chiaro); }
+  .barra-titolo { color: var(--oro-scuro); letter-spacing: .2em; font-size: 10px; }
+  .proprietario { font-family: var(--titoli); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--oro-scuro); border-top-color: rgba(216, 180, 106, .22); text-align: center; }
+  .barra-titolo::after { content: ''; display: block; height: 1px; margin-top: 6px; background: linear-gradient(90deg, var(--oro-scuro), transparent); }
+
+  /* ---------- Controlli ---------- */
+  input, select, textarea {
+    background: linear-gradient(180deg, #0f0c0a, #17120e);
+    background-color: #130f0c;
+    border: 1px solid #3d3021; border-bottom-color: #5c4729; border-radius: 3px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, .5);
+  }
+  /* Elenco aperto dei menu a tendina: Windows non usa lo sfondo sfumato, serve un colore pieno (altrimenti testo chiaro su bianco) */
+  select option, select optgroup { background-color: #1a1511; color: var(--testo); }
+  select optgroup { color: var(--oro); font-style: normal; }
+  select option:disabled { color: #6f6253; }
+  select option:checked { background-color: #4a3a27; color: var(--oro-chiaro); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--oro); box-shadow: inset 0 2px 4px rgba(0, 0, 0, .5), 0 0 0 2px rgba(216, 180, 106, .25), 0 0 12px rgba(216, 180, 106, .2); }
+  button, .bottone {
+    font-family: var(--corpo); font-weight: 500;
+    background: linear-gradient(180deg, #2c231a 0%, #1c1611 100%);
+    border: 1px solid var(--bordo-chiaro); border-radius: 3px;
+    box-shadow: inset 0 1px 0 rgba(255, 228, 170, .1), 0 2px 5px rgba(0, 0, 0, .45);
+    transition: border-color .15s, box-shadow .15s, transform .05s;
+  }
+  button:hover, .bottone:hover { border-color: var(--oro); box-shadow: inset 0 1px 0 rgba(255, 228, 170, .15), 0 0 10px rgba(216, 180, 106, .25); }
+  button:active, .bottone:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+  .primario, button.primario, .bottone.primario {
+    font-family: var(--titoli); font-weight: 700; letter-spacing: .06em;
+    background: var(--metallo); color: #23180a; border: 1px solid #f6e2ac;
+    box-shadow: 0 0 0 1px #5a431f, inset 0 1px 0 rgba(255, 255, 255, .45), 0 3px 10px rgba(0, 0, 0, .55);
+    text-shadow: 0 1px 0 rgba(255, 240, 200, .5);
+  }
+  .primario:hover { background: linear-gradient(180deg, #fff0bf 0%, #e6c47c 45%, #b38a43 100%); box-shadow: 0 0 0 1px #5a431f, 0 0 16px rgba(243, 216, 152, .45); }
+  .pericolo { color: #f08a78; }
+  .pericolo:hover { border-color: var(--rosso); box-shadow: 0 0 10px rgba(216, 97, 79, .3); }
+  .btn-dado { filter: sepia(.4); }
+
+  /* ---------- Pannelli e card: cuoio scuro con filo d'oro e angoli ---------- */
+  .pannello, .scheda, .voce-sessione, .pf-box, .car, .comb, .inc-musica, .info-box, .toast, .tabella-png, .sch-carta {
+    background: var(--cuoio);
+    border: 1px solid var(--bordo);
+    border-radius: var(--raggio);
+    box-shadow: var(--filo-oro), var(--ombra);
+  }
+  .pannello, .scheda, .voce-sessione, .comb, .info-box, .sch-carta { position: relative; }
+  .pannello::before, .scheda::before, .voce-sessione::before, .comb::before, .info-box::before, .sch-carta::before {
+    content: ''; position: absolute; inset: 3px; pointer-events: none; border-radius: 2px;
+    background:
+      linear-gradient(var(--oro), var(--oro)) top left / 12px 1px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) top left / 1px 12px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) top right / 12px 1px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) top right / 1px 12px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) bottom left / 12px 1px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) bottom left / 1px 12px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) bottom right / 12px 1px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) bottom right / 1px 12px no-repeat;
+    opacity: .55;
+  }
+  .scheda:hover, .voce-sessione:hover { border-color: var(--oro-scuro); box-shadow: var(--filo-oro), 0 0 18px rgba(216, 180, 106, .15), var(--ombra); }
+  .scheda-titolo { font-family: var(--titoli); font-size: 17px; letter-spacing: .03em; color: var(--oro-chiaro); }
+  .voce-num { font-family: var(--titoli); }
+  .pf-box, .car { background: linear-gradient(180deg, #1d1712, #120e0b); }
+  .pf-etich { color: var(--oro-scuro); letter-spacing: .1em; font-size: 11px; }
+  .pf-valore { font-family: var(--titoli); color: var(--oro-chiaro); text-shadow: 0 0 12px rgba(216, 180, 106, .3); }
+
+  /* Sezioni a fisarmonica della scheda */
+  .pf-sez > summary { padding: 2px 0; }
+  .pf-sez > summary h3::before { content: '◆ '; font-size: 10px; vertical-align: 2px; }
+  .pf-sez[open] > summary { border-bottom: 1px solid rgba(216, 180, 106, .18); padding-bottom: 10px; margin-bottom: 12px; }
+
+  /* Caratteristiche: medaglioni */
+  .car { border-color: var(--bordo-chiaro); }
+  .car-sigla { font-family: var(--titoli); font-size: 15px; color: var(--oro); }
+  .car-mod { font-family: var(--titoli); font-size: 17px; color: var(--oro-chiaro); }
+  .car input { background: transparent; border: none; box-shadow: none; border-bottom: 1px solid var(--bordo-chiaro); border-radius: 0; font-family: var(--titoli); }
+
+  /* ---------- Schede (tab) ---------- */
+  .schede { border-bottom: 1px solid var(--bordo); gap: 2px; }
+  .schede a { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muto); padding: 10px 18px; border: 1px solid transparent; border-bottom: none; border-radius: 3px 3px 0 0; }
+  .schede a.attiva { color: var(--oro-chiaro); background: linear-gradient(180deg, rgba(216, 180, 106, .14), rgba(216, 180, 106, .02)); border-color: var(--bordo); border-bottom: 2px solid var(--oro); }
+
+  /* ---------- Chip e badge ---------- */
+  .chip { border-radius: 3px; background: linear-gradient(180deg, rgba(181, 155, 224, .16), rgba(181, 155, 224, .06)); }
+  .chip-pg { background: linear-gradient(180deg, rgba(216, 180, 106, .18), rgba(216, 180, 106, .05)); }
+  .badge { border-radius: 2px; font-family: var(--titoli); letter-spacing: .06em; font-size: 10px; padding: 2px 7px; }
+  .badge-pg { color: #23180a; background: var(--metallo); border-color: #f6e2ac; }
+  .badge-mostro { color: #ffd2c8; background: linear-gradient(180deg, #7a2a20, #4a160f); border-color: #b2483a; }
+
+  /* ---------- Tracker di combattimento ---------- */
+  .comb.attivo { border-color: var(--oro); box-shadow: var(--filo-oro), 0 0 0 1px var(--oro), 0 0 26px rgba(216, 180, 106, .3), var(--ombra); }
+  .comb.attivo::before { opacity: 1; }
+  .barra-pf, .sch-vita { height: 10px; border-radius: 2px; background: #0a0806; border: 1px solid #3d3021; box-shadow: inset 0 1px 3px rgba(0, 0, 0, .7); }
+  .barra-pf span, .sch-vita span { border-radius: 1px; background-image: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 55%, rgba(0, 0, 0, .25)); }
+  .barra-pf span { background-color: #4f9a4c; }
+  .sch-vita-verde span { background-color: #4f9a4c; }
+  .sch-vita-gialla span { background-color: #c9a22c; }
+  .sch-vita-rossa span { background-color: #b8352a; }
+  .azione-turno { font-family: var(--titoli); font-size: 12px; letter-spacing: .04em; }
+  .azione-turno.usata { opacity: .5; text-decoration: line-through; }
+  .ritratto { border: 2px solid var(--oro-scuro); box-shadow: 0 0 0 2px #1a1511, 0 0 10px rgba(216, 180, 106, .2); background: radial-gradient(circle at 35% 30%, #3a2d1f, #15100c); }
+
+  /* ---------- Schermo dei giocatori ---------- */
+  .sch-testa { border-bottom: none; position: relative; padding-bottom: 18px; }
+  .sch-testa::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background:
+      linear-gradient(90deg, transparent, var(--oro-scuro) 10%, var(--oro) 50%, var(--oro-scuro) 90%, transparent) center / 100% 1px no-repeat,
+      radial-gradient(circle, var(--oro) 0 4px, transparent 4.5px) center / 12px 12px no-repeat; }
+  .sch-round { font-size: 38px; letter-spacing: .06em; background: var(--metallo); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sch-turno-nome { color: var(--oro-chiaro); text-shadow: 0 0 16px rgba(216, 180, 106, .35); }
+  .sch-carta { border-width: 1px; }
+  .sch-carta.attivo { border-color: var(--oro); box-shadow: var(--filo-oro), 0 0 0 1px var(--oro), 0 0 32px rgba(216, 180, 106, .35), var(--ombra); }
+  .sch-carta.attivo::before { opacity: 1; }
+  .sch-iniz { font-family: var(--titoli); }
+  .sch-nome { letter-spacing: .02em; }
+  .sch-azione { border-radius: 2px; font-family: var(--titoli); font-size: 12px; letter-spacing: .05em; }
+  .sch-scena img { border: 1px solid var(--oro-scuro); box-shadow: 0 0 0 4px #120e0b, 0 0 0 5px var(--bordo), var(--ombra); border-radius: 3px; }
+
+  /* ---------- Finestre e avvisi ---------- */
+  .info-box { border-color: var(--oro-scuro); }
+  .info-testa h2 { font-size: 22px; }
+  .toast { border-color: var(--oro-scuro); font-size: 15px; }
+  .salita { border-color: var(--oro); box-shadow: var(--filo-oro), 0 0 24px rgba(216, 180, 106, .18), var(--ombra); }
+}
+
+/* =====================================================================
+   Scheda personaggio: "schermata del personaggio" da gioco di ruolo
+   ===================================================================== */
+@media screen {
+  /* ---- Intestazione: stendardo con medaglione e nome ---- */
+  .intest-ritratto {
+    position: relative; gap: 26px; padding: 22px 28px 26px; margin-bottom: 22px; border-radius: 4px;
+    background:
+      radial-gradient(ellipse at 18% 50%, rgba(216, 180, 106, .14), transparent 55%),
+      linear-gradient(180deg, #241b13 0%, #15100c 100%);
+    border: 1px solid var(--bordo);
+    box-shadow: var(--filo-oro), var(--ombra);
+  }
+  .intest-ritratto::before, .intest-ritratto::after {
+    content: ''; position: absolute; left: 18px; right: 18px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--oro-scuro) 15%, var(--oro) 50%, var(--oro-scuro) 85%, transparent);
+  }
+  .intest-ritratto::before { top: 6px; }
+  .intest-ritratto::after { bottom: 6px; width: auto; }
+  .ritratto-grande {
+    width: 132px; height: 132px; font-size: 44px; font-family: var(--titoli); color: var(--oro-chiaro);
+    border: 3px solid var(--oro);
+    box-shadow: 0 0 0 4px #1a130d, 0 0 0 5px var(--oro-scuro), 0 0 28px rgba(216, 180, 106, .35), inset 0 0 20px rgba(0, 0, 0, .6);
+  }
+  .intest-nome h1 { font-size: 40px; line-height: 1.1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .intest-nome h1 .badge { -webkit-text-fill-color: initial; }
+  .intest-identita { font-family: var(--titoli); font-size: 17px; letter-spacing: .08em; color: var(--oro-chiaro); margin-top: 6px; }
+  .intest-ritratto .intest-sotto { font-style: italic; color: var(--muto); margin-top: 2px; }
+  /* Iniziativa nell'intestazione: medaglione a destra */
+  .intest-iniz { align-self: center; padding: 10px 18px 12px; border-color: var(--oro-scuro); background: radial-gradient(circle at 50% 30%, rgba(216, 180, 106, .18), transparent 70%), linear-gradient(180deg, #241b13, #120d0a); box-shadow: var(--filo-oro), 0 0 18px rgba(216, 180, 106, .15); }
+  .intest-iniz-et { font-family: var(--titoli); color: var(--oro); letter-spacing: .1em; }
+  .intest-iniz-val { font-family: var(--titoli); font-size: 34px; color: var(--oro-chiaro); text-shadow: 0 0 12px rgba(216, 180, 106, .35); }
+  .intest-iniz .btn-dado { margin-top: 2px; }
+
+  /* ---- Sezioni: intestazioni a fascia ---- */
+  .pf-sez > summary {
+    margin: -16px -16px 0; padding: 11px 16px; border-radius: 4px 4px 0 0;
+    background: linear-gradient(90deg, rgba(216, 180, 106, .13), rgba(216, 180, 106, .03) 60%, transparent);
+    border-bottom: 1px solid transparent;
+  }
+  .pf-sez[open] > summary { border-bottom: 1px solid rgba(216, 180, 106, .25); margin-bottom: 14px; padding-bottom: 11px; }
+  .pf-sez > summary h3 { font-size: 14px; color: var(--oro-chiaro); }
+  .pf-sez > summary h3::before { content: '◆'; display: inline-block; margin-right: 10px; font-size: 9px; color: var(--oro); transition: transform .2s; }
+  .pf-sez:not([open]) > summary h3::before { content: '◇'; }
+  .pf-sez > summary:hover { background: linear-gradient(90deg, rgba(216, 180, 106, .2), rgba(216, 180, 106, .05) 60%, transparent); }
+  .ts-sommario { font-family: var(--corpo); font-size: 15px; }
+  .ts-sommario b { font-family: var(--titoli); color: var(--oro-chiaro); }
+
+  /* ---- Caratteristiche: stemmi ---- */
+  .griglia-car { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 14px; }
+  .car {
+    padding: 12px 8px 22px; border-radius: 6px 6px 48% 48% / 6px 6px 22% 22%;
+    background: linear-gradient(180deg, #2a2017 0%, #17110d 70%, #120d0a 100%);
+    border: 1px solid var(--bordo-chiaro);
+    box-shadow: inset 0 0 0 3px #15100c, inset 0 0 0 4px rgba(216, 180, 106, .25), var(--ombra);
+  }
+  .car-sigla { font-size: 16px; letter-spacing: .12em; }
+  .car input, .car .pf2-punteggio, .car .pun { font-size: 24px; }
+  .car-mod {
+    display: inline-block; min-width: 46px; margin: 4px auto 2px; padding: 2px 8px; font-size: 18px; font-weight: 700;
+    color: #23180a; background: var(--metallo); border-radius: 12px; border: 1px solid #f6e2ac;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .5);
+  }
+  .car-mod:empty { display: none; }
+  .car-nome { font-family: var(--titoli); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muto); }
+  .car { padding-top: 24px; }
+  .car .btn-dado { top: 3px; right: 50%; transform: translateX(50%) scale(.85); opacity: .75; }
+  .car .btn-dado:hover { opacity: 1; }
+  .car-nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---- Riquadri dei valori (CA, PF, TS…): placche ---- */
+  .pf-griglia { gap: 14px; }
+  .pf-box { position: relative; padding: 14px; border-color: var(--bordo-chiaro); background: linear-gradient(180deg, #221a13, #130f0b); }
+  .pf-box .pf-etich { justify-content: center; text-align: center; color: var(--oro); font-size: 12px; border-bottom: 1px solid rgba(216, 180, 106, .18); padding-bottom: 6px; }
+  .pf-valore { font-size: 36px; text-align: center; }
+  .pf-max { font-family: var(--titoli); font-size: 26px; color: var(--oro-chiaro); }
+  .pf-grande { font-family: var(--titoli); font-size: 26px; width: 90px; text-align: center; }
+  .pf-pf { justify-content: center; }
+
+  /* ---- Righe dei campi ---- */
+  .pf-riga label, .pf-mini label, .pf-piede label, .pf-abil label { font-size: 13px; color: var(--muto); }
+  .pf-aiuto { font-style: italic; color: var(--muto); }
+  .modulo label { font-family: var(--titoli); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--oro-scuro); }
+
+  /* ---- Abilità: elenco da libro ---- */
+  .pf-griglia-abil { gap: 0 22px; }
+  .pf-abil { padding: 4px 6px; border-bottom: 1px solid rgba(110, 86, 52, .25); border-radius: 2px; }
+  .pf-abil:nth-child(even) { background: rgba(255, 236, 190, .025); }
+  .pf-abil:hover { background: rgba(216, 180, 106, .08); }
+  .pf-abil.di-classe .abil-nome, .pf-abil.di-classe .pf-abil-nome { color: var(--oro-chiaro); }
+  .pf-tot { font-family: var(--titoli); font-size: 16px; font-weight: 700; color: var(--oro-chiaro); }
+
+  /* ---- Attacchi ---- */
+  .pf-arma { padding: 10px 4px; border-top: 1px solid rgba(110, 86, 52, .35); }
+  .pf-arma-tiri { padding: 6px 10px; margin-top: 4px; border-radius: 3px; background: rgba(0, 0, 0, .25); border-left: 2px solid var(--oro-scuro); }
+  .pf-arma-tiri b { font-family: var(--titoli); color: var(--oro-chiaro); font-size: 16px; }
+
+  /* ---- Incantesimi, talenti, capacità ---- */
+  .pf-inc, .pf-libro { background: linear-gradient(180deg, #1c1611, #120e0b); border-color: var(--bordo); box-shadow: var(--filo-oro); }
+  .pf-slot-testa { color: var(--oro-scuro); font-family: var(--titoli); }
+  .pf-cap { border-top-color: rgba(110, 86, 52, .35); }
+  .priv-classe .priv { color: var(--oro-chiaro); }
+  .tal-riga { border-bottom-color: rgba(110, 86, 52, .3); }
+  .pf-voce-inc:hover, .tal-riga:hover { background: rgba(216, 180, 106, .06); }
+  .pallino { border-color: var(--oro-scuro); }
+  .pallino.usato { background: var(--metallo); box-shadow: 0 0 6px rgba(216, 180, 106, .45); }
+
+  /* ---- Tabelle di progressione: pergamena scura ---- */
+  .prog-tabella { border: 1px solid var(--bordo); border-radius: 3px; overflow: hidden; }
+  .prog-tabella th { font-family: var(--titoli); letter-spacing: .08em; color: var(--oro); background: linear-gradient(180deg, #2a2017, #1b150f); border-bottom: 1px solid var(--oro-scuro); padding: 7px 8px; }
+  .prog-tabella td { padding: 5px 8px; border-bottom-color: rgba(110, 86, 52, .25); }
+  .prog-tabella tbody tr:nth-child(even) td { background: rgba(255, 236, 190, .02); }
+  .prog-tabella tr.prog-attuale td { background: linear-gradient(90deg, rgba(216, 180, 106, .28), rgba(216, 180, 106, .1)); color: var(--oro-chiaro); box-shadow: inset 0 1px 0 var(--oro-scuro), inset 0 -1px 0 var(--oro-scuro); }
+
+  /* ---- Colonna delle apparizioni nel diario ---- */
+  .colonna-app h3 { text-align: center; }
+  .voce-app { border-left: 2px solid var(--oro-scuro); padding-left: 10px; }
+}
+
+/* =====================================================================
+   Tracker di combattimento e schermo dei giocatori
+   ===================================================================== */
+@media screen {
+  @keyframes bagliore-turno {
+    0%, 100% { box-shadow: var(--filo-oro), 0 0 0 1px var(--oro), 0 0 18px rgba(216, 180, 106, .22), var(--ombra); }
+    50% { box-shadow: var(--filo-oro), 0 0 0 1px var(--oro-chiaro), 0 0 34px rgba(243, 216, 152, .42), var(--ombra); }
+  }
+
+  /* ---- Barra di comando: stendardo del round ---- */
+  .inc-barra {
+    position: relative; padding: 14px 18px; gap: 12px; border-radius: 4px;
+    background: radial-gradient(ellipse at 8% 50%, rgba(216, 180, 106, .16), transparent 45%), linear-gradient(180deg, #241b13, #15100c);
+    border: 1px solid var(--bordo); box-shadow: var(--filo-oro), var(--ombra);
+  }
+  .inc-round { font-family: var(--titoli); font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: var(--oro-scuro); margin-right: 14px; min-width: 150px; }
+  .inc-round b { font-size: 34px; letter-spacing: .02em; background: var(--metallo); -webkit-background-clip: text; background-clip: text; color: transparent; vertical-align: -3px; }
+  .inc-turno-di { font-family: var(--corpo); text-transform: none; letter-spacing: 0; font-size: 14px; }
+  .inc-turno-di b { font-family: var(--titoli); font-size: 15px; color: var(--oro-chiaro); background: none; -webkit-text-fill-color: var(--oro-chiaro); }
+
+  /* ---- Righe dei combattenti ---- */
+  .lista-comb { gap: 10px; }
+  .comb { padding: 12px 14px 12px 12px; transition: box-shadow .3s, border-color .3s, filter .3s; }
+  .comb.attivo { animation: bagliore-turno 2.4s ease-in-out infinite; border-color: var(--oro); background: linear-gradient(90deg, rgba(216, 180, 106, .12), transparent 40%), var(--cuoio); }
+  .comb.attivo::after { content: '▶'; position: absolute; left: -15px; top: 50%; transform: translateY(-50%); color: var(--oro); font-size: 16px; text-shadow: 0 0 8px rgba(216, 180, 106, .7); }
+  .comb.a-terra { opacity: .7; filter: grayscale(.6); }
+  /* Iniziativa: medaglione */
+  .comb-iniz {
+    width: 58px; height: 58px; padding: 0; border-radius: 50%; text-align: center;
+    font-family: var(--titoli); font-size: 22px; font-weight: 700; color: var(--oro-chiaro);
+    background: radial-gradient(circle at 35% 30%, #3b2d1f, #120d0a 70%);
+    border: 2px solid var(--oro-scuro);
+    box-shadow: 0 0 0 2px #120d0a, 0 0 0 3px rgba(216, 180, 106, .35), inset 0 2px 6px rgba(0, 0, 0, .7);
+  }
+  .comb.attivo .comb-iniz { border-color: var(--oro-chiaro); box-shadow: 0 0 0 2px #120d0a, 0 0 0 3px var(--oro), 0 0 14px rgba(243, 216, 152, .5), inset 0 2px 6px rgba(0, 0, 0, .7); }
+  .comb-nome, .comb-nome a, .comb-nome-in { font-family: var(--titoli); font-size: 17px; letter-spacing: .03em; }
+  .comb-nome a { color: var(--oro-chiaro); }
+  .comb-nome-in { background: transparent; border: none; border-bottom: 1px solid transparent; box-shadow: none; color: var(--testo); padding: 2px 4px; }
+  .comb-nome-in:hover, .comb-nome-in:focus { border-bottom-color: var(--oro-scuro); box-shadow: none; }
+  .comb-sotto { font-size: 13px; }
+  .comb-sotto b { font-family: var(--titoli); color: var(--oro-chiaro); font-size: 14px; }
+  /* Punti ferita */
+  .comb-pf { font-size: 14px; }
+  .comb-pf b { font-family: var(--titoli); font-size: 18px; color: var(--testo); }
+  .comb .barra-pf { height: 12px; margin-bottom: 6px; border-color: #4a3a27; }
+  .stato-pf { font-family: var(--titoli); letter-spacing: .06em; text-transform: uppercase; }
+  /* Danno e cura */
+  .comb-azioni button[data-segno="-1"] { border-color: #8a3a2e; color: #ffb4a6; background: linear-gradient(180deg, #3a1a14, #22100c); }
+  .comb-azioni button[data-segno="-1"]:hover { border-color: var(--rosso); box-shadow: 0 0 10px rgba(216, 97, 79, .4); }
+  .comb-azioni button[data-segno="1"] { border-color: #3f6e3b; color: #bfe8b5; background: linear-gradient(180deg, #1c2e19, #101b0e); }
+  .comb-azioni button[data-segno="1"]:hover { border-color: var(--verde); box-shadow: 0 0 10px rgba(124, 191, 122, .4); }
+  /* Tiri e statistiche */
+  .comb-scheda { border-top: 1px solid rgba(216, 180, 106, .12); margin-top: 4px; padding-top: 8px; }
+  .comb-tiro { font-size: 13px; padding: 2px 9px; border-color: var(--bordo); }
+  .comb-tiro:hover { border-color: var(--oro); color: var(--oro-chiaro); }
+  /* Azioni del turno: gemme */
+  .azione-turno {
+    font-family: var(--titoli); font-size: 12px; letter-spacing: .05em; padding: 3px 12px; border-radius: 2px;
+    color: #23180a; background: var(--metallo); border: 1px solid #f6e2ac; box-shadow: 0 0 8px rgba(216, 180, 106, .25);
+  }
+  .azione-turno.usata { color: var(--muto); background: linear-gradient(180deg, #221a13, #15100c); border-color: var(--bordo); box-shadow: none; text-decoration: line-through; opacity: .7; }
+  .azione-turno:disabled { opacity: .3; box-shadow: none; }
+  /* Condizioni */
+  .chip-cond { color: #ffd2c8; background: linear-gradient(180deg, rgba(150, 50, 38, .45), rgba(90, 26, 18, .35)); border-color: #9c3e30; }
+  .cond-effetto { font-style: italic; border-left: 2px solid #9c3e30; padding-left: 8px; margin-top: 2px; }
+  .cond-effetto b { font-style: normal; font-family: var(--titoli); color: #ffd2c8; font-size: 12px; letter-spacing: .04em; }
+  /* Effetti a durata, registro, musica */
+  .inc-effetti, .inc-registro { padding: 12px 14px; border: 1px solid var(--bordo); border-radius: 4px; background: var(--cuoio); box-shadow: var(--filo-oro); }
+  .chip-effetto { color: var(--oro-chiaro); background: linear-gradient(180deg, rgba(216, 180, 106, .2), rgba(216, 180, 106, .05)); border-color: var(--oro-scuro); }
+  .inc-registro summary { font-family: var(--titoli); letter-spacing: .06em; color: var(--oro); cursor: pointer; }
+  .inc-musica .musica-ora b { font-family: var(--titoli); }
+  .inc-pe { font-style: italic; }
+  .inc-pe b { font-family: var(--titoli); color: var(--oro-chiaro); font-style: normal; }
+
+  /* ---- Schermo dei giocatori (seconda finestra) ---- */
+  .schermo { padding: 6px 4px 30px; }
+  .sch-turno { padding: 10px 22px 10px 10px; border-radius: 60px 6px 6px 60px; background: linear-gradient(90deg, rgba(216, 180, 106, .18), rgba(216, 180, 106, .02)); border: 1px solid var(--oro-scuro); box-shadow: var(--filo-oro); }
+  .sch-turno .muto { font-family: var(--titoli); font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--oro-scuro); }
+  .sch-turno-nome { font-size: 34px; }
+  .sch-img-grande { width: 104px; height: 104px; border: 3px solid var(--oro); box-shadow: 0 0 0 4px #120d0a, 0 0 0 5px var(--oro-scuro), 0 0 26px rgba(216, 180, 106, .45); }
+  .sch-lista { gap: 12px; margin-top: 14px; }
+  .sch-carta { padding: 12px 20px 12px 14px; gap: 18px; }
+  .sch-carta.attivo { animation: bagliore-turno 2.4s ease-in-out infinite; background: linear-gradient(90deg, rgba(216, 180, 106, .14), transparent 45%), var(--cuoio); transform: none; }
+  .sch-carta.a-terra { opacity: .55; filter: grayscale(.7); }
+  .sch-iniz {
+    width: 60px; height: 60px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 50%;
+    font-size: 24px; color: var(--oro-chiaro); background: radial-gradient(circle at 35% 30%, #3b2d1f, #120d0a 70%);
+    border: 2px solid var(--oro-scuro); box-shadow: 0 0 0 2px #120d0a, 0 0 0 3px rgba(216, 180, 106, .3);
+  }
+  .sch-carta.attivo .sch-iniz { border-color: var(--oro-chiaro); box-shadow: 0 0 0 2px #120d0a, 0 0 0 3px var(--oro), 0 0 16px rgba(243, 216, 152, .55); }
+  .sch-img { width: 76px; height: 76px; }
+  .sch-nome { font-size: 24px; }
+  .sch-vita { width: 320px; height: 14px; }
+  .sch-scena { margin-top: 14px; }
+
+  @media (prefers-reduced-motion: reduce) { .comb.attivo, .sch-carta.attivo { animation: none; } }
+}
+
+/* =====================================================================
+   Tema sci-fi tecnologico: solo per le campagne di Starfinder (body.tema-sf)
+   Stessi elementi del tema fantasy, ridipinti: blu notte, ciano al neon, ambra.
+   ===================================================================== */
+@media screen {
+  body.tema-sf {
+    --sfondo: #050a12;
+    --barra: #07101b;
+    --pannello: #0a1522;
+    --pannello-2: #0e1c2c;
+    --bordo: #1d3a55;
+    --bordo-chiaro: #2c5a80;
+    --testo: #d9ecf7;
+    --muto: #7f9db3;
+    --oro: #45d6ff;
+    --oro-chiaro: #a8ecff;
+    --oro-scuro: #2186a8;
+    --rosso: #ff5d73;
+    --verde: #4cf2b0;
+    --viola: #b18cff;
+    --ambra: #ffb84a;
+    --raggio: 2px;
+    --ombra: 0 6px 24px rgba(0, 0, 0, .6);
+    --filo-oro: inset 0 0 0 1px rgba(69, 214, 255, .12), inset 0 1px 0 rgba(168, 236, 255, .08);
+    --metallo: linear-gradient(180deg, #d9f7ff 0%, #45d6ff 45%, #1b7fa8 100%);
+    --cuoio: linear-gradient(180deg, rgba(14, 30, 48, .96) 0%, rgba(7, 16, 27, .96) 100%);
+    --titoli: 'Orbitron', 'Eurostile', 'Segoe UI', sans-serif;
+    --corpo: 'Exo 2', 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    background:
+      radial-gradient(ellipse at 50% -20%, rgba(69, 214, 255, .14), transparent 55%),
+      radial-gradient(ellipse at 110% 120%, rgba(255, 184, 74, .08), transparent 50%),
+      linear-gradient(rgba(69, 214, 255, .045) 1px, transparent 1px) 0 0 / 40px 40px,
+      linear-gradient(90deg, rgba(69, 214, 255, .045) 1px, transparent 1px) 0 0 / 40px 40px,
+      var(--sfondo);
+  }
+  body.tema-sf h1 { letter-spacing: .08em; text-transform: uppercase; font-size: 26px; text-shadow: 0 0 18px rgba(69, 214, 255, .35); }
+  body.tema-sf h2, body.tema-sf h3, body.tema-sf h4 { text-transform: uppercase; letter-spacing: .12em; }
+  body.tema-sf h2 { font-size: 16px; }
+  body.tema-sf h3 { font-size: 12px; }
+  body.tema-sf h4 { font-size: 13px; }
+  body.tema-sf ::selection { background: rgba(69, 214, 255, .35); }
+  body.tema-sf ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #1f5677, #0f2b40); }
+
+  /* Barra laterale da plancia */
+  body.tema-sf #barra { background: linear-gradient(180deg, #07111d, #03070d); box-shadow: inset -1px 0 0 rgba(69, 214, 255, .25), 4px 0 22px rgba(0, 0, 0, .6); }
+  body.tema-sf .logo-icona { filter: drop-shadow(0 0 8px rgba(69, 214, 255, .8)) hue-rotate(160deg); }
+  body.tema-sf #nav a { letter-spacing: .14em; font-size: 12px; }
+  body.tema-sf #nav a.attiva::before { content: '▸ '; }
+
+  /* Pannelli: lamiere con angoli tagliati e staffe da HUD */
+  body.tema-sf .pannello, body.tema-sf .scheda, body.tema-sf .voce-sessione, body.tema-sf .comb, body.tema-sf .info-box, body.tema-sf .sch-carta, body.tema-sf .intest-ritratto, body.tema-sf .inc-barra {
+    border-radius: 0;
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+    background:
+      repeating-linear-gradient(180deg, rgba(168, 236, 255, .018) 0 1px, transparent 1px 3px),
+      var(--cuoio);
+  }
+  body.tema-sf .pannello::before, body.tema-sf .scheda::before, body.tema-sf .voce-sessione::before, body.tema-sf .comb::before, body.tema-sf .info-box::before, body.tema-sf .sch-carta::before {
+    inset: 4px; opacity: .8;
+    background:
+      linear-gradient(var(--oro), var(--oro)) top right / 18px 2px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) top right / 2px 18px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) bottom left / 18px 2px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) bottom left / 2px 18px no-repeat,
+      linear-gradient(90deg, var(--oro), transparent) top left / 40% 1px no-repeat;
+  }
+  body.tema-sf .intest::after {
+    background: linear-gradient(90deg, var(--oro), rgba(69, 214, 255, .2) 60%, transparent) left center / 100% 1px no-repeat,
+      linear-gradient(var(--ambra), var(--ambra)) left center / 40px 3px no-repeat;
+  }
+  body.tema-sf .intest-ritratto::before, body.tema-sf .intest-ritratto::after { background: linear-gradient(90deg, var(--oro), transparent 70%); }
+
+  /* Controlli */
+  body.tema-sf input, body.tema-sf select, body.tema-sf textarea { background: rgba(3, 8, 14, .85); background-color: #050c14; border-color: #1d3a55; border-bottom-color: #2c5a80; border-radius: 0; }
+  body.tema-sf select option, body.tema-sf select optgroup { background-color: #081422; color: var(--testo); }
+  body.tema-sf select optgroup { color: var(--oro); }
+  body.tema-sf select option:checked { background-color: #12395a; color: var(--oro-chiaro); }
+  body.tema-sf input:focus, body.tema-sf select:focus, body.tema-sf textarea:focus { border-color: var(--oro); box-shadow: 0 0 0 1px var(--oro), 0 0 14px rgba(69, 214, 255, .35); }
+  body.tema-sf button, body.tema-sf .bottone {
+    border-radius: 0; text-transform: uppercase; letter-spacing: .06em; font-size: 13px;
+    background: linear-gradient(180deg, #102538, #0a1826);
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  body.tema-sf button:hover, body.tema-sf .bottone:hover { border-color: var(--oro); box-shadow: inset 0 0 12px rgba(69, 214, 255, .25); color: var(--oro-chiaro); }
+  body.tema-sf .primario, body.tema-sf button.primario { color: #02121c; background: var(--metallo); border-color: #b9f1ff; text-shadow: none; }
+  body.tema-sf .btn-mini, body.tema-sf .btn-x, body.tema-sf .chip-x, body.tema-sf .btn-dado, body.tema-sf .btn-cestino { clip-path: none; text-transform: none; }
+  body.tema-sf .btn-dado { filter: hue-rotate(170deg) saturate(1.4); }
+  body.tema-sf .comb-azioni button[data-segno="-1"] { border-color: #8a2a3a; color: #ffb3c0; background: linear-gradient(180deg, #2a0d16, #17070c); }
+  body.tema-sf .comb-azioni button[data-segno="1"] { border-color: #1f7a5c; color: #b4ffe2; background: linear-gradient(180deg, #0b2a22, #061712); }
+
+  /* Schede, badge e chip */
+  body.tema-sf .schede a { border-radius: 0; letter-spacing: .14em; font-size: 12px; }
+  body.tema-sf .chip, body.tema-sf .badge { border-radius: 0; }
+  body.tema-sf .badge-pg { color: #02121c; }
+  body.tema-sf .badge-mostro { color: #ffd0d8; background: linear-gradient(180deg, #5a1424, #2e0912); border-color: #c23a55; }
+  body.tema-sf .chip-cond { color: #ffd0d8; background: linear-gradient(180deg, rgba(194, 58, 85, .4), rgba(90, 20, 36, .3)); border-color: #c23a55; }
+  body.tema-sf .cond-effetto { border-left-color: #c23a55; }
+
+  /* Scheda personaggio: moduli da tuta spaziale */
+  body.tema-sf .ritratto, body.tema-sf .ritratto-grande { border-radius: 0; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); box-shadow: none; background: radial-gradient(circle at 50% 35%, #12314a, #050c15); }
+  body.tema-sf .ritratto-grande { border: none; outline: none; background: radial-gradient(circle at 50% 40%, #1a4a6c, #06121e 70%); }
+  /* Il contorno luminoso dell'esagono va sul contenitore (l'esagono stesso è ritagliato) */
+  body.tema-sf .ritratto-box, body.tema-sf .comb-nome .ritratto, body.tema-sf .sch-img, body.tema-sf .sch-img-grande { filter: drop-shadow(0 0 1.5px var(--oro)) drop-shadow(0 0 10px rgba(69, 214, 255, .45)); }
+  body.tema-sf .car { border-radius: 0; clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%, 0 10px); background: linear-gradient(180deg, #0f2236, #07111c); box-shadow: inset 0 0 0 1px rgba(69, 214, 255, .25); padding-bottom: 14px; }
+  body.tema-sf .car-mod { border-radius: 0; color: #02121c; }
+  body.tema-sf .pf-box { border-radius: 0; border-left: 2px solid var(--oro); }
+  body.tema-sf .pf-valore, body.tema-sf .pf-tot, body.tema-sf .pf-max { text-shadow: 0 0 10px rgba(69, 214, 255, .5); }
+  body.tema-sf .pf-sez > summary { background: linear-gradient(90deg, rgba(69, 214, 255, .14), rgba(69, 214, 255, .02) 55%, transparent); }
+  body.tema-sf .pf-sez > summary h3::before { content: '▸'; font-size: 12px; }
+  body.tema-sf .pf-sez[open] > summary h3::before { content: '▾'; }
+  body.tema-sf .prog-tabella th { background: linear-gradient(180deg, #0f2236, #0a1826); }
+  body.tema-sf .prog-tabella tr.prog-attuale td { background: linear-gradient(90deg, rgba(69, 214, 255, .25), rgba(69, 214, 255, .06)); }
+  body.tema-sf .pallino.usato { box-shadow: 0 0 8px rgba(69, 214, 255, .7); }
+
+  /* Tracker e schermo: interfaccia tattica */
+  body.tema-sf .comb-iniz, body.tema-sf .sch-iniz { border-radius: 0; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); background: radial-gradient(circle at 50% 35%, #15405e, #06101b); border: none; box-shadow: none; }
+  body.tema-sf .comb.attivo .comb-iniz, body.tema-sf .sch-carta.attivo .sch-iniz { background: radial-gradient(circle at 50% 35%, #2fa6d0, #08324a); color: #ffffff; }
+  /* Con gli angoli tagliati il bagliore esterno non si vede: il turno attivo si accende dall'interno */
+  body.tema-sf .comb.attivo, body.tema-sf .sch-carta.attivo { animation: none; box-shadow: inset 0 0 0 1px var(--oro), inset 0 0 28px rgba(69, 214, 255, .28); border-color: var(--oro); }
+  body.tema-sf .comb.attivo::after { content: '▶'; left: 6px; color: var(--ambra); text-shadow: 0 0 10px rgba(255, 184, 74, .8); font-size: 12px; }
+  body.tema-sf .barra-pf, body.tema-sf .sch-vita { border-radius: 0; background: repeating-linear-gradient(90deg, #071420 0 8px, #0a1a28 8px 10px); border-color: #1d3a55; }
+  body.tema-sf .barra-pf span { background-color: #2bd4a0; box-shadow: 0 0 10px rgba(43, 212, 160, .6); }
+  body.tema-sf .sch-vita-verde span { background-color: #2bd4a0; box-shadow: 0 0 10px rgba(43, 212, 160, .6); }
+  body.tema-sf .sch-vita-gialla span { background-color: var(--ambra); box-shadow: 0 0 10px rgba(255, 184, 74, .6); }
+  body.tema-sf .sch-vita-rossa span { background-color: #ff3d5e; box-shadow: 0 0 10px rgba(255, 61, 94, .6); }
+  body.tema-sf .sch-vita-ps span { background-color: #45d6ff; box-shadow: 0 0 10px rgba(69, 214, 255, .7); }
+  body.tema-sf .azione-turno { border-radius: 0; color: #02121c; clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%); }
+  body.tema-sf .inc-round b, body.tema-sf .sch-round { text-shadow: 0 0 20px rgba(69, 214, 255, .4); }
+  body.tema-sf .sch-turno { border-radius: 0; clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%); }
+  body.tema-sf .sch-turno .muto { color: var(--ambra); }
+  body.tema-sf .sch-testa::after { background: linear-gradient(90deg, var(--oro), rgba(69, 214, 255, .25) 60%, transparent) center / 100% 1px no-repeat, linear-gradient(var(--ambra), var(--ambra)) left center / 60px 3px no-repeat; }
+  body.tema-sf .sch-scena img { border-radius: 0; border-color: var(--oro); box-shadow: 0 0 0 4px #050a12, 0 0 0 5px var(--bordo), 0 0 24px rgba(69, 214, 255, .25); }
+}

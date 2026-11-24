@@ -1,0 +1,30 @@
+{
+  "name": "Cronache del Master — Scheda del giocatore",
+  "short_name": "Scheda GdR",
+  "description": "La scheda del personaggio per le campagne di Cronache del Master",
+  "lang": "it",
+  "start_url": "./index.html#/giocatore",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#18151e",
+  "theme_color": "#18151e",
+  "icons": [
+    {
+      "src": "icone/icona-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icone/icona-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icone/icona-mascherabile-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
