@@ -317,7 +317,8 @@ window.creaPF2 = function creaPF2(ctx) {
           : `<label>Livello ${num('livello', d.livello, 'min="1" max="20" class="pf-corto" data-ridisegna-pf2')}</label>`}
         ${k && k.chiave.length > 1 ? `<label>Caratteristica chiave ${sel('chiave', k.chiave.map((x) => [x, NOMI_CAR[x]]), c.chiave, 'data-ridisegna-pf2')}</label>` : ''}
         ${k ? wiki(d.classe) : ''}
-        <button class="primario" data-azione="pf2-livello-apri" data-id="${id}" ${!k || c.liv >= 20 ? 'disabled' : ''}>⬆ Sali di livello</button></div>
+        <button class="primario" data-azione="pf2-livello-apri" data-id="${id}" ${!k || c.liv >= 20 || (GIOCATORE && mancaPerSalire(p, d, c).length) ? 'disabled' : ''}>⬆ Sali di livello</button></div>
+      ${GIOCATORE && salita?.pgId !== id ? boxDaCompletare(mancaPerSalire(p, d, c), k ? c.liv : 0) : ''}
       ${k ? `<div class="fede-righe"><div><span class="muto">Caratteristica chiave</span> ${esc(k.chiave.map((x) => NOMI_CAR[x]).join(' o '))} · <span class="muto">PF per livello</span> ${k.pf} + COS
         · <span class="muto">CD di classe</span> <b>${kc('cdclasse')}</b> ${badge(c.g.classe)}</div>
         <div><span class="muto">Abilità</span> ${esc(k.abil.testo)}</div>
@@ -629,6 +630,39 @@ window.creaPF2 = function creaPF2(ctx) {
   }
 
   // ---- Salita di livello ----
+  // Scheda del giocatore (kit): si sale di livello solo dopo aver completato quello attuale. Restituisce cosa manca.
+  const GIOCATORE = !!window.MODALITA_GIOCATORE && !window.gdr;
+  function mancaPerSalire(p, d, c) {
+    const manca = [];
+    const st = stirpeDi(d);
+    if (!st) manca.push('scegli la stirpe');
+    if (!d.background) manca.push('scegli il background');
+    if (!classeDi(d)) { manca.push('scegli la classe'); return manca; }
+    // Aumenti di caratteristica (se i punteggi non sono scritti a mano)
+    if (!d.manuale) {
+      const serve = [];
+      if (st) { const liberi = d.stirpeLiberi ? 2 : st.aumenti.filter((x) => x === 'Libero').length; if (d.aumenti.stirpe.length < liberi) serve.push(`stirpe ${d.aumenti.stirpe.length}/${liberi}`); }
+      if (bgDi(d) && d.aumenti.background.length < 2) serve.push(`background ${d.aumenti.background.length}/2`);
+      if (d.aumenti.l1.length < 4) serve.push(`1° livello ${d.aumenti.l1.length}/4`);
+      for (const L of LIVELLI_AUMENTI) if (c.liv >= L && (d.aumenti['l' + L] || []).length < 4) serve.push(`${L}° livello ${(d.aumenti['l' + L] || []).length}/4`);
+      if (serve.length) manca.push(`segna gli aumenti di caratteristica (${serve.join(', ')})`);
+    }
+    // Talenti per tipo
+    const slot = slotTalenti(d, c);
+    if (slot) {
+      const mancano = ['classe', 'stirpe', 'abilita', 'generico'].map((key) => [key, d.capacita.filter((x) => x.tipo === TIPO_TAL[key]).length, slot[key]]).filter(([, presi, dovuti]) => presi < dovuti);
+      if (mancano.length) manca.push(`scegli i talenti (${mancano.map(([key, presi, dovuti]) => `${TIPO_TAL[key].replace('Talento ', '')} ${presi}/${dovuti}`).join(', ')})`);
+    }
+    // Abilità: addestrate al 1° livello e incrementi di abilità (un incremento addestra un'abilità nuova o ne alza il grado)
+    if (c.attese && c.addestrate < c.attese) manca.push(`addestra le abilità del 1° livello (${c.addestrate}/${c.attese})`);
+    else if (c.incrementi) {
+      const sopra = Object.values(c.abil).reduce((a, x) => a + Math.max(0, x.grado - 1), 0) + d.sapienze.reduce((a, x) => a + Math.max(0, n(x.grado) - 1), 0);
+      const usati = Math.max(0, c.addestrate - c.attese) + sopra;
+      if (usati < c.incrementi) manca.push(`usa gli incrementi di abilità (${usati}/${c.incrementi})`);
+    }
+    return manca;
+  }
+  const boxDaCompletare = (manca, liv) => (manca.length ? `<div class="pannello pf-da-completare"><b>${liv ? `Per completare il ${liv}° livello` : 'Per iniziare'}</b>${liv ? ' (poi potrai salire al successivo)' : ''}:<ul>${manca.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '');
   function sezioneSalita(p, d, c) {
     const k = classeDi(d);
     const L = c.liv + 1;
@@ -868,7 +902,11 @@ window.creaPF2 = function creaPF2(ctx) {
       dati(p).oggetti.push({ ...NUOVI.oggetti(), nome: o[0], livello: o[2] || '', ingombro: o[4], note: [o[1], o[3]].filter(Boolean).join(', '), wiki: true });
       ctx.salva(); ctx.render();
     },
-    'pf2-livello-apri'(el) { salita = { pgId: el.dataset.id }; ctx.render(); },
+    'pf2-livello-apri'(el) {
+      if (GIOCATORE) { const p0 = ctx.personaggio(el.dataset.id); const manca = mancaPerSalire(p0, dati(p0), calcola(p0)); if (manca.length) { ctx.toast(`Completa prima il livello attuale: ${esc(manca.join('; '))}`, 'errore'); return; } }
+      salita = { pgId: el.dataset.id };
+      ctx.render();
+    },
     'pf2-livello-chiudi'() { salita = null; ctx.render(); },
     'pf2-livello-conferma'(el) {
       const p = ctx.personaggio(el.dataset.id);

@@ -298,7 +298,8 @@ window.creaDND = function creaDND(ctx) {
     }).join('');
     const corpoClassi = `${classi || '<p class="muto">Nessuna classe.</p>'}
       <div class="pf-piede">${window.MODALITA_GIOCATORE && !window.gdr && d.classi.length ? '<span class="muto">Le altre classi si aggiungono con «⬆ Sali di livello».</span>' : aggiungi('classi', 'Classe')}<span class="muto">Livello <b>${k('liv')}</b> · Bonus di competenza <b>${k('comp')}</b></span>
-        <button class="primario" data-azione="dnd-livello-apri" data-id="${id}">⬆ Sali di livello</button></div>`;
+        ${GIOCATORE && mancaPerSalire(p, d).length ? '<button class="primario" disabled title="Completa prima il livello attuale">⬆ Sali di livello</button>' : `<button class="primario" data-azione="dnd-livello-apri" data-id="${id}">⬆ Sali di livello</button>`}</div>
+      ${GIOCATORE && salita?.pgId !== id ? boxDaCompletare(mancaPerSalire(p, d), d.classi.length ? c.liv : 0) : ''}`;
 
     // Caratteristiche e tiri salvezza
     const car = CARS.map((s) => `<div class="car">
@@ -492,6 +493,26 @@ window.creaDND = function creaDND(ctx) {
     // Multiclasse: requisito di 13 nella caratteristica principale (qui solo promemoria)
     return { k, esistente, dopo, livTot, privilegi, asi, pf, compPrima: c.comp, compDopo: competenza(livTot), sotto: dopo === k.sotto };
   }
+  // Scheda del giocatore (kit): si sale di livello solo dopo aver completato quello attuale. Restituisce cosa manca.
+  const GIOCATORE = !!window.MODALITA_GIOCATORE && !window.gdr;
+  function mancaPerSalire(p, d) {
+    const manca = [];
+    const razza = razzaDi(d);
+    if (!razza) manca.push('scegli la razza');
+    else if (Object.keys(razza.sotto || {}).length && !d.razza.sotto) manca.push('scegli la sottorazza');
+    if (!d.background) manca.push('scegli il background');
+    if (!d.classi.length || !d.classi.some((cl) => classeDi(cl.nome))) { manca.push('scegli la classe di 1° livello'); return manca; }
+    for (const cl of d.classi) {
+      const kk = classeDi(cl.nome);
+      if (kk && n(cl.livello) >= n(kk.sotto) && n(kk.sotto) > 0 && !String(cl.sottoclasse || '').trim()) manca.push(`scegli la sottoclasse di ${kk.nome} (dal ${kk.sotto}° livello)`);
+    }
+    for (const x of d.capacita || []) {
+      const m = String(x.nome || '').match(/^Talento \(livello (\d+)\)$/);
+      if (m) manca.push(`scrivi quale talento hai preso al ${m[1]}° livello (in "Privilegi, talenti e capacità")`);
+    }
+    return manca;
+  }
+  const boxDaCompletare = (manca, liv) => (manca.length ? `<div class="pannello pf-da-completare"><b>${liv ? `Per completare il ${liv}° livello` : 'Per iniziare'}</b>${liv ? ' (poi potrai salire al successivo)' : ''}:<ul>${manca.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '');
   function sezioneSalita(p, d, c) {
     const a = anteprimaSalita(p, d, c);
     const id = p.id;
@@ -733,6 +754,7 @@ window.creaDND = function creaDND(ctx) {
     },
     'dnd-livello-apri'(el) {
       const d = dati(ctx.personaggio(el.dataset.id));
+      if (GIOCATORE) { const manca = mancaPerSalire(ctx.personaggio(el.dataset.id), d); if (manca.length) { ctx.toast(`Completa prima il livello attuale: ${esc(manca.join('; '))}`, 'errore'); return; } }
       salita = { pgId: el.dataset.id, classe: d.classi[0]?.id || 'Guerriero', car: [], talento: false };
       ctx.render();
     },

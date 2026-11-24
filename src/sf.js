@@ -353,7 +353,8 @@ window.creaSF = function creaSF(ctx) {
       <div class="pf-piede">${window.MODALITA_GIOCATORE && !window.gdr && d.classi.length ? '<span class="muto">Le altre classi si aggiungono con «⬆ Sali di livello».</span>' : aggiungi('classi', 'Classe')}
         <label title="Caratteristica chiave: determina i Punti Risolutezza (e le CD di molte capacità)">Caratteristica chiave ${sel('chiave', [['', `automatica (${NOMI_CAR[chiaveDi(d)]})`], ...(chiavi.length ? chiavi : CARS).map((s) => [s, NOMI_CAR[s]])], d.chiave, 'data-ridisegna-sf')}</label>
         <span class="muto">Livello <b>${k('liv')}</b> · BAB <b>${k('bab')}</b></span>
-        <button class="primario" data-azione="sf-livello-apri" data-id="${id}">⬆ Sali di livello</button></div>`;
+        ${GIOCATORE && mancaPerSalire(p, d, c).length ? '<button class="primario" disabled title="Completa prima il livello attuale">⬆ Sali di livello</button>' : `<button class="primario" data-azione="sf-livello-apri" data-id="${id}">⬆ Sali di livello</button>`}</div>
+      ${GIOCATORE && salita?.pgId !== id ? boxDaCompletare(mancaPerSalire(p, d, c), d.classi.length ? c.liv : 0) : ''}`;
 
     // Caratteristiche (i punteggi base restano nei dati generici del personaggio, con data-bind)
     const car = CARS.map((s) => `<div class="car">
@@ -590,6 +591,23 @@ window.creaSF = function creaSF(ctx) {
       talento: livTot % 2 === 1, caratteristiche: LIVELLI_CAR.includes(livTot), pr: livTot % 2 === 0,
     };
   }
+  // Scheda del giocatore (kit): si sale di livello solo dopo aver completato quello attuale. Restituisce cosa manca.
+  const GIOCATORE = !!window.MODALITA_GIOCATORE && !window.gdr;
+  function mancaPerSalire(p, d, c) {
+    const manca = [];
+    if (!razzaDi(d)) manca.push('scegli la razza');
+    const tema = temaDi(d);
+    if (!d.tema?.nome) manca.push('scegli il tema');
+    else if (!tema?.car && !d.tema.car) manca.push('scegli la caratteristica del tema (+1)');
+    if (!d.classi.some((cl) => nomeClasse(cl.nome))) { manca.push('scegli la classe di 1° livello'); return manca; }
+    if (c.gradiSpesi < c.gradiDisp) manca.push(`assegna i gradi di abilità (${c.gradiSpesi}/${c.gradiDisp})`);
+    if (c.gradiSpesi > c.gradiDisp) manca.push(`hai assegnato più gradi del possibile (${c.gradiSpesi}/${c.gradiDisp})`);
+    const attesi = Math.floor((c.liv + 1) / 2) + (/^umano$/i.test(d.razza.nome) ? 1 : 0);
+    const presi = d.capacita.filter((x) => x.tipo === 'Talento').length;
+    if (presi < attesi) manca.push(`scegli i talenti (${presi}/${attesi})`);
+    return manca;
+  }
+  const boxDaCompletare = (manca, liv) => (manca.length ? `<div class="pannello pf-da-completare"><b>${liv ? `Per completare il ${liv}° livello` : 'Per iniziare'}</b>${liv ? ' (poi potrai salire al successivo)' : ''}:<ul>${manca.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : '');
   function sezioneSalita(p, d, c) {
     const a = anteprimaSalita(p, d, c);
     const id = p.id;
@@ -794,6 +812,7 @@ window.creaSF = function creaSF(ctx) {
     },
     'sf-livello-apri'(el) {
       const d = dati(ctx.personaggio(el.dataset.id));
+      if (GIOCATORE) { const p0 = ctx.personaggio(el.dataset.id); const manca = mancaPerSalire(p0, d, calcola(p0)); if (manca.length) { ctx.toast(`Completa prima il livello attuale: ${esc(manca.join('; '))}`, 'errore'); return; } }
       salita = { pgId: el.dataset.id, classe: d.classi[0]?.id || 'Soldato', car: [] };
       ctx.render();
     },
