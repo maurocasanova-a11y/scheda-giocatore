@@ -1346,7 +1346,13 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
 .dv-codice b { font-size: 22px; letter-spacing: .08em; color: var(--oro); font-family: Consolas, monospace; }
 .dv-giocatori { flex: 1 1 260px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .dv-chip small { color: var(--muto); margin-left: 4px; }
-@media print { .dv-master, .dv-giocatore { display: none !important; } }
+.dv-scontro { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; padding: 8px 12px; border-radius: var(--raggio); border: 1px solid var(--bordo); background: var(--pannello); }
+.dv-scontro:empty { display: none; }
+.dv-scontro.turno { border-color: var(--oro); background: linear-gradient(135deg, rgba(212, 173, 90, .22), transparent 75%); animation: dv-turno 1.6s ease-in-out 3; }
+.dv-turno { font-size: 18px; color: var(--oro); letter-spacing: .03em; }
+@keyframes dv-turno { 50% { box-shadow: 0 0 0 3px rgba(212, 173, 90, .5); } }
+.dv-avviso-master { margin: 0 0 12px; padding: 8px 12px; border: 1px solid #3d8b5a; border-radius: var(--raggio); background: rgba(61, 139, 90, .12); font-size: 14px; }
+@media print { .dv-master, .dv-giocatore, .dv-scontro, .dv-avviso-master { display: none !important; } }
 
 /* ---------- Scheda del giocatore su tablet e telefoni ---------- */
 .giocatore-installa { border-color: var(--oro-scuro); background: linear-gradient(135deg, rgba(212, 173, 90, .12), transparent 70%); }

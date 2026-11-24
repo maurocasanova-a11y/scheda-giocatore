@@ -87,6 +87,7 @@
   function salva() {
     if (SCHERMO) return;
     if (GIOCATORE) dvGProgramma(); // scheda collegata dal vivo: la modifica parte anche verso il master
+    else dvMProgramma(); // sessione dal vivo aperta: le modifiche ai PG collegati partono verso i giocatori
     clearTimeout(timerSalva);
     statoSalvataggio('Salvataggio…');
     timerSalva = setTimeout(async () => {
@@ -1205,6 +1206,10 @@
     const schedaTema = cTema ? regolamento(cTema.regolamentoId)?.scheda : p[0] === 'regolamento' ? regolamento(p[1])?.scheda : '';
     document.body.classList.toggle('tema-sf', schedaTema === 'sf');
     if (GIOCATORE && p[0] === 'personaggio' && personaggio(p[1])) html = barraGiocatore(personaggio(p[1])) + html;
+    // Master: PG collegato dal vivo (le modifiche fatte qui arrivano al telefono del giocatore)
+    else if (!GIOCATORE && !SCHERMO && p[0] === 'personaggio' && dvM.codice && Object.values(dvM.giocatori).some((g) => g.pgId === p[1])) {
+      html = `<div class="dv-avviso-master">📡 <b>Collegato dal vivo</b> (sessione ${esc(dvM.codice)}): la scheda la compila il giocatore; danni, cure, condizioni e le modifiche che fai qui arrivano subito anche al suo telefono.</div>` + html;
+    }
     // Libro o breviario aperti nella stessa pagina (kit dei giocatori): pulsante per tornare alla scheda
     const libroInPagina = ['grimorio', 'breviario'].includes(p[0]) && !SCHERMO;
     if (libroInPagina) html = `<a class="grim-torna" href="#/personaggio/${esc(p[1] || '')}">← Torna alla scheda</a>${html}`;
@@ -2142,13 +2147,74 @@
     render();
   }
 
+  // Differenze tra due versioni della scheda: elenco di [percorso, valore] (gli elenchi si sostituiscono interi)
+  function differenze(a, b, percorso = [], out = []) {
+    if (JSON.stringify(a) === JSON.stringify(b)) return out;
+    const oggetto = (x) => x && typeof x === 'object' && !Array.isArray(x);
+    if (oggetto(a) && oggetto(b)) { for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) differenze(a[k], b[k], [...percorso, k], out); }
+    else out.push(b === undefined ? [percorso, 0, true] : [percorso, b]);
+    return out;
+  }
+  function applicaDifferenze(o, ops) {
+    for (const [percorso, v, togli] of ops) {
+      if (!percorso.length) continue;
+      let x = o;
+      for (const k of percorso.slice(0, -1)) { if (!x[k] || typeof x[k] !== 'object') x[k] = {}; x = x[k]; }
+      if (togli) delete x[percorso[percorso.length - 1]]; else x[percorso[percorso.length - 1]] = v;
+    }
+  }
+
   // ---------- Giocatore: collegamento della scheda ----------
   const CHIAVE_DV_GIOCATORE = 'dal-vivo-giocatore';
-  const dvG = { codice: '', pgId: '', ultimo: '', timer: null, stato: '' };
+  // ultimoComando: l'ultima correzione del master applicata (null = alla prima lettura si saltano quelle già presenti)
+  const dvG = { codice: '', pgId: '', ultimo: '', timer: null, stato: '', ultimoComando: null, statoMaster: null, stop: null };
   try { Object.assign(dvG, JSON.parse(localStorage.getItem(CHIAVE_DV_GIOCATORE) || '{}')); } catch { /* niente */ }
-  const dvGRicorda = () => { try { localStorage.setItem(CHIAVE_DV_GIOCATORE, JSON.stringify({ codice: dvG.codice, pgId: dvG.pgId })); } catch { /* niente */ } };
+  const dvGRicorda = () => { try { localStorage.setItem(CHIAVE_DV_GIOCATORE, JSON.stringify({ codice: dvG.codice, pgId: dvG.pgId, ultimoComando: dvG.ultimoComando })); } catch { /* niente */ } };
+  // Ascolta le correzioni del master (danni, cure, condizioni, modifiche alla scheda) e lo stato dello scontro (turno, condizioni)
+  async function dvGAscolta() {
+    dvG.stop?.();
+    dvG.stop = null;
+    if (!dvG.codice || !dvAttivo()) return;
+    const io = await DV.mioUid();
+    const codice = dvG.codice;
+    dvG.stop = DV.ascolta(`sessioni/${codice}/perGiocatore/${io}`, (copia) => {
+      if (dvG.codice !== codice) return;
+      const comandi = Object.entries(copia?.comandi || {}).sort(([a], [b]) => (a < b ? -1 : 1));
+      if (dvG.ultimoComando == null) { dvG.ultimoComando = comandi.length ? comandi[comandi.length - 1][0] : ''; dvGRicorda(); }
+      const nuovi = comandi.filter(([k]) => k > dvG.ultimoComando);
+      const p = personaggio(dvG.pgId);
+      if (nuovi.length && p) {
+        const prima = pf1.pfDalVivo(p.id);
+        for (const [k, cmd] of nuovi) {
+          try { applicaDifferenze(p, JSON.parse(cmd.ops || '[]')); } catch (e) { registra(`dal vivo: correzione non applicata ${e}`); }
+          dvG.ultimoComando = k;
+        }
+        dvGRicorda();
+        const dopo = pf1.pfDalVivo(p.id);
+        toast(prima && dopo && prima.pf !== dopo.pf ? `❤ Il master: PF ${prima.pf} → <b>${dopo.pf}</b>` : '📡 Il master ha aggiornato la scheda');
+        salva();
+        dvRidisegna();
+      }
+      // Stato dello scontro: tocca a te, round, condizioni del tracker
+      const st = copia?.stato || null;
+      const eraTurno = !!dvG.statoMaster?.turno;
+      const cambiato = JSON.stringify(st) !== JSON.stringify(dvG.statoMaster);
+      dvG.statoMaster = st;
+      if (st?.turno && !eraTurno) { toast(`⚔ <b>Tocca a te!</b>${st.round ? ` (round ${st.round})` : ''}`); try { navigator.vibrate?.([200, 100, 200]); } catch { /* niente */ } }
+      if (cambiato) { const el = $('#dv-scontro'); if (el) el.outerHTML = scontroDvGiocatore(); }
+    }, () => {});
+  }
+  const scontroDvGiocatore = () => {
+    const st = dvG.statoMaster;
+    if (!st || (!st.inScontro && !st.condizioni?.length)) return '<div id="dv-scontro"></div>';
+    return `<div id="dv-scontro" class="dv-scontro${st.turno ? ' turno' : ''}">
+      ${st.turno ? '<b class="dv-turno">⚔ Tocca a te!</b>' : st.inScontro ? `<span>⚔ In combattimento${st.di ? ` · turno di <b>${esc(st.di)}</b>` : ''}</span>` : ''}
+      ${st.round ? `<span class="muto">round ${st.round}</span>` : ''}
+      ${(st.condizioni || []).map((x) => `<span class="chip chip-cond">${esc(x.nome)}${x.durata ? ` <small>${x.durata} r</small>` : ''}</span>`).join(' ')}</div>`;
+  };
   function dvGScollega(messaggio) {
-    dvG.codice = ''; dvG.pgId = ''; dvG.ultimo = ''; dvG.stato = '';
+    dvG.stop?.();
+    dvG.codice = ''; dvG.pgId = ''; dvG.ultimo = ''; dvG.stato = ''; dvG.ultimoComando = null; dvG.statoMaster = null; dvG.stop = null;
     clearTimeout(dvG.timer);
     dvGRicorda();
     if (messaggio) toast(messaggio, 'errore');
@@ -2169,7 +2235,8 @@
     const r = regDi(p);
     try {
       const io = await DV.mioUid();
-      await DV.scrivi(`sessioni/${dvG.codice}/pg/${io}`, { nome: String(p.nome || '?').slice(0, 120), regolamento: { id: r?.id || '', nome: r?.nome || '', scheda: r?.scheda || '' }, pers: testo, aggiornato: DV.ORA });
+      // ultimoComando: fin dove la scheda contiene le correzioni del master (le successive il master le rimette sopra)
+      await DV.scrivi(`sessioni/${dvG.codice}/pg/${io}`, { nome: String(p.nome || '?').slice(0, 120), regolamento: { id: r?.id || '', nome: r?.nome || '', scheda: r?.scheda || '' }, pers: testo, ultimoComando: dvG.ultimoComando || '', aggiornato: DV.ORA });
       dvG.ultimo = testo;
       if (dvG.stato !== 'ok') { dvG.stato = 'ok'; aggiornaStatoDv(); }
     } catch (e) {
@@ -2187,7 +2254,8 @@
     if (dvG.codice && dvG.pgId === p.id) {
       return `<div class="barra-azioni dv-giocatore">${statoDvGiocatore()}
         <button class="btn-piccolo" data-azione="dv-scollega">Scollega</button>
-        <span class="muto">Il master vede la scheda in tempo reale.</span></div>`;
+        <span class="muto">Il master vede la scheda in tempo reale; danni, cure e condizioni che segna lui arrivano qui.</span></div>
+      ${scontroDvGiocatore()}`;
     }
     return `<form class="riga-form dv-giocatore" data-form="dv-collega" autocomplete="off">
         <input type="hidden" name="pg" value="${p.id}">
@@ -2206,17 +2274,66 @@
       return;
     }
     // Se prima era collegato un altro personaggio, la sua voce nella sessione si sostituisce (una per dispositivo)
-    Object.assign(dvG, { codice: c, pgId, ultimo: '', stato: '' });
+    Object.assign(dvG, { codice: c, pgId, ultimo: '', stato: '', ultimoComando: null, statoMaster: null });
     dvGRicorda();
     render();
+    await dvGAscolta();
     await dvGInvia(true);
     toast(`📡 Collegato alla sessione <b>${esc(c)}</b>: il master vede la tua scheda`);
   }
   // Riavvio della scheda: se era collegata, si rimanda subito lo stato attuale
-  if (GIOCATORE && dvG.codice && dvAttivo()) setTimeout(() => dvGInvia(true), 1500);
+  if (GIOCATORE && dvG.codice && dvAttivo()) setTimeout(() => { dvGAscolta(); dvGInvia(true); }, 1500);
 
   // ---------- Master: sessione aperta dal tracker ----------
-  const dvM = { codice: '', campagnaId: '', stop: null, giocatori: {}, visti: {}, eventiVisti: new Set(), errore: '' };
+  // base[pgId]: la scheda come la conosce il giocatore; inAttesa[pgId]: correzioni mandate e non ancora confermate;
+  // statoInviato[uid]: l'ultimo stato dello scontro mandato a quel giocatore
+  const dvM = { codice: '', campagnaId: '', stop: null, giocatori: {}, visti: {}, eventiVisti: new Set(), errore: '', base: {}, inAttesa: {}, statoInviato: {}, timer: null };
+  // Campi della scheda che restano del master (non viaggiano verso il giocatore)
+  const CAMPI_DEL_MASTER = ['id', 'campagnaId', 'tipo', 'importato', 'documenti', 'idGiocatore'];
+  const schedaPerGiocatore = (p) => { const x = JSON.parse(JSON.stringify(p)); for (const k of CAMPI_DEL_MASTER) delete x[k]; return x; };
+  // Dopo ogni salvataggio del master: le modifiche ai PG collegati partono verso i giocatori, con lo stato dello scontro
+  function dvMProgramma() {
+    if (!dvM.codice) return;
+    clearTimeout(dvM.timer);
+    dvM.timer = setTimeout(dvMInvia, 500);
+  }
+  function dvMInvia() {
+    const c = campagna(dvM.campagnaId);
+    if (!c || !dvM.codice) return;
+    const codice = dvM.codice;
+    const inc = c.incontro;
+    const attivo = inc?.fase ? inc.combattenti.find((x) => x.id === inc.attivo) : null;
+    for (const [u, g] of Object.entries(dvM.giocatori)) {
+      const p = personaggio(g.pgId);
+      if (!p) continue;
+      // Correzioni alla scheda
+      const ora = schedaPerGiocatore(p);
+      const base = dvM.base[p.id];
+      if (base) {
+        const ops = differenze(base, ora);
+        if (ops.length) {
+          dvM.base[p.id] = ora;
+          const voce = { key: '~', ops };
+          (dvM.inAttesa[p.id] = dvM.inAttesa[p.id] || []).push(voce);
+          DV.aggiungi(`sessioni/${codice}/perGiocatore/${u}/comandi`, { ops: JSON.stringify(ops), t: DV.ORA })
+            .then((r) => { voce.key = r?.name || voce.key; })
+            .catch((e) => { dvM.inAttesa[p.id] = (dvM.inAttesa[p.id] || []).filter((x) => x !== voce); dvM.errore = `correzione non inviata a ${p.nome}: ${e.message}`; });
+        }
+      }
+      // Stato dello scontro per quel giocatore
+      const cb = inc?.combattenti?.find((x) => x.pgId === p.id);
+      const st = cb ? {
+        inScontro: !!inc.fase, turno: !!(inc.fase && inc.attivo === cb.id), round: inc.fase === 'sorpresa' ? 0 : Number(inc.round) || 0,
+        di: attivo && attivo.id !== cb.id ? (attivo.pgId ? personaggio(attivo.pgId)?.nome : attivo.nome) || '' : '',
+        condizioni: (cb.condizioni || []).map((x) => ({ nome: String(x.nome), durata: x.durata === '' || x.durata == null ? 0 : Number(x.durata) })),
+      } : null;
+      const testo = JSON.stringify(st);
+      if (dvM.statoInviato[u] !== testo) {
+        dvM.statoInviato[u] = testo;
+        DV.scrivi(`sessioni/${codice}/perGiocatore/${u}/stato`, st).catch(() => { delete dvM.statoInviato[u]; });
+      }
+    }
+  }
   async function dvMApri(c) {
     if (!dvAttivo()) { toast('La sessione dal vivo non è ancora configurata (manca il database Firebase)', 'errore'); return; }
     if (dvM.codice) await dvMChiudi(false);
@@ -2238,7 +2355,7 @@
   }
   function dvMAscolta(c) {
     dvM.stop?.();
-    Object.assign(dvM, { codice: c.dalVivo.codice, campagnaId: c.id, giocatori: {}, visti: {}, eventiVisti: new Set(), errore: '' });
+    Object.assign(dvM, { codice: c.dalVivo.codice, campagnaId: c.id, giocatori: {}, visti: {}, eventiVisti: new Set(), errore: '', base: {}, inAttesa: {}, statoInviato: {} });
     dvM.stop = DV.ascolta(`sessioni/${dvM.codice}`, (copia) => dvMElabora(copia), (e) => {
       dvM.errore = e.message;
       // Sessione sparita (chiusa da un altro PC o scaduta): si chiude anche qui
@@ -2250,7 +2367,8 @@
     const c = campagna(dvM.campagnaId);
     const codice = dvM.codice;
     dvM.stop?.();
-    Object.assign(dvM, { codice: '', campagnaId: '', stop: null, giocatori: {} });
+    clearTimeout(dvM.timer);
+    Object.assign(dvM, { codice: '', campagnaId: '', stop: null, giocatori: {}, base: {}, inAttesa: {}, statoInviato: {} });
     if (c) { delete c.dalVivo; salva(); }
     try { if (codice) await DV.cancella(`sessioni/${codice}`); } catch { /* già chiusa */ }
     if (avvisa) toast(`📡 Sessione dal vivo <b>${esc(codice)}</b> chiusa: i giocatori non sono più collegati`);
@@ -2272,6 +2390,13 @@
       const tra = S.personaggi.filter((x) => x.campagnaId === c.id);
       let loc = tra.find((x) => x.idGiocatore && x.idGiocatore === pers.id) || tra.find((x) => x.id === pers.id)
         || tra.find((x) => x.tipo === 'PG' && !x.idGiocatore && norm(x.nome) === norm(pers.nome));
+      // Correzioni del master non ancora arrivate al giocatore: si rimettono sopra la sua scheda
+      const ack = String(g.ultimoComando || '');
+      if (loc) {
+        const pend = (dvM.inAttesa[loc.id] || []).filter((x) => x.key > ack);
+        dvM.inAttesa[loc.id] = pend;
+        for (const x of pend) applicaDifferenze(pers, x.ops);
+      }
       if (loc) {
         const prima = pf1.pfDalVivo(loc.id);
         const tieni = { id: loc.id, campagnaId: c.id, tipo: loc.tipo, importato: loc.importato, documenti: loc.documenti };
@@ -2290,8 +2415,10 @@
         S.personaggi.push(loc);
         toast(`📡 <b>${esc(loc.nome)}</b> si è collegato ed è stato aggiunto ai personaggi della campagna`);
       }
-      if (!dvM.giocatori[u]) pf1.annotaDalVivo(c, `📡 ${loc.nome} è collegato dal vivo`);
+      if (!dvM.giocatori[u]) { pf1.annotaDalVivo(c, `📡 ${loc.nome} è collegato dal vivo`); delete dvM.statoInviato[u]; }
       dvM.giocatori[u] = { nome: loc.nome, pgId: loc.id, aggiornato: g.aggiornato };
+      // La scheda come la vede ora il giocatore (più le correzioni in viaggio): base per le prossime correzioni
+      dvM.base[loc.id] = schedaPerGiocatore(loc);
       pgCambiati.add(loc.id);
       cambiato = true;
     }
