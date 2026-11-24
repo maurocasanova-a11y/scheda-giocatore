@@ -290,13 +290,14 @@ window.creaDND = function creaDND(ctx) {
       const kk = classeDi(cl.nome);
       return `<div class="pf-riga">
         ${sel(`classi#${cl.id}|nome`, [['', '— classe —'], ...Object.keys(BASE).map((x) => [x, x])], kk?.nome || cl.nome, 'data-ridisegna-dnd')}
-        <label>Livello ${num(`classi#${cl.id}|livello`, cl.livello, 'min="1" max="20" class="pf-corto" data-ridisegna-dnd')}</label>
+        ${window.MODALITA_GIOCATORE && !window.gdr ? `<span class="pf-liv-fisso" title="Nella scheda del giocatore i livelli si prendono uno alla volta con «⬆ Sali di livello»">Livello <b>${Number(cl.livello) || 1}</b></span>`
+          : `<label>Livello ${num(`classi#${cl.id}|livello`, cl.livello, 'min="1" max="20" class="pf-corto" data-ridisegna-dnd')}</label>`}
         <label>Sottoclasse ${campo(`classi#${cl.id}|sottoclasse`, cl.sottoclasse, `placeholder="${kk ? `dal ${kk.sotto}° livello` : ''}"`)}</label>
         ${kk && !kk.inc ? `<label class="pf-chk" title="Cavaliere Mistico o Mistificatore Arcano: incantatore a un terzo (INT)">${chk(`classi#${cl.id}|terzo`, cl.terzo, 'data-ridisegna-dnd')} incantatore (⅓)</label>` : ''}
         ${kk ? `<span class="muto">d${kk.dado}</span>${wiki(kk.nome)}` : ''}${togli('classi', cl.id)}</div>`;
     }).join('');
     const corpoClassi = `${classi || '<p class="muto">Nessuna classe.</p>'}
-      <div class="pf-piede">${aggiungi('classi', 'Classe')}<span class="muto">Livello <b>${k('liv')}</b> · Bonus di competenza <b>${k('comp')}</b></span>
+      <div class="pf-piede">${window.MODALITA_GIOCATORE && !window.gdr && d.classi.length ? '<span class="muto">Le altre classi si aggiungono con «⬆ Sali di livello».</span>' : aggiungi('classi', 'Classe')}<span class="muto">Livello <b>${k('liv')}</b> · Bonus di competenza <b>${k('comp')}</b></span>
         <button class="primario" data-azione="dnd-livello-apri" data-id="${id}">⬆ Sali di livello</button></div>`;
 
     // Caratteristiche e tiri salvezza

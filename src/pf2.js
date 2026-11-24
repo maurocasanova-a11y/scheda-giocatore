@@ -313,7 +313,8 @@ window.creaPF2 = function creaPF2(ctx) {
     // Classe e livello
     const corpoClasse = `<div class="pf-riga">
         <label>Classe ${sel('classe', [['', '— scegli —'], ...Object.keys(D.classi).map((x) => [x, x])], d.classe, 'data-ridisegna-pf2')}</label>
-        <label>Livello ${num('livello', d.livello, 'min="1" max="20" class="pf-corto" data-ridisegna-pf2')}</label>
+        ${window.MODALITA_GIOCATORE && !window.gdr ? `<span class="pf-liv-fisso" title="Nella scheda del giocatore i livelli si prendono uno alla volta con «⬆ Sali di livello»">Livello <b>${Number(d.livello) || 1}</b></span>`
+          : `<label>Livello ${num('livello', d.livello, 'min="1" max="20" class="pf-corto" data-ridisegna-pf2')}</label>`}
         ${k && k.chiave.length > 1 ? `<label>Caratteristica chiave ${sel('chiave', k.chiave.map((x) => [x, NOMI_CAR[x]]), c.chiave, 'data-ridisegna-pf2')}</label>` : ''}
         ${k ? wiki(d.classe) : ''}
         <button class="primario" data-azione="pf2-livello-apri" data-id="${id}" ${!k || c.liv >= 20 ? 'disabled' : ''}>⬆ Sali di livello</button></div>

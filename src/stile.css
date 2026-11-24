@@ -1335,6 +1335,12 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
 }
 .logo-versione { font-size: 12px; color: var(--oro); font-weight: 700; vertical-align: super; }
 
+/* ---------- Scheda del giocatore: un livello alla volta ---------- */
+.pf-liv-fisso { padding: 4px 8px; border: 1px solid var(--bordo); border-radius: 6px; background: var(--pannello-2); font-size: 14px; }
+.pf-da-completare { border-color: #b8862b; background: linear-gradient(135deg, rgba(212, 173, 90, .12), transparent 70%); margin: 10px 0; }
+.pf-da-completare ul { margin: 6px 0 0; padding-left: 20px; }
+@media print { .pf-da-completare { display: none !important; } }
+
 /* ---------- Sessione dal vivo ---------- */
 .dv-giocatore { margin-top: 8px; padding: 8px 10px; border: 1px dashed var(--bordo); border-radius: var(--raggio); }
 .dv-giocatore input[name="codice"] { text-transform: uppercase; max-width: 260px; }

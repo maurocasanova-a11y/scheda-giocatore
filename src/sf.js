@@ -344,12 +344,13 @@ window.creaSF = function creaSF(ctx) {
     // Classi
     const classi = d.classi.map((cl) => `<div class="pf-riga">
         ${sel(`classi#${cl.id}|nome`, [['', '— classe —'], ...Object.keys(D.classi).map((x) => [x, x])], nomeClasse(cl.nome) || cl.nome, 'data-ridisegna-sf')}
-        <label>Livello ${num(`classi#${cl.id}|livello`, cl.livello, 'min="1" max="20" data-ridisegna-sf')}</label>
+        ${window.MODALITA_GIOCATORE && !window.gdr ? `<span class="pf-liv-fisso" title="Nella scheda del giocatore i livelli si prendono uno alla volta con «⬆ Sali di livello»">Livello <b>${Number(cl.livello) || 1}</b></span>`
+          : `<label>Livello ${num(`classi#${cl.id}|livello`, cl.livello, 'min="1" max="20" data-ridisegna-sf')}</label>`}
         ${D.classi[nomeClasse(cl.nome)] ? `<span class="muto">PS ${D.classi[nomeClasse(cl.nome)].ps} + COS · PF ${D.classi[nomeClasse(cl.nome)].pf} · gradi ${D.classi[nomeClasse(cl.nome)].gradi} + INT</span>${wiki(nomeClasse(cl.nome))}` : ''}
         ${togli('classi', cl.id)}</div>`).join('');
     const chiavi = [...new Set(d.classi.flatMap((cl) => CHIAVE[nomeClasse(cl.nome)] || []))];
     const corpoClassi = `${classi || '<p class="muto">Nessuna classe.</p>'}
-      <div class="pf-piede">${aggiungi('classi', 'Classe')}
+      <div class="pf-piede">${window.MODALITA_GIOCATORE && !window.gdr && d.classi.length ? '<span class="muto">Le altre classi si aggiungono con «⬆ Sali di livello».</span>' : aggiungi('classi', 'Classe')}
         <label title="Caratteristica chiave: determina i Punti Risolutezza (e le CD di molte capacità)">Caratteristica chiave ${sel('chiave', [['', `automatica (${NOMI_CAR[chiaveDi(d)]})`], ...(chiavi.length ? chiavi : CARS).map((s) => [s, NOMI_CAR[s]])], d.chiave, 'data-ridisegna-sf')}</label>
         <span class="muto">Livello <b>${k('liv')}</b> · BAB <b>${k('bab')}</b></span>
         <button class="primario" data-azione="sf-livello-apri" data-id="${id}">⬆ Sali di livello</button></div>`;

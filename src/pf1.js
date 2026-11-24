@@ -1173,7 +1173,9 @@ window.creaPF1 = function creaPF1(ctx) {
       abil[a.nome] = gr + (m[a.car] || 0) + (diClasse[a.nome] && gr > 0 ? 3 : 0) + n(s.varie)
         - (a.car === 'FOR' || a.car === 'DES' ? penalita : 0) + cumula(per('abilita', 'abil:' + a.nome));
     }
-    const gradiDisp = d.classi.reduce((a, c) => a + Math.max(1, n(c.gradi) + m.INT) * n(c.livello), 0) + n(d.gradiExtra);
+    // Umani (tratto Esperti, se non sostituito): +1 grado di abilità per livello
+    const esperti = razzaDi(d)?.nome === 'Umano' && !sostituitiDa(d).has(chiaveTratto('Esperti'));
+    const gradiDisp = d.classi.reduce((a, c) => a + (Math.max(1, n(c.gradi) + m.INT) + (esperti ? 1 : 0)) * n(c.livello), 0) + n(d.gradiExtra);
 
     // Resoconto del cumulo, valore per valore: quali bonus contano e quali vengono scartati (e perché)
     const cumuli = [];
@@ -2120,6 +2122,35 @@ window.creaPF1 = function creaPF1(ctx) {
     const caratteristica = CAR_LIVELLI.includes(livTot);
     return { k, info, esistente, prima, dopo, livTot, babPiu, ts: prog ? { tempra: delta('tempra', prog.tempra), riflessi: delta('riflessi', prog.riflessi), volonta: delta('volonta', prog.volonta) } : null,
       privilegi, incantesimi, pf, gradi, talento, talentiBonus, caratteristica, esperti };
+  }
+  // Scheda del giocatore (kit): si sale un livello alla volta, e solo dopo aver completato quello attuale.
+  // Restituisce l'elenco di quello che manca (vuoto = si può salire).
+  const GIOCATORE = !!window.MODALITA_GIOCATORE && !window.gdr;
+  function mancaPerSalire(p, d, c) {
+    const manca = [];
+    if (!razzaDi(d)) manca.push('scegli la razza');
+    if (!d.classi.length) { manca.push('scegli la classe di 1° livello (sezione Classi e livelli)'); return manca; }
+    const livelli = righeAvanzamento(d).filter((r) => r.tipo === 'livello');
+    // Talenti: al 1° livello 1 (+1 umani, + talenti bonus di classe del 1°); poi quelli previsti dall'ultimo livello preso
+    let talentiOk = true, talentiTesto = '';
+    if (!livelli.length) {
+      let attesi = 1;
+      if (razzaDi(d)?.nome === 'Umano' && !sostituitiDa(d).has(chiaveTratto('Talento Bonus'))) attesi++;
+      const k = nomeClasse(d.classi[0].nome);
+      const t = k && (window.PF1_PROGRESSIONE || {})[k];
+      if (t) attesi += pezziPrivilegi(t.righe[0]?.[4 + colonnaPrivilegi(t)]).filter((f) => /Talento Bonus/i.test(f)).length;
+      const presi = istantanea(d).talenti.length;
+      if (presi < attesi) { talentiOk = false; talentiTesto = `scegli i talenti del 1° livello (${presi}/${attesi})`; }
+    } else {
+      const ultimo = livelli[livelli.length - 1];
+      if (ultimo.talentiPresi.length < ultimo.talentiPrevisti) { talentiOk = false; talentiTesto = `scegli i talenti del ${ultimo.livTot}° livello (${ultimo.talentiPresi.length}/${ultimo.talentiPrevisti})`; }
+    }
+    if (c.gradiSpesi < c.gradiDisp) manca.push(`assegna i gradi di abilità (${c.gradiSpesi}/${c.gradiDisp})`);
+    if (c.gradiSpesi > c.gradiDisp) manca.push(`hai assegnato più gradi del possibile (${c.gradiSpesi}/${c.gradiDisp})`);
+    if (!talentiOk) manca.push(talentiTesto);
+    const aum = controlloAumenti(d, c).mancanti;
+    if (aum.length) manca.push(`manca l'aumento di caratteristica del ${aum.join('°, ')}° livello`);
+    return manca;
   }
   function sezioneSalita(p, d, c) {
     const s = salita;
@@ -4175,8 +4206,9 @@ window.creaPF1 = function creaPF1(ctx) {
     // Classi
     const classi = d.classi.map((cl) => `<div class="pf-riga">
         <input list="pf1-classi" class="pf-largo" data-pf1="classi#${cl.id}|nome" data-id="${id}" value="${esc(cl.nome)}" placeholder="Classe">
-        <label>Livello ${num(`classi#${cl.id}|livello`, cl.livello, 'min="1" max="20"')}</label>
-        <span class="pf-liv-btn"><button class="btn-mini" data-azione="pf1-classe-liv" data-id="${id}" data-cl="${cl.id}" data-d="-1" title="Togli un livello di ${esc(cl.nome || 'questa classe')}">−</button><button class="btn-mini" data-azione="pf1-classe-liv" data-id="${id}" data-cl="${cl.id}" data-d="1" title="Aggiungi un livello (senza la procedura di salita)">+</button></span>
+        ${GIOCATORE ? `<span class="pf-liv-fisso" title="Nella scheda del giocatore i livelli si prendono uno alla volta con «⬆ Sali di livello»">Livello <b>${n(cl.livello)}</b></span>`
+          : `<label>Livello ${num(`classi#${cl.id}|livello`, cl.livello, 'min="1" max="20"')}</label>
+        <span class="pf-liv-btn"><button class="btn-mini" data-azione="pf1-classe-liv" data-id="${id}" data-cl="${cl.id}" data-d="-1" title="Togli un livello di ${esc(cl.nome || 'questa classe')}">−</button><button class="btn-mini" data-azione="pf1-classe-liv" data-id="${id}" data-cl="${cl.id}" data-d="1" title="Aggiungi un livello (senza la procedura di salita)">+</button></span>`}
         <label>DV ${sel(`classi#${cl.id}|dv`, [6, 8, 10, 12].map((x) => [x, 'd' + x]), cl.dv, 'data-tipo="numero"')}</label>
         <label>BAB ${sel(`classi#${cl.id}|bab`, [['pieno', 'pieno'], ['3/4', '¾'], ['1/2', '½']], cl.bab)}</label>
         <label class="pf-chk" title="Tempra buona">${chk(`classi#${cl.id}|tempra`, cl.tempra)} Tem</label>
@@ -4188,7 +4220,7 @@ window.creaPF1 = function creaPF1(ctx) {
         <button class="btn-piccolo pf-togli-classe" data-azione="pf1-classe-togli" data-id="${id}" data-cl="${cl.id}" title="Togli questa classe con tutti i suoi livelli">🗑 Togli classe</button>
       </div>`).join('');
     const corpoClassi = `${classi || '<p class="muto">Nessuna classe. Aggiungine una: i valori si calcolano da soli.</p>'}
-      <div class="pf-piede">${aggiungi('classi', 'Classe')}<span class="muto">Livello totale <b>${k('liv')}</b> · BAB <b>${k('bab')}</b></span>
+      <div class="pf-piede">${GIOCATORE && d.classi.length ? '<span class="muto">Le altre classi (multiclasse) si aggiungono con «⬆ Sali di livello».</span>' : aggiungi('classi', 'Classe')}<span class="muto">Livello totale <b>${k('liv')}</b> · BAB <b>${k('bab')}</b></span>
         <label>Taglia ${sel('taglia', TAGLIE.map((t) => [t[0], t[0]]), d.taglia, 'data-ridisegna-pf1')}</label></div>
       ${datalistFisso('pf1-classi', () => Object.keys(CLASSI).map((x) => `<option value="${esc(x)}">`).join(''))}`;
 
@@ -4627,8 +4659,14 @@ window.creaPF1 = function creaPF1(ctx) {
         <span class="muto">Bonus attivi: <b class="pf-attivi">${k('bonusAttivi')}</b></span>
         <a class="bottone" href="#/personaggio/${id}/tavolo">📋 Vista da tavolo</a>
         <button data-azione="pf1-riposo" data-id="${id}" title="Recupera PF pari al livello, slot di incantesimo e potere mitico">🌙 Riposo (8 ore)</button>
-        <button class="primario" data-azione="pf1-livello-apri" data-id="${id}" title="Avanzamento guidato al livello successivo">⬆ Sali di livello</button>
+        ${(() => {
+          if (!GIOCATORE) return `<button class="primario" data-azione="pf1-livello-apri" data-id="${id}" title="Avanzamento guidato al livello successivo">⬆ Sali di livello</button>`;
+          const manca = mancaPerSalire(p, d, c);
+          return manca.length ? `<button class="primario" disabled title="Completa prima il livello attuale">⬆ Sali di livello</button>`
+            : `<button class="primario" data-azione="pf1-livello-apri" data-id="${id}" title="Avanzamento guidato al livello successivo">⬆ Sali di livello</button>`;
+        })()}
       </div>
+      ${GIOCATORE && salita?.pgId !== id ? (() => { const manca = mancaPerSalire(p, d, c); return manca.length ? `<div class="pannello pf-da-completare"><b>${d.classi.length ? `Per completare il ${c.liv}° livello` : 'Per iniziare'}</b>${d.classi.length ? ' (poi potrai salire al successivo)' : ''}:<ul>${manca.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''; })() : ''}
       ${salita?.pgId === id ? sezioneSalita(p, d, c, r) : ''}
       ${sezione('razza', 'Razza', sezioneRazza(p, d))}
       ${sezione('classi', 'Classi e livelli', corpoClassi)}
@@ -4889,6 +4927,7 @@ window.creaPF1 = function creaPF1(ctx) {
       const d = dati(p);
       const cl = d.classi.find((x) => x.id === el.dataset.cl);
       if (!cl) return;
+      if (GIOCATORE) { ctx.toast('Nella scheda del giocatore i livelli si prendono uno alla volta con «⬆ Sali di livello»', 'errore'); return; }
       const nuovo = n(cl.livello) + Number(el.dataset.d);
       if (nuovo < 1) { azioni['pf1-classe-togli'](el); return; }
       if (nuovo > 20) return;
@@ -5677,6 +5716,10 @@ window.creaPF1 = function creaPF1(ctx) {
     'pf1-livello-apri'(el) {
       const p = ctx.personaggio(el.dataset.id);
       const d = dati(p);
+      if (GIOCATORE) {
+        const manca = mancaPerSalire(p, d, calcola(p, ctx.regDi(p)));
+        if (manca.length) { ctx.toast(`Completa prima il livello attuale: ${esc(manca.join('; '))}`, 'errore'); return; }
+      }
       apriSalita(p, d.classi[0]?.id || 'Guerriero');
       ctx.render();
       document.querySelector('.salita')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
