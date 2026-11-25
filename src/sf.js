@@ -136,12 +136,41 @@ window.creaSF = function creaSF(ctx) {
     Spia: { abil: ['Camuffare', 'Raggirare'], attacco: ['Raggirare', 4], trucco: 'Maestro dei Travestimenti', potere: 'Ingannare Individuazione' },
     Temerario: { abil: ['Acrobazia', 'Atletica'], attacco: ['Acrobazia', 0], trucco: 'Movimento Versatile', potere: 'Sfruttare il Terreno' },
   };
+  // Mistico: connessioni (src/sf-connessioni.js, wiki «Mistico/Connessioni») e incantesimi conosciuti (tabella del mistico)
+  const CONNESSIONI = window.SF_CONNESSIONI || {};
+  const livMistico = (d) => d.classi.filter((cl) => nomeClasse(cl.nome) === 'Mistico').reduce((a, cl) => a + n(cl.livello), 0);
+  const connessioneDi = (d) => CONNESSIONI[d.mistico?.connessione] || null;
+  // Incanalare Abilità: +1 al 2° livello (al 1° per la connessione Akashica), poi +1 ogni 3 livelli
+  const incanalareMs = (L, akashica) => (L >= 2 ? 1 + Math.floor((L - 2) / 3) : akashica && L >= 1 ? 1 : 0);
+  // Incantesimi conosciuti per livello del mistico: [livello 0, 1°, 2°, …, 6°]
+  const CONOSCIUTI_MS = [[4, 2], [5, 3], [6, 4], [6, 4, 2], [6, 4, 3], [6, 4, 4], [6, 5, 4, 2], [6, 5, 4, 3], [6, 5, 4, 4], [6, 5, 5, 4, 2], [6, 6, 5, 4, 3], [6, 6, 5, 4, 4],
+    [6, 6, 5, 5, 4, 2], [6, 6, 6, 5, 4, 3], [6, 6, 6, 5, 4, 4], [6, 6, 6, 5, 5, 4, 2], [6, 6, 6, 6, 5, 4, 3], [6, 6, 6, 6, 5, 4, 4], [6, 6, 6, 6, 5, 5, 4], [6, 6, 6, 6, 6, 5, 5]];
+  // Livello d'incantesimo più alto del mistico (1° dal 1°, 2° dal 4°, 3° dal 7°… 6° dal 16°)
+  const incMaxMs = (L) => (L ? Math.min(6, Math.floor((L - 1) / 3) + 1) : 0);
+  // Incantesimi della connessione tra i conosciuti: uno per livello lanciabile; con l'incantesimo di livello variabile,
+  // il livello più alto ha quello variabile e i livelli sotto l'incantesimo che lo sostituisce
+  function sincronizzaConnessione(d) {
+    const cn = connessioneDi(d);
+    const L = livMistico(d);
+    const voluti = [];
+    if (cn && L) {
+      const max = incMaxMs(L);
+      for (let l = 1; l <= max; l++) {
+        const nome = cn.variabile && (l === max || !cn.inc[l]) ? cn.variabile : cn.inc[l];
+        if (nome) voluti.push({ id: `conn-${l}`, classe: 'Mistico', nome, livello: l, connessione: true });
+      }
+    }
+    const chiave = (x) => `${x.livello}|${x.nome}`;
+    const ora = d.incantesimi.filter((x) => x.connessione);
+    if (ora.length === voluti.length && ora.every((x, i) => chiave(x) === chiave(voluti[i]))) return;
+    d.incantesimi = [...d.incantesimi.filter((x) => !x.connessione), ...voluti];
+  }
   const livOperativo = (d) => d.classi.filter((cl) => nomeClasse(cl.nome) === 'Operativo').reduce((a, cl) => a + n(cl.livello), 0);
   const specDi = (d) => SPEC_OPERATIVO[d.operativo?.spec] || null;
   // Vantaggio dell'Operativo: +1, +2 al 3°, poi +1 ogni 4 livelli (7°, 11°, 15°, 19°)
   const vantaggioOp = (L) => (L >= 3 ? 2 + Math.floor((L - 3) / 4) : L ? 1 : 0);
   const predefiniti = () => ({
-    operativo: { spec: '' },
+    operativo: { spec: '' }, mistico: { connessione: '' },
     razza: { nome: '', scelta: '', inclusi: false }, tema: { nome: '', car: '' }, chiave: '',
     classi: [], pf: { attuali: '', temp: '' }, ps: { attuali: '' }, pr: { usati: 0 },
     ca: { cae: '', cac: '' }, ts: { tempra: { varie: '' }, riflessi: { varie: '' }, volonta: { varie: '' } }, iniz: { varie: '' },
@@ -162,6 +191,7 @@ window.creaSF = function creaSF(ctx) {
     const d = p.sf;
     const def = predefiniti();
     for (const key of Object.keys(def)) if (d[key] === undefined) d[key] = def[key];
+    sincronizzaConnessione(d);
     return d;
   }
   const razzaDi = (d) => D.razze[d.razza?.nome] || null;
@@ -199,6 +229,10 @@ window.creaSF = function creaSF(ctx) {
     const spec = livOp ? specDi(d) : null;
     if (livOp) { const v = vantaggioOp(livOp); eff.push({ bersaglio: 'iniz', valore: v, tipo: 'cognitivo', fonte: "Vantaggio dell'Operativo" }, { bersaglio: 'abilita', valore: v, tipo: 'cognitivo', fonte: "Vantaggio dell'Operativo" }); }
     if (spec) for (const a of spec.abil) eff.push({ bersaglio: 'abil:' + a, valore: 3, tipo: 'cognitivo', fonte: `Abilità Focalizzata (${d.operativo.spec})` });
+    const livMs = livMistico(d);
+    const conn = livMs ? connessioneDi(d) : null;
+    const incanalare = conn ? incanalareMs(livMs, d.mistico.connessione === 'Akashica') : 0;
+    if (incanalare) for (const a of conn.abil) eff.push({ bersaglio: 'abil:' + a, valore: incanalare, tipo: 'cognitivo', fonte: `Incanalare Abilità (${d.mistico.connessione})` });
     const per = (...k) => eff.filter((e) => k.includes(e.bersaglio));
     const liv = livelloTot(d);
     const base = {}, punteggio = {}, m = {};
@@ -288,7 +322,7 @@ window.creaSF = function creaSF(ctx) {
       });
       return { classe: k, giorno, cd: (L) => 10 + L + mc };
     });
-    return { base, punteggio, m, liv, livOp, chiave, bab, pfMax, psMax, prMax, pfAtt, psAtt, cae, cac, desMax, penalita, ts, iniz, abil, gradiSpesi, gradiDisp, armi, incantesimi, arm,
+    return { base, punteggio, m, liv, livOp, livMs, incanalare, chiave, bab, pfMax, psMax, prMax, pfAtt, psAtt, cae, cac, desMax, penalita, ts, iniz, abil, gradiSpesi, gradiDisp, armi, incantesimi, arm,
       volume, leggeri: vol.leggeri, carico, limiteVolume: forza / 2, forza,
       bonusAttivi: d.bonus.filter((b) => b.attivo).map((b) => b.nome), cumuli: { voci: eff } };
   }
@@ -488,7 +522,7 @@ window.creaSF = function creaSF(ctx) {
         return `<span class="chip" title="${esc(v ? [v.scuola, v.tempo, v.gittata, v.durata, v.ts && `TS ${v.ts}`].filter(Boolean).join(' · ') : '')}">${esc(x.nome)}
           ${v ? `<a class="btn-mini" href="${esc(linkWiki(v.pagina))}" target="_blank" rel="noopener" title="Descrizione sul wiki">i</a>` : ''}
           <button class="btn-mini" data-azione="sf-lancia" data-id="${id}" data-classe="${esc(inc.classe)}" data-livello="${L}" data-nome="${esc(x.nome)}" title="Lancia (usa uno slot)">✨</button>
-          <button class="chip-x" data-azione="sf-rimuovi" data-id="${id}" data-lista="incantesimi" data-elem="${x.id}" title="Togli">×</button></span>`;
+          ${x.connessione ? '<small class="muto" title="Incantesimo della connessione: lo dà la connessione">◆ connessione</small>' : `<button class="chip-x" data-azione="sf-rimuovi" data-id="${id}" data-lista="incantesimi" data-elem="${x.id}" title="Togli">×</button>`}</span>`;
       }).join(' ')}</div>`).join('');
       const L = sfogliaInc[inc.classe] ?? '';
       const lista = L === '' ? [] : INCANTESIMI.filter((v) => livelloInc(v, inc.classe) === Number(L)).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
@@ -590,6 +624,7 @@ window.creaSF = function creaSF(ctx) {
       ${sezione('difese', 'Difese e tiri salvezza', corpoDifese, `<span class="ts-sommario">CAE <b>${c.cae}</b> · CAC <b>${c.cac}</b></span>`)}
       ${sezione('attacchi', 'Attacchi', corpoAttacchi)}
       ${sezione('abilita', 'Abilità', corpoAbil, `<span class="ts-sommario">Gradi <b>${k('gradi')}</b> · max ${c.liv} per abilità</span>`)}
+      ${c.livMs ? sezione('mistico', 'Mistico', sezioneMistico(p, d, c), `<small class="muto">${esc(d.mistico?.connessione || 'connessione da scegliere')}</small>`) : ''}
       ${c.livOp ? sezione('operativo', 'Operativo', sezioneOperativo(p, d, c), `<small class="muto">${esc(d.operativo?.spec || 'specializzazione da scegliere')}</small>`) : ''}
       ${sezione('capacita', 'Talenti e capacità', corpoCap)}
       ${corpoInc ? sezione('incantesimi', 'Incantesimi', corpoInc) : ''}
@@ -665,6 +700,50 @@ window.creaSF = function creaSF(ctx) {
       </ul>`;
   }
 
+  // Sezione «Mistico»: connessione, incantesimi conosciuti e privilegi calcolati dal livello (wiki «Mistico»)
+  function sezioneMistico(p, d, c) {
+    const id = p.id;
+    const L = c.livMs;
+    const cn = connessioneDi(d);
+    const cdTs = 10 + Math.floor(L / 2) + c.m.SAG;
+    const cdAbil = 10 + Math.floor(L * 1.5) + c.m.SAG;
+    const tot = (a) => c.abil[a]?.tot ?? 0;
+    // Incantesimi conosciuti: tabella del mistico (gli incantesimi della connessione si aggiungono e non contano)
+    const tab = CONOSCIUTI_MS[Math.min(20, L) - 1] || [];
+    const noti = d.incantesimi.filter((x) => x.classe === 'Mistico' && !x.connessione);
+    const conteggi = tab.map((max, l) => {
+      const presi = noti.filter((x) => n(x.livello) === l).length;
+      return `<span class="chip">${l ? `${l}°` : 'liv. 0'} <b class="${presi > max ? 'oltre' : ''}">${presi}/${max}</b></span>`;
+    }).join(' ');
+    const voce = (ok, nome, testo) => `<li class="${ok ? '' : 'muto'}"><b>${esc(nome)}</b>${testo ? ` — ${testo}` : ''}${ok ? '' : ' <small>(non ancora)</small>'}</li>`;
+    return `<div class="pf-riga">
+        <label>Connessione <select data-sf="mistico|connessione" data-id="${id}" data-ridisegna-sf>${opz([['', '— scegli —'], ...Object.keys(CONNESSIONI).map((x) => [x, x])], d.mistico?.connessione || '')}</select></label>
+        <a class="btn-piccolo" href="${esc(linkWiki('Mistico/Connessioni'))}" target="_blank" rel="noopener">📖 connessioni</a>
+        <a class="btn-piccolo" href="${esc(linkWiki('Mistico'))}" target="_blank" rel="noopener">📖 mistico</a>
+        <span class="muto">livello da mistico <b>${L}</b> · CD incantesimi 10 + livello ${segno(c.m.SAG)}</span></div>
+      ${cn ? `<div class="fede-righe">
+        <div><span class="muto">Abilità associate</span> ${cn.abil.map((a) => `<b>${esc(a)}</b> ${segno(tot(a))}`).join(' · ')}
+          <small class="muto">— Incanalare Abilità ${c.incanalare ? `+${c.incanalare} cognitivo (già nella scheda; non si somma ad altri bonus cognitivi, vale il più alto)` : 'dal 2° livello'}</small></div>
+        <div><span class="muto">Incantesimi della connessione</span> ${[1, 2, 3, 4, 5, 6].map((l) => {
+          const nome = cn.variabile && (!cn.inc[l] || l === incMaxMs(L)) && l <= incMaxMs(L) ? cn.variabile : cn.inc[l] || cn.variabile;
+          return `<span class="${l <= incMaxMs(L) ? '' : 'muto'}">${l}° ${esc(nome || '—')}</span>`;
+        }).join(' · ')}${cn.variabile ? ` <small class="muto">(${esc(cn.variabile)}: incantesimo di livello variabile, al livello più alto che lanci)</small>` : ''}
+          <small class="muto">— aggiunti da soli agli incantesimi conosciuti</small></div>
+        <div><span class="muto">Poteri della connessione</span> ${cn.poteri.map(([nome, l]) => `<span class="${l <= L ? '' : 'muto'}">${esc(nome)} (${l}°)</span>`).join(', ')}
+          · CD tiri salvezza <b>${cdTs}</b> · CD prove di abilità <b>${cdAbil}</b></div></div>`
+        : '<p class="oltre pf-aiuto">Scegli la connessione: dà due abilità associate (Incanalare Abilità), un incantesimo in più per ogni livello di incantesimi e i poteri della connessione.</p>'}
+      <div class="pf-riga"><span class="muto">Incantesimi conosciuti (tabella del mistico, senza quelli della connessione):</span> ${conteggi}</div>
+      <ul class="op-privilegi">
+        ${voce(true, 'Tocco di Cura', `1 volta al giorno, 10 minuti: cura un alleato fino a <b>${5 * L}</b> PF`)}
+        ${voce(L >= 2, 'Arma Specializzata', 'talento bonus per le armi della classe (danni già nella scheda)')}
+        ${voce(L >= 2 || d.mistico?.connessione === 'Akashica', 'Incanalare Abilità', c.incanalare ? `+${c.incanalare} cognitivo alle abilità della connessione` : '')}
+        ${voce(L >= 3, 'Collegamento Mentale', 'a volontà, una volta al giorno per creatura toccata')}
+        ${voce(L >= 11, 'Legame Telepatico', 'permanente, fino a 6 creature consenzienti')}
+        ${voce(L >= 19, 'Trascendenza', 'ogni incantesimo della connessione 1 volta al giorno senza slot; proiezione psichica (1 PR)')}
+        ${voce(L >= 20, 'Illuminazione', '1 volta al giorno per 1 minuto: +4 a colpire, TS e prove; 20 PR per i poteri della connessione; Miracolo 1 volta a settimana')}
+      </ul>`;
+  }
+
   function mancaPerSalire(p, d, c) {
     const manca = [];
     if (!razzaDi(d)) manca.push('scegli la razza');
@@ -673,6 +752,7 @@ window.creaSF = function creaSF(ctx) {
     else if (!tema?.car && !d.tema.car) manca.push('scegli la caratteristica del tema (+1)');
     if (!d.classi.some((cl) => nomeClasse(cl.nome))) { manca.push('scegli la classe di 1° livello'); return manca; }
     if (livOperativo(d) && !specDi(d)) manca.push("scegli la specializzazione dell'operativo");
+    if (livMistico(d) && !connessioneDi(d)) manca.push('scegli la connessione del mistico');
     if (c.gradiSpesi < c.gradiDisp) manca.push(`assegna i gradi di abilità (${c.gradiSpesi}/${c.gradiDisp})`);
     if (c.gradiSpesi > c.gradiDisp) manca.push(`hai assegnato più gradi del possibile (${c.gradiSpesi}/${c.gradiDisp})`);
     const attesi = Math.floor((c.liv + 1) / 2) + (/^umano$/i.test(d.razza.nome) ? 1 : 0);
