@@ -1405,3 +1405,18 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
   body.modo-giocatore h1 { font-size: 22px; }
 }
 
+
+/* ---------- Officina PF1: oggetti che crescono con il livello (reliquie) ---------- */
+.off-crescita { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 10px; }
+.off-cr-riga { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 5px 8px; border-left: 3px solid var(--bordo); border-radius: 4px; background: var(--pannello-2); opacity: .7; }
+.off-cr-riga.attiva { opacity: 1; border-left-color: var(--oro); background: rgba(212, 173, 90, .08); }
+.off-cr-liv { font-weight: 700; color: var(--oro); }
+.off-cr-testo { flex: 1 1 260px; min-width: 0; }
+.off-cr-bonus, .off-cr-res { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 13px; }
+.off-cr-res .pf-chk { margin: 0; }
+.off-cr-stato { font-size: 12px; color: var(--muto); min-width: 70px; }
+.off-cr-riga.attiva .off-cr-stato { color: var(--verde); font-weight: 600; }
+.off-crescita-riassunto { font-size: 12.5px; padding: 2px 4px 4px; flex-basis: 100%; }
+.off-cr-liv input { width: 52px; }
+.off-cr-bonus select { max-width: 210px; }
+.off-cr-bonus input, .off-cr-res input[type="number"] { width: 56px; }

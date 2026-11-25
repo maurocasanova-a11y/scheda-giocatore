@@ -1106,7 +1106,7 @@ window.creaPF1 = function creaPF1(ctx) {
     // Ogni effetto ricorda da dove viene: serve alla regola "stessa fonte" e a mostrare cosa conta
     const eff = [
       ...effettiRazza(d).map((e) => ({ ...e, fonte: `${e.tratto} (razza)` })),
-      ...d.bonus.filter((b) => b.attivo).flatMap((b) => (b.effetti || []).map((e) => ({ ...e, fonte: b.nome || 'bonus', fonteId: b.id }))),
+      ...d.bonus.filter((b) => b.attivo).flatMap((b) => (b.effetti || []).filter((e) => !e.livMin || e.livMin <= livelloPersonaggio(d)).map((e) => ({ ...e, fonte: b.nome || 'bonus', fonteId: b.id }))),
       ...effettiMaestro(d, abilitaScheda(r, d)),
       ...effettiMitici(d),
       ...effettiChimico(d, abilitaScheda(r, d)),
@@ -3014,6 +3014,23 @@ window.creaPF1 = function creaPF1(ctx) {
     return { pot, bonusCap, bonusTot, caps, prezzo, costo, dettaglio: dettaglio.filter(Boolean), avvisi, liMin, durezza, pf, pfAtt, origine, ts, stato, artefatto };
   }
 
+  // Oggetti che crescono con il livello del personaggio (reliquie): righe raggiunte e prossima
+  const livelloPersonaggio = (d) => d.classi.reduce((a, cl) => a + n(cl.livello), 0);
+  function poteriCrescita(d, x) {
+    const liv = livelloPersonaggio(d);
+    const righe = (x.livelli || []).filter((r) => n(r.livello)).slice().sort((a, b) => n(a.livello) - n(b.livello));
+    return { liv, attivi: righe.filter((r) => n(r.livello) <= liv), prossimi: righe.filter((r) => n(r.livello) > liv) };
+  }
+  const testoRiga = (r) => [r.testo, r.bersaglio && n(r.valore) ? `${n(r.valore) > 0 ? '+' : ''}${n(r.valore)} ${(BERSAGLI.find((b) => b[0] === r.bersaglio)?.[1] || r.bersaglio.replace(/^abil:/, '')).toLowerCase()}${r.tipo && r.tipo !== 'senza tipo' ? ` (${r.tipo})` : ''}` : '',
+    n(r.resistenza) && ENERGIE.some(([k]) => r['en_' + k]) ? `resistenza ${ENERGIE.filter(([k]) => r['en_' + k]).map(([, nome]) => nome.toLowerCase()).join(', ')} ${n(r.resistenza)}` : ''].filter(Boolean).join(' · ') || '—';
+  // Riassunto per la scheda: poteri attivi (il più alto di ogni bonus dello stesso tipo vale da solo) e prossimo potere
+  function riassuntoCrescita(d, x) {
+    if (!x?.crescita || !(x.livelli || []).length) return '';
+    const { liv, attivi, prossimi } = poteriCrescita(d, x);
+    const testi = attivi.filter((r) => r.testo && !(r.bersaglio && n(r.valore)) && !n(r.resistenza)).map((r) => r.testo);
+    return `<div class="off-crescita-riassunto"><span class="muto">Al ${liv}° livello:</span> ${attivi.length ? esc([...new Set(testi)].join(', ') || 'bonus e resistenze attivi sulla scheda') : 'nessun potere ancora'}${prossimi[0] ? ` <span class="muto">· prossimo al ${n(prossimi[0].livello)}°: ${esc(testoRiga(prossimi[0]))}</span>` : ''}</div>`;
+  }
+
   // Tiene allineata la voce della scheda (arma, armatura/scudo o oggetto) all'oggetto creato
   function sincronizzaCreazione(d, x) {
     const cv = calcolaCreazione(x);
@@ -3054,12 +3071,13 @@ window.creaPF1 = function creaPF1(ctx) {
     } else {
       voce.note = [CATEGORIE_OGG.find((c) => c[0] === x.categoria)?.[1], RARITA_OGG.find((r) => r[0] === x.rarita)?.[1]].filter(Boolean).join(' · ');
       // Effetti sulla scheda: un bonus collegato, attivo se l'oggetto è indossato
-      const eff = (x.effetti || []).filter((e) => e.bersaglio && n(e.valore));
+      const eff = [...(x.effetti || []).filter((e) => e.bersaglio && n(e.valore)),
+        ...(x.crescita ? (x.livelli || []).filter((r) => r.bersaglio && n(r.valore)).map((r) => ({ id: r.id, bersaglio: r.bersaglio, valore: r.valore, tipo: r.tipo, livMin: n(r.livello) })) : [])];
       let b = voce.bonusId ? d.bonus.find((y) => y.id === voce.bonusId) : null;
       if (eff.length) {
         if (!b) { b = { id: uid(), nome, attivo: (voce.dove || 'indossato') === 'indossato', effetti: [] }; d.bonus.push(b); voce.bonusId = b.id; }
         b.nome = nome;
-        b.effetti = eff.map((e) => ({ id: e.id || uid(), bersaglio: e.bersaglio, valore: n(e.valore), tipo: e.tipo || 'senza tipo' }));
+        b.effetti = eff.map((e) => ({ id: e.id || uid(), bersaglio: e.bersaglio, valore: n(e.valore), tipo: e.tipo || 'senza tipo', ...(e.livMin ? { livMin: e.livMin } : {}) }));
       } else if (b) { d.bonus = d.bonus.filter((y) => y.id !== b.id); voce.bonusId = ''; }
     }
   }
@@ -3312,6 +3330,15 @@ window.creaPF1 = function creaPF1(ctx) {
       const tipo = p.x.e.energia || p.scelta;
       if (ENERGIE.some((e) => e[0] === tipo)) out.push({ id: `auto-pref-${p.classe}-${p.i}`, nome: `Classe preferita (${p.classe})`, tipo, valore: p.tot, auto: true });
     }
+    for (const x of (d.creazioni || []).filter((y) => y.crescita)) {
+      const o = d.oggetti.find((y) => y.creazioneId === x.id);
+      const indossato = o && (window.Luoghi ? window.Luoghi.tipoDi(o.dove, d).k : o.dove) === 'indossato';
+      if (!indossato) continue;
+      for (const [k] of ENERGIE) {
+        const v = Math.max(0, ...poteriCrescita(d, x).attivi.filter((r) => r['en_' + k]).map((r) => n(r.resistenza)));
+        if (v) out.push({ id: `auto-cr-${x.id}-${k}`, nome: x.nome || 'oggetto', tipo: k, valore: v, auto: true });
+      }
+    }
     for (const a of d.armature.filter((x) => x.indossata)) {
       const x = a.creazioneId ? (d.creazioni || []).find((y) => y.id === a.creazioneId) : null;
       const caps = [...(x?.capacita || []), a.nome || ''];
@@ -3412,7 +3439,7 @@ window.creaPF1 = function creaPF1(ctx) {
           <button class="btn-piccolo" data-azione="pf1-off-apri" data-id="${id}" data-off="${x.id}">${aperta ? 'Chiudi' : '✏️ Modifica'}</button>
           <button class="btn-x" data-azione="pf1-off-togli" data-id="${id}" data-off="${x.id}" title="Elimina l'oggetto creato">×</button>
         </div>`;
-      if (!aperta) return `<div class="off-scheda">${riassunto}</div>`;
+      if (!aperta) return `<div class="off-scheda">${riassunto}${riassuntoCrescita(d, x)}</div>`;
       const P = (k) => `creazioni#${x.id}|${k}`;
       const armaArmatura = ['arma', 'munizioni', 'armatura', 'scudo'].includes(x.categoria);
       const spell = ['pozione', 'pergamena', 'bacchetta'].includes(x.categoria);
@@ -3441,6 +3468,29 @@ window.creaPF1 = function creaPF1(ctx) {
           <button class="btn-x" data-azione="pf1-off-riga-togli" data-id="${id}" data-off="${x.id}" data-lista="effetti" data-i="${i}" title="Togli">×</button></div>`).join('')}
         <div class="pf-piede"><button class="btn-piccolo" data-azione="pf1-off-riga" data-id="${id}" data-off="${x.id}" data-lista="effetti">+ Effetto</button>
           <span class="muto">es. Anello di protezione: CA +2 deviazione · Mantello della resistenza: TS +1 resistenza</span></div>` : '';
+      // Oggetti che crescono con il livello di chi li porta (reliquie): una riga per livello, con potere, bonus e resistenze
+      const opzBersagli = [['', '— nessun bonus —'], ...BERSAGLI.filter((b) => !SPECIALI.has(b[0])).map((b) => [b[0], b[1]]), ...ctx.regDi(p).abilita.map((a) => ['abil:' + a.nome, 'Abilità: ' + a.nome])];
+      const cr = poteriCrescita(d, x);
+      const crescitaHtml = !armaArmatura && !spell ? `<h4>Cresce con il livello <small class="muto">poteri che si risvegliano quando chi lo porta sale di livello (reliquie)</small></h4>
+        <label class="pf-chk">${chk(P('crescita'), x.crescita, 'data-ridisegna-pf1')} l'oggetto acquisisce poteri con il livello del personaggio</label>
+        ${x.crescita ? `<div class="off-crescita">
+          ${(x.livelli || []).map((r, i) => {
+            const L = (k) => `creazioni#${x.id}|livelli|${i}|${k}`;
+            const attivo = n(r.livello) && n(r.livello) <= cr.liv;
+            return `<div class="off-cr-riga${attivo ? ' attiva' : ''}">
+              <label class="off-cr-liv" title="Livello (o DV) del personaggio da cui vale">${num(L('livello'), r.livello, 'min="1" max="20" class="pf-corto" data-ridisegna-pf1')}°</label>
+              ${campo(L('testo'), r.testo, 'placeholder="Potere (es. Eludere, Sostentamento, Accumula Incantesimi 10)" class="pf-largo off-cr-testo"')}
+              <span class="off-cr-bonus">${sel(L('bersaglio'), opzBersagli, r.bersaglio || '', 'data-ridisegna-pf1')}
+                ${r.bersaglio ? `<label>+${num(L('valore'), r.valore, 'class="pf-corto" data-ridisegna-pf1')}</label>${sel(L('tipo'), TIPI_BONUS.map((t) => [t, t]), r.tipo || 'senza tipo', 'data-ridisegna-pf1')}` : ''}</span>
+              <span class="off-cr-res" title="Resistenza all'energia data da questa riga">res.
+                ${ENERGIE.map(([k, nome, ic]) => `<label class="pf-chk" title="${nome}">${chk(L('en_' + k), r['en_' + k], 'data-ridisegna-pf1')}${ic}</label>`).join('')}
+                ${num(L('resistenza'), r.resistenza, 'min="0" class="pf-corto" placeholder="5" data-ridisegna-pf1')}</span>
+              <span class="off-cr-stato">${attivo ? '✓ attivo' : 'non ancora'}</span>
+              <button class="btn-x" data-azione="pf1-off-riga-togli" data-id="${id}" data-off="${x.id}" data-lista="livelli" data-i="${i}" title="Togli">×</button></div>`;
+          }).join('') || '<p class="muto">Nessun potere: aggiungi una riga per ogni livello.</p>'}
+          <div class="pf-piede"><button class="btn-piccolo" data-azione="pf1-off-riga" data-id="${id}" data-off="${x.id}" data-lista="livelli">+ Livello</button>
+            <span class="muto">Livello del personaggio ora: <b>${cr.liv}</b>. Valgono le righe fino a quel livello; tra bonus dello stesso tipo (es. resistenza ai TS +1, +2, +3) e tra resistenze alla stessa energia conta il più alto. Bonus e resistenze valgono quando l'oggetto è indossato.</span></div>
+        </div>` : ''}` : '';
       const potHtml = `<h4>${spell ? 'Incantesimo contenuto' : 'Poteri'} <small class="muto">${spell ? '' : 'capacità magiche dell\'oggetto'}</small></h4>
         ${(x.poteri || []).map((pw, i) => `<div class="off-potere">
           <div class="pf-riga">
@@ -3488,7 +3538,7 @@ window.creaPF1 = function creaPF1(ctx) {
             ${!armaArmatura && !spell && x.rarita !== 'normale' ? `<label class="pf-chk" title="Occupa uno slot del corpo (anello, testa, collo…): se no, il prezzo raddoppia">${chk(P('slot'), x.slot, 'data-ridisegna-pf1')} occupa uno slot</label>` : ''}
           </div>
           ${cv.liMin && x.rarita !== 'normale' && n(x.li) < cv.liMin ? `<p class="oltre pf-aiuto">LI minimo consigliato per un bonus +${cv.bonusTot}: ${cv.liMin}.</p>` : ''}
-          ${x.rarita === 'normale' ? '' : capHtml + effHtml + potHtml}
+          ${x.rarita === 'normale' ? '' : capHtml + effHtml + crescitaHtml + potHtml}
           ${durHtml}
           <h4>Prezzo e costo</h4>
           <div class="pf-riga">
@@ -4617,7 +4667,7 @@ window.creaPF1 = function creaPF1(ctx) {
       const creato = o.creazioneId ? (d.creazioni || []).find((x) => x.id === o.creazioneId) : null;
       return `<div class="pf-riga luogo-riga">
         ${immagineOk(creato?.immagine) ? `<button class="off-mini" data-azione="pf1-off-immagine-vedi" data-id="${id}" data-off="${creato.id}" title="Immagine dell'oggetto"><img src="${creato.immagine}" alt=""></button>` : ''}
-        <input class="pf-largo" data-pf1="oggetti#${o.id}|nome" data-id="${id}" value="${esc(o.nome)}" placeholder="Oggetto">
+        <input class="pf-largo" data-pf1="oggetti#${o.id}|nome" data-id="${id}" value="${esc(o.nome)}" placeholder="Oggetto">${creato?.crescita ? riassuntoCrescita(d, creato) : ''}
         ${ow ? `<button class="btn-mini" data-azione="pf1-info-oggetto" data-nome="${esc(ow[0])}" title="Descrizione dal wiki">i</button>` : ''}
         ${b ? `<label class="pf-chk" title="Bonus attivo (${esc(riassuntoBonus(b))})">${chk(`bonus#${b.id}|attivo`, b.attivo, 'data-ridisegna-pf1')} attivo</label>` : ''}
         <label>Qtà ${num(`oggetti#${o.id}|qta`, o.qta, 'min="0"')}</label>
@@ -5475,7 +5525,11 @@ window.creaPF1 = function creaPF1(ctx) {
       if (!x) return;
       const lista = el.dataset.lista;
       x[lista] = x[lista] || [];
-      x[lista].push(lista === 'effetti' ? { id: uid(), bersaglio: '', valore: '', tipo: 'senza tipo' } : { id: uid(), nome: '', livInc: '', attivazione: 'continuo', cariche: '', durata: '', componente: '', descrizione: '' });
+      if (lista === 'livelli') {
+        // Prossimo livello libero (dopo l'ultimo scritto)
+        const ultimo = Math.max(0, ...x.livelli.map((r) => n(r.livello)));
+        x.livelli.push({ id: uid(), livello: Math.min(20, ultimo + 1), testo: '', bersaglio: '', valore: '', tipo: 'senza tipo', resistenza: '' });
+      } else x[lista].push(lista === 'effetti' ? { id: uid(), bersaglio: '', valore: '', tipo: 'senza tipo' } : { id: uid(), nome: '', livInc: '', attivazione: 'continuo', cariche: '', durata: '', componente: '', descrizione: '' });
       ctx.salva();
       ctx.render();
     },
