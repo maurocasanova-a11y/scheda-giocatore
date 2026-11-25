@@ -554,3 +554,131 @@
   body.tema-sf .sch-testa::after { background: linear-gradient(90deg, var(--oro), rgba(69, 214, 255, .25) 60%, transparent) center / 100% 1px no-repeat, linear-gradient(var(--ambra), var(--ambra)) left center / 60px 3px no-repeat; }
   body.tema-sf .sch-scena img { border-radius: 0; border-color: var(--oro); box-shadow: 0 0 0 4px #050a12, 0 0 0 5px var(--bordo), 0 0 24px rgba(69, 214, 255, .25); }
 }
+
+/* =====================================================================
+   Tema «Rovine di Thassilon»: solo per le campagne di Pathfinder 1 (body.tema-pf1)
+   Pietra antica incisa, giada e oro antico, la stella a sette punte dell'impero di Thassilon.
+   ===================================================================== */
+@media screen {
+  body.tema-pf1 {
+    --sfondo: #0d1512;
+    --barra: #0f1916;
+    --pannello: #16221e;
+    --pannello-2: #1c2b26;
+    --bordo: #2f4c40;
+    --bordo-chiaro: #3f6b55;
+    --testo: #dfe8de;
+    --muto: #92ab9a;
+    --oro: #8fd6a8;
+    --oro-chiaro: #c6f0d4;
+    --oro-scuro: #4d8a68;
+    --oro-antico: #d9c27a;
+    --rosso: #e0745e;
+    --verde: #9be08a;
+    --viola: #b6a3e6;
+    --raggio: 2px;
+    --ombra: 0 6px 22px rgba(0, 0, 0, .6);
+    --filo-oro: inset 0 0 0 1px rgba(143, 214, 168, .12), inset 0 1px 0 rgba(198, 240, 212, .06);
+    --metallo: linear-gradient(180deg, #f3e6b0 0%, #d9c27a 45%, #8f7a3c 100%);
+    --cuoio: linear-gradient(180deg, #1a2723 0%, #121c19 100%);
+    --titoli: 'Cinzel', 'Trajan Pro', Georgia, serif;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50.0 4.0L70.0 91.4L14.0 21.3L94.8 60.2L5.2 60.2L86.0 21.3L30.0 91.4Z' fill='none' stroke='%238fd6a8' stroke-width='0.6' stroke-opacity='0.09' stroke-linejoin='round'/%3E%3C/svg%3E") right -120px top -120px / 520px 520px no-repeat,
+      radial-gradient(ellipse at 50% -10%, rgba(143, 214, 168, .10), transparent 55%),
+      radial-gradient(ellipse at 110% 115%, rgba(217, 194, 122, .08), transparent 50%),
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, .012) 0 1px, transparent 1px 46px),
+      repeating-linear-gradient(90deg, rgba(0, 0, 0, .18) 0 2px, transparent 2px 92px),
+      var(--sfondo);
+    background-attachment: fixed;
+  }
+  body.tema-pf1 h1 { letter-spacing: .12em; text-transform: uppercase; background: var(--metallo); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 22px rgba(143, 214, 168, .18); }
+  body.tema-pf1 h2 { color: var(--oro-antico); letter-spacing: .1em; text-transform: uppercase; font-size: 17px; }
+  body.tema-pf1 h3 { color: var(--oro); letter-spacing: .18em; text-transform: uppercase; }
+  body.tema-pf1 h4 { color: var(--oro-chiaro); }
+  body.tema-pf1 a { color: var(--oro-chiaro); }
+  body.tema-pf1 ::selection { background: rgba(143, 214, 168, .32); }
+  body.tema-pf1 ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #3f6b55, #22382f); }
+  /* Sotto i titoli: linea incisa con la stella a sette punte */
+  body.tema-pf1 .intest:not(.intest-ritratto)::after {
+    height: 16px;
+    background:
+      linear-gradient(90deg, transparent, var(--oro-scuro) 12%, var(--oro) 50%, var(--oro-scuro) 88%, transparent) center / 100% 1px no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50.0 4.0L70.0 91.4L14.0 21.3L94.8 60.2L5.2 60.2L86.0 21.3L30.0 91.4Z' fill='none' stroke='%23d9c27a' stroke-width='6' stroke-opacity='1' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
+  }
+
+  /* Barra laterale: colonna di pietra */
+  body.tema-pf1 #barra { background: linear-gradient(180deg, #13201c, #0a110f); border-right-color: var(--bordo); box-shadow: inset -1px 0 0 rgba(143, 214, 168, .18), 4px 0 20px rgba(0, 0, 0, .55); }
+  body.tema-pf1 .logo-icona { filter: drop-shadow(0 0 7px rgba(143, 214, 168, .6)) hue-rotate(95deg); }
+  body.tema-pf1 #nav a.attiva { background: linear-gradient(90deg, rgba(143, 214, 168, .16), transparent); }
+  body.tema-pf1 #nav a.attiva::before { content: '✶ '; font-size: 11px; color: var(--oro-antico); }
+  body.tema-pf1 #barra-campagne a.attiva { background: linear-gradient(90deg, rgba(143, 214, 168, .12), transparent); }
+
+  /* Pannelli: lastre di pietra con bordo inciso e angoli smussati */
+  body.tema-pf1 .pannello, body.tema-pf1 .scheda, body.tema-pf1 .voce-sessione, body.tema-pf1 .comb, body.tema-pf1 .info-box, body.tema-pf1 .sch-carta, body.tema-pf1 .intest-ritratto, body.tema-pf1 .inc-barra {
+    border-radius: 0;
+    clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% calc(100% - 10px), calc(100% - 10px) 100%, 10px 100%, 0 calc(100% - 10px), 0 10px);
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(198, 240, 212, .035), transparent 60%),
+      repeating-linear-gradient(115deg, rgba(255, 255, 255, .012) 0 2px, transparent 2px 9px),
+      var(--cuoio);
+  }
+  body.tema-pf1 .pannello::before, body.tema-pf1 .scheda::before, body.tema-pf1 .voce-sessione::before, body.tema-pf1 .comb::before, body.tema-pf1 .info-box::before, body.tema-pf1 .sch-carta::before {
+    inset: 5px; opacity: .5; border: 1px solid rgba(143, 214, 168, .28); border-radius: 0;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50.0 4.0L70.0 91.4L14.0 21.3L94.8 60.2L5.2 60.2L86.0 21.3L30.0 91.4Z' fill='none' stroke='%238fd6a8' stroke-width='5' stroke-opacity='1' stroke-linejoin='round'/%3E%3C/svg%3E") top 3px right 3px / 12px 12px no-repeat;
+  }
+  body.tema-pf1 .intest-ritratto::before, body.tema-pf1 .intest-ritratto::after { background: linear-gradient(90deg, transparent, var(--oro-scuro) 15%, var(--oro) 50%, var(--oro-scuro) 85%, transparent); }
+  body.tema-pf1 .intest-iniz { border-radius: 0; border-color: var(--oro-scuro); clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px); background: radial-gradient(circle at 50% 30%, rgba(143, 214, 168, .16), transparent 70%), linear-gradient(180deg, #1f302a, #121c19); box-shadow: inset 0 0 0 1px rgba(143, 214, 168, .3); }
+  body.tema-pf1 .intest-iniz-et { color: var(--oro); }
+  body.tema-pf1 .intest-iniz-val { color: var(--oro-antico); text-shadow: 0 0 12px rgba(217, 194, 122, .3); }
+
+  /* Controlli */
+  body.tema-pf1 input, body.tema-pf1 select, body.tema-pf1 textarea { background: linear-gradient(180deg, #0a110f, #111b18); background-color: #0d1613; border-color: #2a443a; border-bottom-color: #3f6b55; border-radius: 1px; }
+  body.tema-pf1 select option, body.tema-pf1 select optgroup { background-color: #131f1b; color: var(--testo); }
+  body.tema-pf1 select optgroup { color: var(--oro-antico); }
+  body.tema-pf1 select option:checked { background-color: #2f4c40; color: var(--oro-chiaro); }
+  body.tema-pf1 input:focus, body.tema-pf1 select:focus, body.tema-pf1 textarea:focus { border-color: var(--oro); box-shadow: inset 0 2px 4px rgba(0, 0, 0, .5), 0 0 0 2px rgba(143, 214, 168, .22), 0 0 12px rgba(143, 214, 168, .18); }
+  body.tema-pf1 button, body.tema-pf1 .bottone { border-radius: 1px; background: linear-gradient(180deg, #213530, #16241f); border-color: var(--bordo-chiaro); letter-spacing: .02em; }
+  body.tema-pf1 button:hover, body.tema-pf1 .bottone:hover { border-color: var(--oro-antico); color: #f3e6b0; box-shadow: inset 0 1px 0 rgba(217, 194, 122, .15), 0 0 10px rgba(217, 194, 122, .22); }
+  body.tema-pf1 .primario, body.tema-pf1 button.primario { background: var(--metallo); color: #1e1a08; border-color: #f3e6b0; box-shadow: 0 0 0 1px #4d4220, inset 0 1px 0 rgba(255, 255, 255, .4), 0 3px 10px rgba(0, 0, 0, .55); }
+  body.tema-pf1 .btn-dado { filter: hue-rotate(95deg) saturate(.9); }
+  body.tema-pf1 .comb-azioni button[data-segno="-1"] { border-color: #8a3a2a; color: #ffc2b3; background: linear-gradient(180deg, #2c130d, #190a07); }
+  body.tema-pf1 .comb-azioni button[data-segno="1"] { border-color: #3f8a55; color: #c8f5d2; background: linear-gradient(180deg, #11291b, #0a1810); }
+
+  /* Schede, chip e badge */
+  body.tema-pf1 .schede a { border-radius: 0; letter-spacing: .12em; }
+  body.tema-pf1 .chip, body.tema-pf1 .badge { border-radius: 1px; }
+  body.tema-pf1 .badge-pg { color: #1e1a08; }
+
+  /* Scheda personaggio: caratteristiche su tavolette di pietra a punta, valori in oro antico */
+  body.tema-pf1 .car {
+    border-radius: 0;
+    clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+    background: linear-gradient(180deg, #1f302a, #131e1a);
+    box-shadow: inset 0 0 0 1px rgba(143, 214, 168, .3);
+  }
+  body.tema-pf1 .car-sigla { color: var(--oro); letter-spacing: .16em; }
+  body.tema-pf1 .car-mod { color: #1e1a08; }
+  body.tema-pf1 .pf-box { border-radius: 0; border-left: 2px solid var(--oro-scuro); }
+  body.tema-pf1 .pf-valore, body.tema-pf1 .pf-tot, body.tema-pf1 .pf-max { color: var(--oro-antico); text-shadow: 0 0 10px rgba(217, 194, 122, .25); }
+  body.tema-pf1 .pf-etich { color: var(--oro); letter-spacing: .1em; }
+  body.tema-pf1 .pf-sez > summary { background: linear-gradient(90deg, rgba(143, 214, 168, .12), rgba(143, 214, 168, .02) 55%, transparent); }
+  body.tema-pf1 .pf-sez > summary h3::before { content: ''; display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -1px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50.0 4.0L70.0 91.4L14.0 21.3L94.8 60.2L5.2 60.2L86.0 21.3L30.0 91.4Z' fill='none' stroke='%23d9c27a' stroke-width='6' stroke-opacity='1' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform .2s; }
+  body.tema-pf1 .pf-sez[open] > summary h3::before { transform: rotate(25.7deg); }
+  body.tema-pf1 .prog-tabella th { background: linear-gradient(180deg, #1f302a, #16241f); color: var(--oro-antico); }
+  body.tema-pf1 .prog-tabella tr.prog-attuale td { background: linear-gradient(90deg, rgba(143, 214, 168, .22), rgba(143, 214, 168, .05)); }
+  body.tema-pf1 .pallino.usato { box-shadow: 0 0 8px rgba(143, 214, 168, .6); }
+  body.tema-pf1 .ritratto, body.tema-pf1 .ritratto-grande { border-color: var(--oro-scuro); }
+
+  /* Tracker e schermo */
+  body.tema-pf1 .comb-iniz, body.tema-pf1 .sch-iniz { border-radius: 0; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); background: radial-gradient(circle at 50% 35%, #2f5a48, #0f1b17); border: none; box-shadow: none; color: var(--oro-antico); }
+  body.tema-pf1 .comb.attivo .comb-iniz, body.tema-pf1 .sch-carta.attivo .sch-iniz { background: radial-gradient(circle at 50% 35%, #d9c27a, #5c4f22); color: #1e1a08; }
+  body.tema-pf1 .comb.attivo, body.tema-pf1 .sch-carta.attivo { animation: none; box-shadow: inset 0 0 0 1px var(--oro), inset 0 0 26px rgba(143, 214, 168, .22); border-color: var(--oro); }
+  body.tema-pf1 .comb.attivo::after { content: '✶'; left: 6px; color: var(--oro-antico); text-shadow: 0 0 10px rgba(217, 194, 122, .7); font-size: 13px; }
+  body.tema-pf1 .barra-pf, body.tema-pf1 .sch-vita { border-radius: 0; background: #101a17; border-color: var(--bordo); }
+  body.tema-pf1 .barra-pf span, body.tema-pf1 .sch-vita-verde span { background-color: #4fae7a; }
+  body.tema-pf1 .sch-vita-gialla span { background-color: var(--oro-antico); }
+  body.tema-pf1 .sch-vita-rossa span { background-color: #d0563e; }
+  body.tema-pf1 .azione-turno { border-radius: 0; color: #1e1a08; background: var(--metallo); }
+  body.tema-pf1 .sch-testa::after { background: linear-gradient(90deg, var(--oro), rgba(143, 214, 168, .25) 60%, transparent) center / 100% 1px no-repeat; }
+  body.tema-pf1 .sch-scena img { border-radius: 0; border-color: var(--oro-scuro); }
+}

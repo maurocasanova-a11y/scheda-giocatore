@@ -1297,11 +1297,12 @@
       case 'impostazioni': html = vistaImpostazioni(); break;
       default: html = vistaCampagne();
     }
-    // Tema grafico della campagna aperta: sci-fi tecnologico per Starfinder, fantasy per tutto il resto
+    // Tema grafico della campagna aperta: sci-fi tecnologico per Starfinder, rovine di Thassilon per Pathfinder 1, fantasy per il resto
     const cid = p[0] === 'campagna' || p[0] === 'schermo' ? p[1] : p[0] === 'sessione' ? sessione(p[1])?.campagnaId : p[0] === 'personaggio' ? personaggio(p[1])?.campagnaId : null;
     const cTema = cid ? campagna(cid) : null;
     const schedaTema = cTema ? regolamento(cTema.regolamentoId)?.scheda : p[0] === 'regolamento' ? regolamento(p[1])?.scheda : '';
     document.body.classList.toggle('tema-sf', schedaTema === 'sf');
+    document.body.classList.toggle('tema-pf1', schedaTema === 'pf1'); // Rovine di Thassilon
     if (GIOCATORE && p[0] === 'personaggio' && personaggio(p[1])) html = barraGiocatore(personaggio(p[1])) + html;
     // Master: PG collegato dal vivo (le modifiche fatte qui arrivano al telefono del giocatore)
     else if (!GIOCATORE && !SCHERMO && p[0] === 'personaggio' && dvM.codice && Object.values(dvM.giocatori).some((g) => g.pgId === p[1])) {
