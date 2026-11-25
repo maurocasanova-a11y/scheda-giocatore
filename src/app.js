@@ -795,6 +795,99 @@
     });
   }
 
+  // Ritratto: l'immagine scelta si adatta da sola al cerchio (riempie il riquadro, privilegiando la parte alta dove di
+  // solito c'è il viso); un'anteprima permette di spostarla e ingrandirla prima di confermare. Risultato: JPEG quadrato.
+  function caricaImmagineFile(file) {
+    return new Promise((ok, ko) => {
+      const lettore = new FileReader();
+      lettore.onerror = () => ko(new Error('Impossibile leggere il file'));
+      lettore.onload = () => {
+        const img = new Image();
+        img.onerror = () => ko(new Error('Il file non è un\'immagine valida'));
+        img.onload = () => ok(img);
+        img.src = lettore.result;
+      };
+      lettore.readAsDataURL(file);
+    });
+  }
+  function regolaRitratto(img, lato = 320) {
+    return new Promise((fine) => {
+      const W = img.naturalWidth || img.width, H = img.naturalHeight || img.height;
+      const V = 260; // lato dell'anteprima in pixel
+      const base = V / Math.min(W, H); // scala minima: l'immagine copre tutto il cerchio
+      // Posizione automatica: centrata in orizzontale; in verticale, per le immagini alte, verso l'alto (testa)
+      const st = { zoom: 1, x: 0, y: 0 };
+      const misura = () => ({ w: W * base * st.zoom, h: H * base * st.zoom });
+      const limita = () => { const m = misura(); st.x = Math.min(0, Math.max(V - m.w, st.x)); st.y = Math.min(0, Math.max(V - m.h, st.y)); };
+      const automatico = () => {
+        st.zoom = 1;
+        const m = misura();
+        st.x = (V - m.w) / 2;
+        st.y = m.h > V * 1.05 ? -Math.min(m.h - V, m.h * 0.06) : (V - m.h) / 2;
+        limita();
+      };
+      automatico();
+      const fondo = document.createElement('div');
+      fondo.className = 'rit-fondo';
+      fondo.innerHTML = `<div class="rit-finestra" role="dialog" aria-label="Adatta l'immagine del personaggio">
+          <h3>Adatta l'immagine</h3>
+          <div class="rit-anteprima" style="width:${V}px;height:${V}px"><img alt="" draggable="false"><div class="rit-cerchio"></div></div>
+          <label class="rit-zoom">🔍 <input type="range" min="1" max="4" step="0.01" value="1" aria-label="Ingrandimento"></label>
+          <p class="muto rit-aiuto">Trascina l'immagine per spostarla; usa la barra (o la rotellina) per ingrandire. Conta quello che sta nel cerchio.</p>
+          <div class="rit-comandi"><button type="button" data-rit="auto">↺ Adatta di nuovo</button><span></span>
+            <button type="button" data-rit="annulla">Annulla</button><button type="button" class="primario" data-rit="usa">Usa questa immagine</button></div>
+        </div>`;
+      document.body.appendChild(fondo);
+      const vista = fondo.querySelector('.rit-anteprima');
+      const immagine = vista.querySelector('img');
+      immagine.src = img.src;
+      const barra = fondo.querySelector('input[type=range]');
+      const disegna = () => { const m = misura(); Object.assign(immagine.style, { width: `${m.w}px`, height: `${m.h}px`, transform: `translate(${st.x}px, ${st.y}px)` }); barra.value = st.zoom; };
+      // Ingrandisce mantenendo fermo il punto (cx, cy) dell'anteprima
+      const ingrandisci = (z, cx = V / 2, cy = V / 2) => {
+        const prima = misura();
+        const px = (cx - st.x) / prima.w, py = (cy - st.y) / prima.h;
+        st.zoom = Math.min(4, Math.max(1, z));
+        const dopo = misura();
+        st.x = cx - px * dopo.w; st.y = cy - py * dopo.h;
+        limita(); disegna();
+      };
+      disegna();
+      let presa = null;
+      vista.addEventListener('pointerdown', (e) => { presa = { x: e.clientX - st.x, y: e.clientY - st.y }; vista.setPointerCapture(e.pointerId); e.preventDefault(); });
+      vista.addEventListener('pointermove', (e) => { if (!presa) return; st.x = e.clientX - presa.x; st.y = e.clientY - presa.y; limita(); disegna(); });
+      vista.addEventListener('pointerup', () => { presa = null; });
+      vista.addEventListener('pointercancel', () => { presa = null; });
+      vista.addEventListener('wheel', (e) => { e.preventDefault(); const r = vista.getBoundingClientRect(); ingrandisci(st.zoom * (e.deltaY < 0 ? 1.08 : 1 / 1.08), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+      barra.addEventListener('input', () => ingrandisci(Number(barra.value)));
+      const chiudi = (valore) => { document.removeEventListener('keydown', tasti); fondo.remove(); fine(valore); };
+      const tasti = (e) => { if (e.key === 'Escape') chiudi(null); if (e.key === 'Enter') usa(); };
+      const usa = () => {
+        // Ritaglio: la parte visibile nell'anteprima, riportata alle misure originali
+        const k = 1 / (base * st.zoom);
+        const tela = document.createElement('canvas');
+        tela.width = lato; tela.height = lato;
+        const g = tela.getContext('2d');
+        g.fillStyle = '#ffffff';
+        g.fillRect(0, 0, lato, lato);
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(img, -st.x * k, -st.y * k, V * k, V * k, 0, 0, lato, lato);
+        chiudi(tela.toDataURL('image/jpeg', 0.88));
+      };
+      document.addEventListener('keydown', tasti);
+      fondo.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-rit]');
+        if (e.target === fondo) chiudi(null);
+        if (!b) return;
+        e.stopPropagation();
+        if (b.dataset.rit === 'auto') { automatico(); disegna(); }
+        if (b.dataset.rit === 'annulla') chiudi(null);
+        if (b.dataset.rit === 'usa') usa();
+      });
+      fondo.querySelector('[data-rit="usa"]').focus();
+    });
+  }
+
   // Iniziativa in evidenza nell'intestazione di ogni scheda: valore calcolato dalla scheda automatica
   // (si aggiorna da solo) o, per i regolamenti senza scheda automatica, un bonus scritto a mano; sempre tirabile
   function bloccoIniziativa(p, r) {
@@ -1988,7 +2081,9 @@
         if (!file) return;
         if (file.size > 20 * 1024 * 1024) { toast('Immagine troppo grande (massimo 20 MB)', 'errore'); return; }
         try {
-          p.immagine = await riduciImmagine(file);
+          const risultato = await regolaRitratto(await caricaImmagineFile(file));
+          if (!risultato) return;
+          p.immagine = risultato;
           p.modificato = Date.now();
           salva();
           render();

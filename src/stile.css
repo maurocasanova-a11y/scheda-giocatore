@@ -861,6 +861,20 @@ body.modo-schermo #contenuto { max-width: none; padding: 18px 24px; height: 100v
 .tav-titolo { display: flex; align-items: center; }
 .intest-ritratto { display: flex; align-items: center; gap: 18px; }
 .ritratto-box { position: relative; }
+/* Finestra "Adatta l'immagine" del ritratto */
+.rit-fondo { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(5, 4, 8, .72); backdrop-filter: blur(3px); }
+.rit-finestra { width: min(360px, 100%); padding: 18px 20px; border: 1px solid var(--oro-scuro); border-radius: var(--raggio); background: var(--pannello); box-shadow: 0 18px 50px rgba(0, 0, 0, .6); display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.rit-finestra h3 { margin: 0; align-self: flex-start; }
+.rit-anteprima { position: relative; overflow: hidden; border-radius: 8px; background: #0c0b10; cursor: grab; touch-action: none; user-select: none; }
+.rit-anteprima:active { cursor: grabbing; }
+.rit-anteprima img { position: absolute; left: 0; top: 0; max-width: none; pointer-events: none; }
+/* Fuori dal cerchio l'immagine è scurita: si vede cosa resterà nel ritratto */
+.rit-cerchio { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgba(0, 0, 0, .58); border: 2px solid var(--oro); pointer-events: none; }
+.rit-zoom { display: flex; align-items: center; gap: 8px; width: 100%; }
+.rit-zoom input { flex: 1; }
+.rit-aiuto { margin: 0; font-size: 12.5px; text-align: center; }
+.rit-comandi { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; align-items: center; }
+.rit-comandi span { flex: 1; }
 .ritratto-togli { position: absolute; top: -4px; right: -4px; border-radius: 50%; }
 .scheda-titolo { display: flex; align-items: center; }
 @media print { .ritratto-togli { display: none; } .ritratto { border-color: #999; } }
