@@ -3819,6 +3819,24 @@ window.creaPF1 = function creaPF1(ctx) {
     aggiorna(p);
   }
 
+  // Scelta della classe: menu a tendina con le classi in elenco; una classe fuori elenco si scrive a mano
+  // (con il pulsante per tornare all'elenco)
+  function sceltaClasse(cl, id) {
+    const k = nomeClasse(cl.nome);
+    if (cl.nome && !k) {
+      return `<input class="pf-largo" data-pf1="classi#${cl.id}|nome" data-id="${id}" value="${esc(cl.nome)}" placeholder="Nome della classe">
+        <button class="btn-mini" data-azione="pf1-classe-elenco" data-id="${id}" data-cl="${cl.id}" title="Scegli una classe dall'elenco">📋 Elenco</button>`;
+    }
+    const nomi = Object.keys(CLASSI).sort((a, b) => a.localeCompare(b, 'it'));
+    const gruppo = (titolo, lista) => `<optgroup label="${titolo}">${lista.map((x) => `<option value="${esc(x)}"${x === k ? ' selected' : ''}>${esc(x)}</option>`).join('')}</optgroup>`;
+    return `<select class="pf-largo" data-pf1="classi#${cl.id}|nome" data-id="${id}">
+        <option value=""${k ? '' : ' selected'}>— scegli la classe —</option>
+        ${gruppo('Classi', nomi.filter((x) => !CLASSI[x].prestigio))}
+        ${gruppo('Classi di prestigio', nomi.filter((x) => CLASSI[x].prestigio))}
+        <option value="Classe personalizzata">✎ Altra classe (personalizzata)…</option>
+      </select>`;
+  }
+
   function cambioScheda(el) {
     const percorso = el.dataset.pf1;
     const p = ctx.personaggio(el.dataset.id);
@@ -4273,7 +4291,7 @@ window.creaPF1 = function creaPF1(ctx) {
 
     // Classi
     const classi = d.classi.map((cl) => `<div class="pf-riga">
-        <input list="pf1-classi" class="pf-largo" data-pf1="classi#${cl.id}|nome" data-id="${id}" value="${esc(cl.nome)}" placeholder="Classe">
+        ${sceltaClasse(cl, id)}
         ${GIOCATORE ? `<span class="pf-liv-fisso" title="Nella scheda del giocatore i livelli si prendono uno alla volta con «⬆ Sali di livello»">Livello <b>${n(cl.livello)}</b></span>`
           : `<label>Livello ${num(`classi#${cl.id}|livello`, cl.livello, 'min="1" max="20"')}</label>
         <span class="pf-liv-btn"><button class="btn-mini" data-azione="pf1-classe-liv" data-id="${id}" data-cl="${cl.id}" data-d="-1" title="Togli un livello di ${esc(cl.nome || 'questa classe')}">−</button><button class="btn-mini" data-azione="pf1-classe-liv" data-id="${id}" data-cl="${cl.id}" data-d="1" title="Aggiungi un livello (senza la procedura di salita)">+</button></span>`}
@@ -4284,13 +4302,13 @@ window.creaPF1 = function creaPF1(ctx) {
         <label class="pf-chk" title="Volontà buona">${chk(`classi#${cl.id}|volonta`, cl.volonta)} Vol</label>
         <label class="pf-chk" title="Classe di prestigio: TS buoni +1 al 1° livello invece di +2">${chk(`classi#${cl.id}|prestigio`, cl.prestigio)} Prestigio</label>
         <label title="Gradi di abilità per livello (senza INT)">Gradi/liv ${num(`classi#${cl.id}|gradi`, cl.gradi)}</label>
-        ${nomeClasse(cl.nome) ? '' : '<span class="muto" title="Classe non in elenco: imposta tu progressione e abilità di classe">personalizzata</span>'}
+        ${!cl.nome || nomeClasse(cl.nome) ? '' : '<span class="muto" title="Classe non in elenco: imposta tu progressione e abilità di classe">personalizzata</span>'}
         <button class="btn-piccolo pf-togli-classe" data-azione="pf1-classe-togli" data-id="${id}" data-cl="${cl.id}" title="Togli questa classe con tutti i suoi livelli">🗑 Togli classe</button>
       </div>`).join('');
     const corpoClassi = `${classi || '<p class="muto">Nessuna classe. Aggiungine una: i valori si calcolano da soli.</p>'}
       <div class="pf-piede">${GIOCATORE && d.classi.length ? '<span class="muto">Le altre classi (multiclasse) si aggiungono con «⬆ Sali di livello».</span>' : aggiungi('classi', 'Classe')}<span class="muto">Livello totale <b>${k('liv')}</b> · BAB <b>${k('bab')}</b></span>
         <label>Taglia ${sel('taglia', TAGLIE.map((t) => [t[0], t[0]]), d.taglia, 'data-ridisegna-pf1')}</label></div>
-      ${datalistFisso('pf1-classi', () => Object.keys(CLASSI).map((x) => `<option value="${esc(x)}">`).join(''))}`;
+`;
 
     // Bonus attivabili
     const opzBersagli = (scelto) => `${opz(BERSAGLI, scelto)}<optgroup label="Una sola abilità">${opz(abilitaScheda(r, d).filter((a) => !a.nascosta).map((a) => ['abil:' + a.nome, a.nome]), scelto)}</optgroup>`;
@@ -5009,6 +5027,14 @@ window.creaPF1 = function creaPF1(ctx) {
       ctx.salva();
       ctx.render();
       ctx.toast(`<b>${esc(cl.nome || 'Classe')}</b> ora di livello ${nuovo}`);
+    },
+    'pf1-classe-elenco'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      const cl = p && dati(p).classi.find((x) => x.id === el.dataset.cl);
+      if (!cl) return;
+      cl.nome = '';
+      ctx.salva();
+      ctx.render();
     },
     'pf1-classe-togli'(el) {
       const p = ctx.personaggio(el.dataset.id);
