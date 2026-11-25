@@ -483,11 +483,12 @@ window.creaPF1 = function creaPF1(ctx) {
 
   // ---- Slot del corpo per gli oggetti magici indossati ----
   // [chiave, nome, punto sul corpo (x, y) nello schema]
+  // Slot del corpo: punto sulla figura dell'immagine src/img/sagoma-slot.webp (coordinate in pixel dell'immagine, 683×1024)
   const SLOT_CORPO = [
-    ['testa', 'Testa', 100, 22], ['fronte', 'Fronte', 100, 38], ['occhi', 'Occhi', 108, 50], ['collo', 'Collo', 100, 80],
-    ['spalle', 'Spalle', 136, 96], ['torace', 'Torace', 104, 118], ['corpo', 'Corpo', 96, 150], ['armatura', 'Armatura', 112, 172],
-    ['cintura', 'Cintura', 100, 214], ['polsi', 'Polsi', 160, 238], ['mani', 'Mani', 166, 262], ['anello1', 'Anello 1', 170, 278],
-    ['anello2', 'Anello 2', 32, 278], ['scudo', 'Scudo', 26, 236], ['piedi', 'Piedi', 120, 432],
+    ['testa', 'Testa', 340, 108], ['fronte', 'Fronte', 340, 128], ['occhi', 'Occhi', 352, 150], ['collo', 'Collo', 340, 207],
+    ['spalle', 'Spalle', 425, 245], ['torace', 'Torace', 345, 290], ['corpo', 'Corpo', 322, 350], ['armatura', 'Armatura', 365, 395],
+    ['cintura', 'Cintura', 340, 470], ['polsi', 'Polsi', 482, 490], ['mani', 'Mani', 492, 522], ['anello1', 'Anello 1', 497, 545],
+    ['anello2', 'Anello 2', 185, 545], ['scudo', 'Scudo', 215, 430], ['piedi', 'Piedi', 368, 905],
   ];
   const SLOT_WIKI = { mani: 'mani', corpo: 'corpo', torace: 'torace', spalle: 'spalle', collo: 'collo', polsi: 'polsi', anello: 'anello', armatura: 'armatura', testa: 'testa', cintura: 'cintura', scudo: 'scudo', occhi: 'occhi', piedi: 'piedi', fronte: 'fronte' };
   // Slot automatico di un oggetto: dal database del wiki, dagli oggetti creati (anelli) o dal nome ("Anello di…")
@@ -519,28 +520,36 @@ window.creaPF1 = function creaPF1(ctx) {
     const pieni = SLOT_CORPO.filter(([k]) => per[k].length).length;
     const doppi = SLOT_CORPO.filter(([k]) => per[k].length > 1);
     const riga = 30;
-    const voci = SLOT_CORPO.map(([k, nome, x, y], i) => {
+    const alto = 18 + SLOT_CORPO.length * riga;
+    // Ritaglio dell'immagine mostrato a sinistra: la figura (x 150-530, y 80-930 dell'immagine) riempie il riquadro
+    const S = alto / 850, OX = 150, OY = 80, LARGO = 210;
+    const px = (x) => Math.round((x - OX) * S * 10) / 10;
+    const py = (y) => Math.round((y - OY) * S * 10) / 10;
+    const voci = SLOT_CORPO.map(([k, nome, ix, iy], i) => {
+      const x = px(ix), y = py(iy);
       const ly = 18 + i * riga;
       const og = per[k];
       const stato = og.length > 1 ? 'doppio' : og.length ? 'pieno' : 'vuoto';
       const testo = og.length ? og.join(', ') : '—';
       const breve = testo.length > 40 ? `${testo.slice(0, 38)}…` : testo;
       return `<g class="slot-${stato}"><title>${esc(nome)}: ${esc(testo)}</title>
-        <polyline points="${x},${y} ${x < 100 ? 196 : Math.max(x + 14, 190)},${y} 214,${ly} 232,${ly}" class="slot-linea"/>
-        <circle cx="${x}" cy="${y}" r="3.5" class="slot-punto"/>
+        <polyline points="${x},${y} ${LARGO + 4},${y} ${LARGO + 20},${ly} 232,${ly}" class="slot-linea"/>
+        <circle cx="${x}" cy="${y}" r="4" class="slot-punto"/>
         <text x="238" y="${ly - 2}" class="slot-nome">${esc(nome)}${og.length > 1 ? ' ⚠' : ''}</text>
         <text x="238" y="${ly + 11}" class="slot-ogg">${esc(breve)}</text></g>`;
     }).join('');
-    // Sagoma stilizzata (forme semplici)
-    const sagoma = `<g class="slot-sagoma">
-        <ellipse cx="100" cy="36" rx="20" ry="25"/><rect x="91" y="58" width="18" height="16" rx="4"/>
-        <path d="M58 82 Q100 70 142 82 L150 120 L138 214 L62 214 L50 120 Z"/>
-        <path d="M58 84 L40 110 L30 200 L26 260 L38 262 L46 204 L60 130 Z"/>
-        <path d="M142 84 L160 110 L168 200 L174 262 L162 264 L154 204 L140 130 Z"/>
-        <path d="M64 210 L136 210 L134 300 L128 420 L132 440 L106 440 L108 300 L100 250 L92 300 L94 440 L68 440 L72 420 L66 300 Z"/>
-      </g>`;
+    // Figura: l'immagine della sala con la sagoma luminosa, ritagliata e sfumata verso le scritte
+    const sagoma = `<defs>
+        <clipPath id="slot-ritaglio"><rect x="0" y="0" width="${LARGO}" height="${alto}" rx="10"/></clipPath>
+        <linearGradient id="slot-sfuma" x1="0" x2="1" y1="0" y2="0"><stop offset="0.72" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></linearGradient>
+      </defs>
+      <g clip-path="url(#slot-ritaglio)">
+        <image href="src/img/sagoma-slot.webp" x="${-OX * S}" y="${-OY * S}" width="${683 * S}" height="${1024 * S}" preserveAspectRatio="none"/>
+        <rect x="0" y="0" width="${LARGO}" height="${alto}" fill="url(#slot-sfuma)"/>
+      </g>
+      <rect x="0.5" y="0.5" width="${LARGO - 1}" height="${alto - 1}" rx="10" class="slot-cornice"/>`;
     return `<div class="slot-box">
-        <svg class="slot-schema" viewBox="0 0 500 ${18 + SLOT_CORPO.length * riga}" role="img" aria-label="Oggetti magici indossati per slot del corpo">${sagoma}${voci}</svg>
+        <svg class="slot-schema" viewBox="0 0 500 ${alto}" role="img" aria-label="Oggetti magici indossati per slot del corpo">${sagoma}${voci}</svg>
         <p class="muto pf-aiuto">${pieni} slot su ${SLOT_CORPO.length} occupati · contano gli oggetti nel luogo «Indossato», le armature e gli scudi indossati.
           ${doppi.length ? `<span class="oltre">⚠ Due oggetti nello stesso slot: ${esc(doppi.map(([, nm]) => nm).join(', '))} — di solito funziona solo il primo indossato.</span>` : ''}
           Lo slot si prende dal database del wiki; per gli altri oggetti sceglilo nella riga dell'oggetto.</p>

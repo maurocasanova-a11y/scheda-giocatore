@@ -1036,9 +1036,9 @@ body.modo-giocatore .layout-scheda { grid-template-columns: minmax(0, 1fr); }
 /* Schema degli slot del corpo (oggetti magici indossati) */
 .slot-box { margin: 4px 0 14px; }
 .slot-schema { width: 100%; max-width: 560px; height: auto; display: block; }
-.slot-sagoma > * { fill: #0c0b10; stroke: var(--oro-scuro); stroke-width: 1; }
-.slot-linea { fill: none; stroke: var(--bordo); stroke-width: 1; }
-.slot-punto { fill: var(--muto); }
+.slot-cornice { fill: none; stroke: var(--oro-scuro); stroke-width: 1; }
+.slot-linea { fill: none; stroke: rgba(200, 200, 210, .45); stroke-width: 1; }
+.slot-punto { fill: rgba(225, 225, 235, .7); stroke: rgba(0, 0, 0, .75); stroke-width: 1.5; }
 .slot-nome { fill: var(--muto); font-size: 11px; font-weight: 700; }
 .slot-ogg { fill: var(--muto); font-size: 11px; opacity: .6; }
 /* Slot con un oggetto indossato: blu acceso */
