@@ -852,7 +852,7 @@ window.creaPF1 = function creaPF1(ctx) {
   // Bonus alla CA che valgono anche per la DMC
   const TIPI_DMC = new Set(['deviazione', 'schivare', 'cognitivo', 'fortuna', 'morale', 'profano', 'sacro', 'circostanza']);
   const BERSAGLI = [
-    ['FOR', 'Forza'], ['DES', 'Destrezza'], ['COS', 'Costituzione'], ['INT', 'Intelligenza'], ['SAG', 'Saggezza'], ['CAR', 'Carisma'],
+    ['FOR', 'Forza'], ['DES', 'Destrezza'], ['COS', 'Costituzione'], ['INT', 'Intelligenza'], ['SAG', 'Saggezza'], ['CAR', 'Carisma'], ['proveCar', 'Prove di caratteristica'],
     ['colpire', 'Tiri per colpire'], ['danni', 'Danni'], ['ca', 'Classe Armatura'],
     ['ts', 'Tutti i tiri salvezza'], ['tempra', 'Tempra'], ['riflessi', 'Riflessi'], ['volonta', 'Volontà'],
     ['abilita', 'Tutte le abilità'], ['iniz', 'Iniziativa'], ['bmc', 'BMC'], ['dmc', 'DMC'],
@@ -1194,6 +1194,7 @@ window.creaPF1 = function creaPF1(ctx) {
       if (utili.length) cumuli.push({ etichetta, ...analizzaCumulo(utili) });
     };
     for (const s of CARS) resoconto(NOMI_CAR[s], per(s));
+    resoconto('Prove di caratteristica', per('proveCar'));
     resoconto('Classe Armatura', contributi);
     for (const [k, nome] of TS) resoconto(nome, per('ts', k));
     for (const k of ['colpire', 'danni', 'iniz', 'bmc', 'dmc']) resoconto(etichettaBersaglio(k), per(k));
@@ -1303,6 +1304,7 @@ window.creaPF1 = function creaPF1(ctx) {
       base, punteggio, m, liv, bab, ca, contatto, sorpresa, desMax, penalita, fallimento, ts, init, bmc, dmc,
       abil, diClasse, daClasse, gradiSpesi, gradiDisp, armi, peso, leggero, medio, pesante, livelloCarico, valoreMonete,
       mitico, pfMax, pfAtt, pfDett, incantatori, cumuli, bonusColpire, bonusDanni, bonusAttivi: d.bonus.filter((b) => b.attivo).map((b) => b.nome),
+      proveCar: cumula(per('proveCar')), // bonus alle prove di caratteristica (es. Forza per sfondare una porta)
     };
   }
 
@@ -1311,6 +1313,7 @@ window.creaPF1 = function creaPF1(ctx) {
     const o = {};
     for (const s of CARS) {
       o['mod:' + s] = segno(c.m[s]);
+      o['prova:' + s] = n(c.proveCar) ? `prova ${segno(c.m[s] + n(c.proveCar))}` : '';
       o['eff:' + s] = c.punteggio[s] !== c.base[s] ? `→ ${c.punteggio[s]}` : '';
     }
     Object.assign(o, {
@@ -4336,6 +4339,7 @@ window.creaPF1 = function creaPF1(ctx) {
           <span class="car-eff">${k('eff:' + s)}</span></div>
         <div class="car-mod">${k('mod:' + s)}</div>
         <div class="car-nome">${esc(kk?.nome || s)}</div>
+        <div class="car-prova" title="Prove di caratteristica, con il bonus degli oggetti e dei bonus attivi">${k('prova:' + s)}</div>
         ${dado('car:' + s, kk?.nome || s)}
       </div>`;
     }).join('');
@@ -4927,7 +4931,7 @@ window.creaPF1 = function creaPF1(ctx) {
     const [tipo, arg] = chiave.split(/:(.*)/s);
     const nomeCar = (s) => r.caratteristiche.find((x) => x.sigla === s)?.nome || s;
     const tiro = (bonus, et) => ctx.eseguiTiro('1d20' + fmtMod(bonus), `${p.nome} · ${et}`);
-    if (tipo === 'car') return tiro(c.m[arg], nomeCar(arg));
+    if (tipo === 'car') return tiro(c.m[arg] + n(c.proveCar), nomeCar(arg) + (n(c.proveCar) ? ' (prova)' : ''));
     if (tipo === 'ts') return tiro(c.ts[arg].tot, TS.find((x) => x[0] === arg)[1]);
     if (tipo === 'tsc') {
       const [k, id] = arg.split('|');

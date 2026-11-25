@@ -1432,3 +1432,5 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
 .salto-riga.blocco-sotto { box-shadow: inset 0 -2px 0 var(--oro); }
 .salto-riga.blocco-in-volo { opacity: .45; }
 @media (hover: none) { .salto-sposta { opacity: 1; } }
+.car-prova { font-size: 11px; color: var(--verde); min-height: 0; }
+.car-prova:empty { display: none; }
