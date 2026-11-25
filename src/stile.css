@@ -262,6 +262,12 @@ mark { background: rgba(212, 173, 90, .35); color: inherit; border-radius: 2px; 
 /* ---------- Suggerimenti @ ---------- */
 #suggerimenti { position: fixed; z-index: 50; background: var(--barra); border: 1px solid var(--oro-scuro); border-radius: var(--raggio); min-width: 260px; max-width: 380px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); overflow: hidden; }
 #suggerimenti[hidden] { display: none; }
+/* Suggerimenti dei campi con elenco (src/elenchi.js): sotto il campo, si scorrono e si toccano */
+#elenco-sugg { position: fixed; z-index: 55; background: var(--barra); border: 1px solid var(--oro-scuro); border-radius: var(--raggio); box-shadow: 0 10px 30px rgba(0, 0, 0, .5); overflow-y: auto; overscroll-behavior: contain; }
+#elenco-sugg[hidden] { display: none; }
+#elenco-sugg .sugg { padding: 9px 12px; white-space: normal; line-height: 1.3; }
+#elenco-sugg .sugg small { margin-left: 4px; }
+@media (pointer: coarse) { #elenco-sugg .sugg { padding: 12px 14px; } }
 .sugg { padding: 7px 12px; cursor: pointer; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sugg.sel, .sugg:hover { background: var(--pannello-2); }
 .sugg-nuovo { color: var(--oro); }
