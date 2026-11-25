@@ -465,7 +465,8 @@ window.creaSF = function creaSF(ctx) {
       }).join(' ')}</div>`).join('');
       const L = sfogliaInc[inc.classe] ?? '';
       const lista = L === '' ? [] : INCANTESIMI.filter((v) => livelloInc(v, inc.classe) === Number(L)).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
-      return `<h4>${esc(inc.classe)} <small class="muto">caratteristica ${NOMI_CAR[CLASSI_INC[inc.classe]]} · incantesimi di livello 0 a volontà</small></h4>
+      return `<h4>${esc(inc.classe)} <small class="muto">caratteristica ${NOMI_CAR[CLASSI_INC[inc.classe]]} · incantesimi di livello 0 a volontà</small>
+          <button class="btn-piccolo olo-apri" data-azione="sf-olo-apri" data-id="${id}" data-classe="${esc(inc.classe)}" title="Gli incantesimi su uno schermo olografico, da tenere aperto durante il gioco">◈ Archivio olografico</button></h4>
         <div class="pf-riga">${slot || '<span class="muto">nessuno slot a questo livello</span>'}</div>
         ${perLiv || '<p class="muto">Nessun incantesimo conosciuto: aggiungili dall\'elenco.</p>'}
         <div class="pf-elenco-inc"><div class="pf-riga"><b>Elenco del wiki</b>
@@ -866,9 +867,117 @@ window.creaSF = function creaSF(ctx) {
     aggiorna(p);
   }
 
+  // =====================================================================
+  // Archivio olografico: il "libro degli incantesimi" di Starfinder, come uno schermo olografico.
+  // Si apre in una finestra a parte (nell'app) o nella stessa pagina (kit dei giocatori): #/olografico/<pg>/<classe>
+  // =====================================================================
+  const slugClasse = (k) => String(k).replace(/ /g, '-');
+  const classeDaSlug = (s) => Object.keys(CLASSI_INC).find((k) => slugClasse(k) === s) || '';
+  const olo = { pg: '', classe: '', livello: null, scelto: '' };
+  const testiOlo = new Map(); // descrizioni lette dal wiki (pagina → testo), non salvate
+  function estraiDescrizione(doc) {
+    const c = doc.querySelector('#mw-content-text .mw-parser-output') || doc.querySelector('#mw-content-text');
+    if (!c) return '';
+    c.querySelectorAll('table, .toc, .navbox, .mw-editsection, sup.reference, style, script').forEach((x) => x.remove());
+    const out = [];
+    for (const x of c.querySelectorAll('p, li')) {
+      const t = x.textContent.replace(/\s+/g, ' ').trim();
+      if (t.length <= 2 || /^Fonte\s*:/i.test(t)) continue;
+      // Blocco delle statistiche (già nei riquadri): se ne tiene solo bersaglio, area ed effetto
+      if (/^Scuola\s*:/i.test(t)) {
+        const extra = [...x.textContent.matchAll(/(Bersagli?o?|Area|Effetto)\s*:\s*([^\n]+?)(?=\s*(?:Durata|Tiro Salvezza|Resistenza|Gittata|Tempo di Lancio)\s*:|\n|$)/gi)].map((m) => `${m[1]}: ${m[2].trim()}`);
+        if (extra.length) out.push(extra.join(' · '));
+        continue;
+      }
+      out.push(t.replace(/^Descrizione\s*:\s*/i, ''));
+    }
+    return out.join('\n\n');
+  }
+  function caricaDescrizione(pagina) {
+    if (testiOlo.has(pagina) || !ctx.wiki) return;
+    testiOlo.set(pagina, null); // in caricamento
+    ctx.wiki(pagina.replace(/ /g, '_'), 'sf')
+      .then((html) => estraiDescrizione(new DOMParser().parseFromString(html, 'text/html')))
+      .then((t) => { testiOlo.set(pagina, t || ''); }, () => { testiOlo.delete(pagina); testiOlo.set('!' + pagina, true); })
+      .then(() => { const box = document.getElementById('olo-testo'); if (box && box.dataset.pagina === pagina) box.outerHTML = testoOlo(pagina); });
+  }
+  function testoOlo(pagina) {
+    const t = testiOlo.get(pagina);
+    const corpo = t ? t.split(/\n{2,}/).map((x) => `<p>${esc(x)}</p>`).join('')
+      : t === '' || testiOlo.has('!' + pagina) || !ctx.wiki ? `<p class="olo-muto">Descrizione non disponibile qui: apri la scheda sul wiki.</p>`
+        : '<p class="olo-muto olo-carica">Ricezione dati dal wiki<span>…</span></p>';
+    return `<div id="olo-testo" class="olo-testo" data-pagina="${esc(pagina)}">${corpo}</div>`;
+  }
+  function vistaOlografico(p, slug) {
+    if (!p) return '<p class="vuoto">Personaggio non trovato.</p>';
+    const d = dati(p);
+    const c = calcola(p);
+    const classe = classeDaSlug(slug) || c.incantesimi[0]?.classe || '';
+    const inc = c.incantesimi.find((x) => x.classe === classe);
+    if (olo.pg !== p.id || olo.classe !== classe) Object.assign(olo, { pg: p.id, classe, livello: null, scelto: '' });
+    document.title = `Archivio olografico — ${p.nome}`;
+    if (!inc) return `<div class="olo"><div class="olo-schermo"><p class="olo-muto">${esc(p.nome)} non ha classi incantatrici.</p></div></div>`;
+    const usi = d.usiInc[classe] || {};
+    const noti = d.incantesimi.filter((x) => x.classe === classe);
+    const livelli = [0, ...inc.giorno.map((x, i) => (x === '' ? null : i + 1)).filter((x) => x !== null)];
+    for (const x of noti) if (!livelli.includes(x.livello)) livelli.push(x.livello);
+    livelli.sort((a, b) => a - b);
+    if (olo.livello === null || !livelli.includes(olo.livello)) olo.livello = livelli.find((L) => noti.some((x) => x.livello === L)) ?? livelli[0];
+    const L = olo.livello;
+    const qui = noti.filter((x) => x.livello === L).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+    if (!qui.some((x) => x.id === olo.scelto)) olo.scelto = qui[0]?.id || '';
+    const scelto = qui.find((x) => x.id === olo.scelto);
+    const v = scelto ? INCANTESIMI.find((y) => y.nome === scelto.nome) : null;
+    const tot = (Lv) => (Lv === 0 ? null : n(inc.giorno[Lv - 1]));
+    const restano = (Lv) => (Lv === 0 ? null : Math.max(0, tot(Lv) - n(usi[Lv])));
+    const tacche = (Lv) => (Lv === 0 ? '<span class="olo-inf">∞</span>' : Array.from({ length: tot(Lv) }, (_, i) => `<i class="${i < restano(Lv) ? 'on' : ''}"></i>`).join(''));
+    const schede = livelli.map((Lv) => `<button class="olo-tab${Lv === L ? ' attiva' : ''}" data-azione="sf-olo-livello" data-livello="${Lv}">
+        <b>${Lv === 0 ? 'LIV 0' : `LIV ${Lv}`}</b><span class="olo-tacche">${tacche(Lv)}</span>
+        <small>${noti.filter((x) => x.livello === Lv).length} incant.</small></button>`).join('');
+    const elenco = qui.map((x) => {
+      const w = INCANTESIMI.find((y) => y.nome === x.nome);
+      return `<button class="olo-voce${x.id === olo.scelto ? ' scelta' : ''}" data-azione="sf-olo-scegli" data-sp="${x.id}">
+        <span class="olo-voce-nome">${esc(x.nome)}</span><small>${esc(w ? w.scuola.split(' ')[0] : '')}${w?.tempo ? ` · ${esc(w.tempo)}` : ''}</small></button>`;
+    }).join('') || `<p class="olo-muto">Nessun incantesimo conosciuto di livello ${L}. Aggiungili dalla scheda.</p>`;
+    let dettaglio = '<p class="olo-muto">Seleziona un incantesimo.</p>';
+    if (scelto) {
+      const pagina = v?.pagina || scelto.nome;
+      caricaDescrizione(pagina);
+      const dato = (et, val) => (val ? `<div class="olo-dato"><span>${et}</span><b>${esc(val)}</b></div>` : '');
+      const puoi = L === 0 || restano(L) > 0;
+      dettaglio = `<div class="olo-titolo"><h2>${esc(scelto.nome)}</h2><span class="olo-liv">LIV ${L}</span></div>
+        <div class="olo-dati">${dato('Scuola', v?.scuola)}${dato('Tempo di lancio', v?.tempo)}${dato('Gittata', v?.gittata)}${dato('Durata', v?.durata)}${dato('Tiro salvezza', v?.ts)}${dato('Resistenza incant.', v?.ri)}${dato('CD', L > 0 ? String(inc.cd(L)) : String(10 + c.m[CLASSI_INC[classe]]))}</div>
+        ${testoOlo(pagina)}
+        <div class="olo-comandi">
+          <button class="olo-lancia" data-azione="sf-lancia" data-remoto data-id="${p.id}" data-classe="${esc(classe)}" data-livello="${L}" data-nome="${esc(scelto.nome)}" ${puoi ? '' : 'disabled'}>✦ ${puoi ? 'Lancia' : 'Slot esauriti'}</button>
+          <a class="olo-link" href="${esc(linkWiki(pagina))}" target="_blank" rel="noopener">Apri sul wiki ↗</a>
+        </div>`;
+    }
+    return `<div class="olo">
+      <div class="olo-schermo">
+        <span class="olo-angolo a1"></span><span class="olo-angolo a2"></span><span class="olo-angolo a3"></span><span class="olo-angolo a4"></span>
+        <header class="olo-testa">
+          <div><div class="olo-sigla">◈ ARCHIVIO ARCANO · ${esc(classe.toUpperCase())}</div><h1>${esc(p.nome)}</h1></div>
+          <div class="olo-stato"><span>CD base ${10 + c.m[CLASSI_INC[classe]]}</span><span>${esc(NOMI_CAR[CLASSI_INC[classe]])} ${c.m[CLASSI_INC[classe]] >= 0 ? '+' : ''}${c.m[CLASSI_INC[classe]]}</span><span class="olo-online">● ONLINE</span></div>
+        </header>
+        <nav class="olo-tabs">${schede}</nav>
+        <div class="olo-corpo">
+          <div class="olo-elenco">${elenco}</div>
+          <section class="olo-dettaglio">${dettaglio}</section>
+        </div>
+      </div>
+    </div>`;
+  }
+  Object.assign(azioni, {
+    'sf-olo-apri'(el) { ctx.apriLibro?.(el.dataset.id, slugClasse(el.dataset.classe), 'olografico'); },
+    'sf-olo-livello'(el) { olo.livello = Number(el.dataset.livello); olo.scelto = ''; ctx.render(); },
+    'sf-olo-scegli'(el) { olo.scelto = el.dataset.sp; ctx.render(); },
+  });
+
   return {
     CAMPI_CALCOLATI,
     vistaScheda,
+    vistaOlografico,
     azioni,
     moduli: {},
     calcola: (p) => calcola(p),

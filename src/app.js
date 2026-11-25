@@ -1180,7 +1180,7 @@
     const q = new URLSearchParams(qs);
     const p = percorso.split('/').filter(Boolean);
     let html;
-    if (GIOCATORE && !['personaggio', 'dadi', 'grimorio', 'breviario'].includes(p[0])) html = vistaGiocatore();
+    if (GIOCATORE && !['personaggio', 'dadi', 'grimorio', 'breviario', 'olografico'].includes(p[0])) html = vistaGiocatore();
     else switch (p[0]) {
       case 'campagna': html = vistaCampagna(p[1], p[2], p[3]); break;
       case 'sessione': html = vistaSessione(p[1], p[2] === 'modifica', q.get('evidenzia')); break;
@@ -1193,6 +1193,7 @@
       case 'schermo': html = pf1.vistaSchermo(campagna(p[1])); break;
       case 'grimorio': html = pf1.vistaGrimorio(personaggio(p[1]), p[2]); break;
       case 'breviario': html = pf1.vistaBreviario(personaggio(p[1]), p[2]); break;
+      case 'olografico': html = sf.vistaOlografico(personaggio(p[1]), p[2]); break;
       case 'regolamenti': html = vistaRegolamenti(); break;
       case 'regolamento': html = vistaRegolamento(p[1]); break;
       case 'dadi': html = vistaDadi(); break;
@@ -1211,11 +1212,12 @@
       html = `<div class="dv-avviso-master">📡 <b>Collegato dal vivo</b> (sessione ${esc(dvM.codice)}): la scheda la compila il giocatore; danni, cure, condizioni e le modifiche che fai qui arrivano subito anche al suo telefono.</div>` + html;
     }
     // Libro o breviario aperti nella stessa pagina (kit dei giocatori): pulsante per tornare alla scheda
-    const libroInPagina = ['grimorio', 'breviario'].includes(p[0]) && !SCHERMO;
+    const libroInPagina = ['grimorio', 'breviario', 'olografico'].includes(p[0]) && !SCHERMO;
     if (libroInPagina) html = `<a class="grim-torna" href="#/personaggio/${esc(p[1] || '')}">← Torna alla scheda</a>${html}`;
     document.body.classList.toggle('modo-libro', libroInPagina);
     // Il libro cambia il titolo della finestra: uscendo si torna a quello della pagina
-    if (!['grimorio', 'breviario'].includes(p[0])) document.title = TITOLO_PAGINA;
+    if (!['grimorio', 'breviario', 'olografico'].includes(p[0])) document.title = TITOLO_PAGINA;
+    document.body.classList.toggle('modo-olo', p[0] === 'olografico');
     const contenuto = $('#contenuto');
     contenuto.innerHTML = html;
     // Arrivando dalla ricerca: parola evidenziata nella pagina della lore
@@ -1483,6 +1485,14 @@
     toast: (h, t) => toast(h, t),
     eseguiTiro: (e, et, o) => eseguiTiro(e, et, o),
     personaggio: (id) => personaggio(id),
+    // Archivio olografico (libro degli incantesimi) e descrizioni dal wiki
+    apriLibro: (pg, inc, tipo) => {
+      if (window.gdr?.apriLibro) return window.gdr.apriLibro(pg, inc, tipo);
+      if (GIOCATORE) { location.hash = `#/${tipo}/${pg}/${inc}`; return Promise.resolve(true); }
+      const pagina = decodeURIComponent(location.pathname.split('/').pop() || 'index.html');
+      return Promise.resolve(window.open(`${encodeURIComponent(pagina)}?schermo=1#/${tipo}/${pg}/${inc}`, `${tipo}-gdr`, 'width=1280,height=860'));
+    },
+    wiki: (pagina, sito) => (window.gdr?.wiki ? window.gdr.wiki(pagina, sito) : Promise.reject(new Error('disponibile solo nell\'app'))),
   });
 
   // Modulo D&D 5e (src/dnd.js)
@@ -2488,7 +2498,7 @@
     const cmd = { azione: el.dataset.azione, dataset: { ...el.dataset } };
     if (window.gdr?.inviaComando) window.gdr.inviaComando(cmd); else canaleComandi?.postMessage(cmd);
   }
-  const AZIONI_REMOTE = new Set(['brev-prepara', 'brev-togli', 'brev-lancia', 'brev-ripristina']);
+  const AZIONI_REMOTE = new Set(['brev-prepara', 'brev-togli', 'brev-lancia', 'brev-ripristina', 'sf-lancia']);
   function eseguiComando(cmd) {
     if (SCHERMO || !cmd || !AZIONI_REMOTE.has(cmd.azione) || !azioni[cmd.azione]) return;
     azioni[cmd.azione]({ dataset: cmd.dataset, closest: () => null });
