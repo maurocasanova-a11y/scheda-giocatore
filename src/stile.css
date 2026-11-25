@@ -1436,3 +1436,7 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
 .car-prova:empty { display: none; }
 .sf-abil-gratis { flex-basis: 100%; grid-column: 1 / -1; font-size: 12px; padding-left: 30px; }
 .pf-abil:has(.sf-abil-gratis) { flex-wrap: wrap; }
+.sf-catalogo .pf-riga { flex-wrap: wrap; }
+.sf-catalogo label.pf-largo { flex: 1 1 260px; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.sf-catalogo select { max-width: 100%; min-width: 0; }
+.sf-catalogo label.pf-largo select { flex: 1; width: 100%; }

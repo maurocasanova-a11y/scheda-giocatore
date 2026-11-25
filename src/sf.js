@@ -58,6 +58,12 @@ window.creaSF = function creaSF(ctx) {
 
   // ---- Contenuti dal wiki (src/sf-contenuti.js) ----
   const C = window.SF_CONTENUTI || { talenti: [], incantesimi: [], armi: [], armature: [], scudi: [] };
+  // Catalogo dell'equipaggiamento (src/sf-equip.js): [gruppo, nome, livello, prezzo, volume, dettagli, pagina]
+  const CATALOGO = window.SF_EQUIP?.catalogo || [];
+  const GRUPPI_CATALOGO = [...new Set(CATALOGO.map((x) => x[0]))];
+  // Dove si può installare: migliorie nelle armature, fusioni/accessori/cristalli sulle armi
+  const DEST_CATALOGO = { "Migliorie d'armatura": 'armature', "Fusioni d'arma": 'armi', 'Accessori per armi': 'armi', 'Cristalli arma solarian': 'armi' };
+  const prezzoNumero = (p) => (/^\d{1,3}(\.\d{3})*$|^\d+$/.test(String(p).trim()) ? Number(String(p).replace(/\./g, '')) : '');
   const linkWiki = (pagina, nome) => WIKI + String(pagina || nome).replace(/ /g, '_');
   const TALENTI = C.talenti.map(([nome, en, tipo, pre, fonte, pagina]) => ({ nome, en, tipo, pre, fonte, pagina: pagina || nome }));
   const talentoDi = (nome) => TALENTI.find((t) => norm(t.nome) === norm(String(nome || '').replace(/\s*\([^)]*\)\s*$/, ''))) || TALENTI.find((t) => norm(t.nome) === norm(nome || '')) || null;
@@ -118,7 +124,7 @@ window.creaSF = function creaSF(ctx) {
   const livelloInc = (v, classe) => { const s = v.liv[classe]; return s === '' || s == null ? null : Number(String(s).split('-')[0]); };
   const sfogliaInc = {}; // classe -> livello mostrato nell'elenco
   // Equipaggiamento
-  const TIPOLOGIA = { 'da Mischia Base': ['mischia base', 'mischia'], 'da Mischia Avanzata': ['mischia avanzata', 'mischia'], Piccole: ['piccola', 'distanza'], Lunghe: ['lunga', 'distanza'], Pesanti: ['pesante', 'distanza'], 'di Precisione': ['precisione', 'distanza'], Speciali: ['speciale', 'distanza'] };
+  const TIPOLOGIA = { 'da Mischia Base': ['mischia base', 'mischia'], 'da Mischia Avanzata': ['mischia avanzata', 'mischia'], Piccole: ['piccola', 'distanza'], Lunghe: ['lunga', 'distanza'], Pesanti: ['pesante', 'distanza'], 'di Precisione': ['precisione', 'distanza'], Speciali: ['speciale', 'distanza'], Granate: ['granata', 'distanza'] };
 
   // ---- Dati del personaggio ----
   // Operativo: specializzazioni (wiki «Operativo/Specializzazioni»). abil: abilità associate; attacco: abilità per l'attacco
@@ -678,7 +684,8 @@ window.creaSF = function creaSF(ctx) {
     : c.carico === 'sovraccarico' ? '<span class="sf-cond">⛔ Sovraccarico: velocità 1,5 m, DES max alla CA +0, −5 alle prove basate su FOR e DES (già applicati a CA e abilità)</span>' : '<span class="muto">nessuna penalità</span>'}
         <small class="muto">Contano armi, armature e ciò che è nello zaino; casa e astronave no. Con l'armatura vale la penalità peggiore, non si sommano.</small></div>`;
     const corpoEquip = `${statoCarico}<h4>Armature e scudi</h4>${armature || '<p class="muto">Nessuna.</p>'}<div class="pf-piede">${aggiungi('armature', 'Armatura')}${sceltaArm}</div>
-      <h4>Oggetti</h4>${oggetti || '<p class="muto">Nessun oggetto.</p>'}<div class="pf-piede">${aggiungi('oggetti', 'Oggetto')}<label>Crediti ${num('crediti', d.crediti)}</label></div>`;
+      <h4>Oggetti</h4>${oggetti || '<p class="muto">Nessun oggetto.</p>'}<div class="pf-piede">${aggiungi('oggetti', 'Oggetto')}<label>Crediti ${num('crediti', d.crediti)}</label></div>
+      ${sceltaCatalogo(p, d)}`;
 
     // Progressione
     const corpoProg = d.classi.map((cl) => {
@@ -776,6 +783,29 @@ window.creaSF = function creaSF(ctx) {
         ${voce(L >= 17, 'Doppia Debilitazione', 'due effetti di inganno debilitante')}
         ${voce(L >= 20, 'Operativo Supremo', 'tiri due volte le prove delle abilità della specializzazione; 1 volta al giorno scambi un trucco per 24 ore')}
       </ul>`;
+  }
+
+  // Catalogo dell'equipaggiamento del wiki: gruppo → oggetto → dove metterlo (zaino, oppure installato in un'armatura o su un'arma)
+  function sceltaCatalogo(p, d) {
+    if (!CATALOGO.length) return '';
+    const id = p.id;
+    const gruppo = GRUPPI_CATALOGO.includes(d.catalogoGruppo) ? d.catalogoGruppo : GRUPPI_CATALOGO[0];
+    const voci = CATALOGO.map((x, i) => [x, i]).filter(([x]) => x[0] === gruppo)
+      .sort(([a], [b]) => (Number(a[2]) || 0) - (Number(b[2]) || 0) || a[1].localeCompare(b[1], 'it'));
+    const scelta = CATALOGO[d.catalogoVoce]?.[0] === gruppo ? CATALOGO[d.catalogoVoce] : null;
+    const dest = scelta && DEST_CATALOGO[gruppo];
+    const bersagli = dest === 'armature' ? d.armature.filter((a) => a.tipo !== 'scudo').map((a) => [a.id, `🛡 in ${a.nome || 'armatura'}`])
+      : dest === 'armi' ? d.armi.map((a) => [a.id, `⚔ su ${a.nome || 'arma'}`]) : [];
+    return `<div class="sf-catalogo"><h4>Catalogo del wiki <small class="muto">(${CATALOGO.length} oggetti: munizioni, impianti, computer, oggetti tecnologici, magici, ibridi, merci…)</small></h4>
+      <div class="pf-riga">
+        <label>Gruppo <select data-sf="catalogoGruppo" data-id="${id}" data-ridisegna-sf>${opz(GRUPPI_CATALOGO.map((g) => [g, `${g} (${CATALOGO.filter((x) => x[0] === g).length})`]), gruppo)}</select></label>
+        <label class="pf-largo">Oggetto <select data-sf="catalogoVoce" data-id="${id}" data-ridisegna-sf><option value="">— scegli —</option>${voci.map(([x, i]) => `<option value="${i}"${scelta === x ? ' selected' : ''}>${esc(x[1])}${x[2] ? ` — liv. ${esc(x[2])}` : ''}${x[3] ? ` · ${esc(x[3])} cr` : ''}</option>`).join('')}</select></label>
+        ${bersagli.length ? `<label>Dove <select id="sf-cat-dest-${id}"><option value="">nello zaino</option>${opz(bersagli, '')}</select></label>` : ''}
+        <button class="btn-piccolo" data-azione="sf-catalogo-aggiungi" data-id="${id}">Aggiungi</button>
+        ${scelta ? `<a class="btn-piccolo" href="${esc(linkWiki(scelta[6] || scelta[1]))}" target="_blank" rel="noopener" title="Descrizione sul wiki">📖 wiki</a>` : ''}
+      </div>
+      ${scelta ? `<div class="muto pf-aiuto">${esc([scelta[2] && `livello ${scelta[2]}`, scelta[3] && `prezzo ${scelta[3]} crediti`, scelta[4] && `volume ${scelta[4]}`, scelta[5]].filter(Boolean).join(' · '))}</div>` : ''}
+    </div>`;
   }
 
   // Abilità del tema nella riga del tema: scelta (se libera) e cosa dà
@@ -1085,6 +1115,30 @@ window.creaSF = function creaSF(ctx) {
       usi[el.dataset.livello] = Math.max(0, n(usi[el.dataset.livello]) + Number(el.dataset.d));
       ctx.salva(); ctx.render();
     },
+    'sf-catalogo-aggiungi'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      if (!p) return;
+      const d = dati(p);
+      const x = CATALOGO[d.catalogoVoce];
+      if (!x || x[0] !== (GRUPPI_CATALOGO.includes(d.catalogoGruppo) ? d.catalogoGruppo : GRUPPI_CATALOGO[0])) { ctx.toast('Scegli prima un oggetto dal catalogo', 'errore'); return; }
+      const [gruppo, nome, livello, prezzo, volume, dettagli] = x;
+      const dest = document.getElementById(`sf-cat-dest-${p.id}`)?.value || '';
+      const arm = dest && d.armature.find((a) => a.id === dest);
+      const arma = dest && d.armi.find((a) => a.id === dest);
+      if (arm) {
+        arm.upgrade = [arm.upgrade, nome].filter(Boolean).join(', ');
+        ctx.toast(`🛡 <b>${esc(nome)}</b> installata in ${esc(arm.nome || 'armatura')}${avvisoLivello(p, livello)}`);
+      } else if (arma) {
+        arma.critico = [arma.critico, `${gruppo === "Fusioni d'arma" ? 'fusione' : gruppo === 'Cristalli arma solarian' ? 'cristallo' : 'accessorio'} ${nome}`].filter(Boolean).join(' · ');
+        ctx.toast(`⚔ <b>${esc(nome)}</b> su ${esc(arma.nome || 'arma')}${avvisoLivello(p, livello)}`);
+      } else {
+        const v = prezzoNumero(prezzo);
+        d.oggetti.push({ ...NUOVI.oggetti(), nome, ingombro: /^(L|\d+)$/.test(volume) ? volume : '', valore: v,
+          note: [livello && `liv. ${livello}`, v === '' && prezzo ? `prezzo ${prezzo}` : '', /^(L|\d+)$/.test(volume) || !volume ? '' : `volume ${volume}`, dettagli].filter(Boolean).join(' · ') });
+        ctx.toast(`🎒 <b>${esc(nome)}</b> aggiunto agli oggetti${avvisoLivello(p, livello)}`);
+      }
+      ctx.salva(); ctx.render();
+    },
     'sf-arma-wiki'(el) {
       const p = ctx.personaggio(el.dataset.id);
       const a = C.armi.find((x) => x[0] === document.getElementById(`sf-scelta-arma-${p.id}`)?.value);
@@ -1102,7 +1156,7 @@ window.creaSF = function creaSF(ctx) {
       if (v.startsWith('A:')) {
         const a = C.armature.find((x) => x[0] === v.slice(2));
         if (!a) return;
-        dati(p).armature.push({ ...NUOVI.armature(), nome: a[0], tipo: { Leggera: 'leggera', Pesante: 'pesante', Potenziata: 'potenziata' }[a[1]] || 'leggera', cae: numero(a[4]), cac: numero(a[5]), desMax: numero(a[6]), penalita: Math.abs(numero(a[7]) || 0) || '', velocita: a[8] === '-' ? '' : a[8], upgrade: a[9] && a[9] !== '0' ? `${a[9]} spazi per migliorie` : '', volume: volumeWiki(a[10]) });
+        dati(p).armature.push({ ...NUOVI.armature(), nome: a[0], tipo: { Leggera: 'leggera', Pesante: 'pesante', Potenziata: 'potenziata' }[a[1]] || 'leggera', cae: numero(a[4]), cac: numero(a[5]), desMax: numero(a[6]), penalita: Math.abs(numero(a[7]) || 0) || '', velocita: a[8] === '-' ? '' : a[8], upgrade: [a[9] && a[9] !== '0' ? `${a[9]} spazi per migliorie` : '', a[12] ? `Forza ${a[12]}, danni ${a[13]}, taglia ${a[14]}, capacità ${a[15]} (uso ${a[16]}), spazi per armi ${a[17]}` : ''].filter(Boolean).join(' · '), volume: volumeWiki(a[10]) });
         ctx.toast(`🛡 <b>${esc(a[0])}</b> (livello ${esc(a[2])}) aggiunta${avvisoLivello(p, a[2])}`);
       } else if (v.startsWith('S:')) {
         const s = C.scudi.find((x) => x[0] === v.slice(2));
