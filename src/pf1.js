@@ -207,6 +207,9 @@ window.creaPF1 = function creaPF1(ctx) {
   // ---- Razze (dati in src/pf1-razze.js) ----
   const RAZZE = window.PF1_RAZZE || {};
   const razzaDi = (d) => RAZZE[d.razza?.nome] || null;
+  // Razze umane con i tratti Esperti (+1 grado per livello) e Talento Bonus (quanti talenti in più al 1° livello)
+  const TALENTI_UMANI = { Umano: 1, 'Umano Azlanti': 2 };
+  const espertoUmano = (d) => !!TALENTI_UMANI[razzaDi(d)?.nome] && !sostituitiDa(d).has(chiaveTratto('Esperti'));
   // Tratti razziali alternativi scelti (solo quelli della razza attuale)
   const alternativiScelti = (d) => {
     const r = razzaDi(d);
@@ -988,6 +991,8 @@ window.creaPF1 = function creaPF1(ctx) {
     if (mis && d.classi.some((cl) => nomeClasse(cl.nome) === 'Oracolo')) {
       for (const a of mis.abil) { if (!mappa.has(a)) mappa.set(a, []); mappa.get(a).push('Mistero ' + mis.nome); }
     }
+    // Umani Azlanti (Linguista Dotato): Linguistica è sempre di classe
+    if (razzaDi(d)?.nome === 'Umano Azlanti') { if (!mappa.has('Linguistica')) mappa.set('Linguistica', []); mappa.get('Linguistica').push('Linguista Dotato'); }
     // La stirpe dello stregone aggiunge un'abilità di classe ("Conoscenze (qualsiasi)": quella scelta nella sezione)
     const st = stirpeDi(d);
     if (st && d.classi.some((cl) => nomeClasse(cl.nome) === 'Stregone')) {
@@ -1184,7 +1189,7 @@ window.creaPF1 = function creaPF1(ctx) {
         - (a.car === 'FOR' || a.car === 'DES' ? penalita : 0) + cumula(per('abilita', 'abil:' + a.nome));
     }
     // Umani (tratto Esperti, se non sostituito): +1 grado di abilità per livello
-    const esperti = razzaDi(d)?.nome === 'Umano' && !sostituitiDa(d).has(chiaveTratto('Esperti'));
+    const esperti = espertoUmano(d);
     const gradiDisp = d.classi.reduce((a, c) => a + (Math.max(1, n(c.gradi) + m.INT) + (esperti ? 1 : 0)) * n(c.livello), 0) + n(d.gradiExtra);
 
     // Resoconto del cumulo, valore per valore: quali bonus contano e quali vengono scartati (e perché)
@@ -1871,7 +1876,7 @@ window.creaPF1 = function creaPF1(ctx) {
   function sezioneRazza(p, d) {
     const id = p.id;
     const r = razzaDi(d);
-    const gruppi = ['Razze Base', 'Razze Peculiari', 'Razze Insolite', 'Altre Razze'];
+    const gruppi = ['Razze Base', 'Razze Peculiari', 'Razze Insolite', 'Altre Razze', 'Razze del Master'];
     const tendina = `<label>Razza <select data-pf1="razza|nome" data-id="${id}" data-ridisegna-pf1>
         <option value="">— scegli —</option>
         ${gruppi.map((g) => `<optgroup label="${g}">${opz(Object.values(RAZZE).filter((x) => x.gruppo === g).map((x) => [x.nome, x.nome]), d.razza.nome)}</optgroup>`).join('')}
@@ -2128,7 +2133,7 @@ window.creaPF1 = function creaPF1(ctx) {
     // Scelte
     const dv = prog ? prog.dv : n(esistente?.dv) || 8;
     const pf = (d.pfCalc.metodo === 'massimo' ? dv : Math.floor(dv / 2) + 1) + c.m.COS + (s.preferita === 'pf' ? 1 : 0);
-    const esperti = razzaDi(d)?.nome === 'Umano' && !sostituitiDa(d).has(chiaveTratto('Esperti'));
+    const esperti = espertoUmano(d);
     const gradi = Math.max(1, n(prog ? prog.gradi : esistente?.gradi) + c.m.INT) + (s.preferita === 'gradi' ? 1 : 0) + (esperti ? 1 : 0);
     const talento = livTot % 2 === 1;
     const talentiBonus = privilegi.filter((x) => /Talento Bonus/i.test(x.nome) && !x.sostituito).length;
@@ -2148,7 +2153,7 @@ window.creaPF1 = function creaPF1(ctx) {
     let talentiOk = true, talentiTesto = '';
     if (!livelli.length) {
       let attesi = 1;
-      if (razzaDi(d)?.nome === 'Umano' && !sostituitiDa(d).has(chiaveTratto('Talento Bonus'))) attesi++;
+      if (TALENTI_UMANI[razzaDi(d)?.nome] && !sostituitiDa(d).has(chiaveTratto('Talento Bonus'))) attesi += TALENTI_UMANI[razzaDi(d).nome];
       const k = nomeClasse(d.classi[0].nome);
       const t = k && (window.PF1_PROGRESSIONE || {})[k];
       if (t) attesi += pezziPrivilegi(t.righe[0]?.[4 + colonnaPrivilegi(t)]).filter((f) => /Talento Bonus/i.test(f)).length;
@@ -5167,7 +5172,7 @@ window.creaPF1 = function creaPF1(ctx) {
       apriInfo(r.nome, `<div class="info-fatti">
           ${fatto('Caratteristiche', Object.entries(r.car).map(([s, v]) => `${NOMI_CAR[s]} ${segno(v)}`).join(', ') || (r.scelta ? `+${r.scelta} a una caratteristica a scelta` : ''))}
           ${fatto('Taglia', r.taglia)}${fatto('Velocità', String(r.velocita).replace('.', ',') + ' m')}
-          ${fatto('Tratti', r.tratti.join(', '))}
+          ${r.testi ? r.testi.map(([t, x]) => fatto(t, x)).join('') : fatto('Tratti', r.tratti.join(', '))}
         </div>`, r.pagina, estraiRazza);
     },
     'pf1-uso-benedizione'(el) {

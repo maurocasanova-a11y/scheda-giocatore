@@ -15,6 +15,11 @@
   const DROW = [['Cospiratore Ambizioso', [SA]], ['Infiltrato in Superficie', ['Scurovisione', 'Cecità alla Luce']],
     ['Patto Blasfemo', [SA, 'Uso dei Veleni']], ['Predatore delle Lande Tenebrose', [CM]], ['Rancore Ancestrale', ['Uso dei Veleni']],
     ['Seduttore', ['Immunità dei Drow']]];
+  // Razze aggiunte dal master (non prese dal wiki): stessi campi delle altre, con le descrizioni dei tratti scritte qui
+  RAZZE['Umano Azlanti'] = ['Razze del Master', '', { FOR: 4, DES: 2, COS: 4, INT: 2, SAG: 4, CAR: 2 }, 0, 'Media', '9',
+    [['abil:Diplomazia', 4, 'Esperti'], ['abil:Linguistica', 2, 'Linguista Dotato']],
+    ["Visione Crepuscolare Avanzata","Scurovisione","Esperti","Talento Bonus","Familiarità nelle Armi","Competenza nelle Armi","Linguista Dotato","Longevità"]];
+  const TESTI = { 'Umano Azlanti': [["Visione Crepuscolare Avanzata","Gli Umani Azlanti vedono quattro volte più lontano di un umano in condizioni di luce scarsa."],["Scurovisione","Gli Umani Azlanti vedono al buio fino a 18 metri."],["Esperti","Ottengono 1 grado di abilità aggiuntivo al 1° livello e 1 grado aggiuntivo ogni volta che avanzano di livello. Inoltre la conoscenza degli errori passati dà loro bonus +4 alle prove di Diplomazia."],["Talento Bonus","Scelgono due talenti addizionali al 1° livello."],["Familiarità nelle Armi","Sono competenti in due armi a loro scelta."],["Competenza nelle Armi","Sono competenti in tutte le armi che hanno «Azlanti» nel nome."],["Linguista Dotato","Bonus razziale +2 alle prove di Linguistica; ottengono 2 linguaggi ogni volta che prendono un grado in Linguistica anziché 1. Linguistica è sempre di classe."],["Longevità","Gli Umani Azlanti hanno una vita lunghissima, arrivando in rari casi a 1300 anni."]] };
   const ALTERNATIVI = {
     Elfo: [['Arti Lunghi', [E], [], '10.5'], ['Cacciatore Silenzioso', [ME]], ['Corridore del Deserto', [ME]], ['Custode di Segreti', [ME]],
       ['Esile', [IE]], ['Figlio della Piaga', [IE]], ['Focus Arcano', [E]], ['Inquietante', [ME]], ['Intagliatore di Legno', [ME]],
@@ -115,6 +120,7 @@
       nome, gruppo, pagina, car, scelta, taglia, velocita: Number(velocita),
       bonus: bonus.map(([bersaglio, valore, tratto]) => ({ bersaglio, valore, tipo: 'razziale', tratto: pulisci(tratto) })),
       tratti: [...new Set(tratti.map(pulisci))],
+      testi: TESTI[nome] || null,
       alternativi: (ALTERNATIVI[nome] || []).map(([n, sostituiti = [], bon = [], vel = '']) => ({
         nome: n, sostituiti,
         bonus: bon.map(([bersaglio, valore]) => ({ bersaglio, valore, tipo: 'razziale', tratto: n })),
