@@ -227,8 +227,13 @@ window.creaPF1 = function creaPF1(ctx) {
     const r = razzaDi(d);
     if (!r) return [];
     const via = sostituitiDa(d);
-    return [...r.bonus.filter((b) => !via.has(chiaveTratto(b.tratto))),...alternativiScelti(d).flatMap((a) => a.bonus)];
+    const arte = r.arte && !via.has(chiaveTratto("Amante dell'Arte"))
+      ? ['Canto', 'Oratoria', d.razza.strumento].filter(Boolean).map((t) => ({ bersaglio: `abil:Intrattenere (${t})`, valore: 4, tipo: 'razziale', tratto: "Amante dell'Arte" }))
+      : [];
+    return [...r.bonus.filter((b) => !via.has(chiaveTratto(b.tratto))), ...arte, ...alternativiScelti(d).flatMap((a) => a.bonus)];
   };
+  // Amante dell'Arte (Celestiale): il beneficio vale per canto, poesia (Oratoria) e un tipo di strumento a scelta
+  const STRUMENTI_ARTE = ['Strumenti a Corda', 'Strumenti a Fiato', 'Strumenti a Percussione', 'Strumenti a Tastiera'];
   // Velocità base della razza, tenendo conto dei tratti alternativi che la cambiano
   const velocitaRazza = (d) => {
     const a = alternativiScelti(d).find((x) => x.velocita);
@@ -960,13 +965,14 @@ window.creaPF1 = function creaPF1(ctx) {
   }
   // Abilità che sono famiglie di abilità: ogni tipo ha i suoi gradi (elenchi dal wiki, pagine Artigianato e Professione)
   const ABIL_SPECIALIZZATE = {
+    Intrattenere: ['Canto', 'Comicità', 'Danza', 'Oratoria', 'Recitazione', 'Strumenti a Corda', 'Strumenti a Fiato', 'Strumenti a Percussione', 'Strumenti a Tastiera'],
     Artigianato: ['Alchimia', 'Calligrafia', 'Carpenteria', 'Ceramica', 'Costruire Archi', 'Costruire Navi', 'Costruire Trappole', 'Fabbricare Armature', 'Fabbricare Armi', 'Ferramenta',
       'Intessere Ceste', 'Lavorare Pellami', 'Lavori in Muratura', 'Metallurgia', 'Pittura', 'Oreficeria', 'Rilegare Libri', 'Riparare Scarpe', 'Scultura', 'Tessitura'],
     Professione: ['Allevatore', 'Architetto', 'Avvocato', 'Barcaiolo', 'Bibliotecario', 'Birraio', 'Boscaiolo', 'Cacciatore', 'Carovaniere', 'Conciatore', 'Conestabile', 'Contabile',
       'Contadino', 'Cortigiano', 'Cuoco', 'Erborista', 'Farmacista', 'Fornaio', 'Giardiniere', "Giocatore d'Azzardo", 'Guida', 'Ingegnere', 'Levatrice', 'Locandiere', 'Macellaio',
       'Marinaio', 'Mercante', 'Minatore', 'Mugnaio', 'Pastore', 'Pescatore', 'Scrivano', 'Siniscalco', 'Soldato', 'Stalliere', 'Taglialegna'],
   };
-  // Abilità della scheda: quelle del regolamento più i tipi di Artigianato e Professione scelti dal personaggio.
+  // Abilità della scheda: quelle del regolamento più i tipi di Artigianato, Professione e Intrattenere scelti dal personaggio.
   // La voce generica resta solo se non ci sono tipi o se ha già dei gradi (schede vecchie).
   function abilitaScheda(r, d) {
     const out = [];
@@ -1884,6 +1890,14 @@ window.creaPF1 = function creaPF1(ctx) {
     return `<div><span class="muto">Soffio di Ashardalon</span> Nube Sacra (emanazione 9 m) <b>${nube ? `${nube}d8` : '—'}</b> sacri${nube ? '' : ' <small class="muto">(dal 2° livello)</small>'}
       · Soffio Elettrico (linea 36 m) <b>${L ? `${L}d6` : '—'}</b> elettricità · Riflessi <b>CD ${cd}</b> <small class="muto">(10 + ½ livello + COS)</small></div>`;
   }
+  function rigaArte(p, d) {
+    const voluti = ['Canto', 'Oratoria', d.razza.strumento].filter(Boolean);
+    const presenti = d.sottoAbil?.Intrattenere || [];
+    const mancano = voluti.filter((t) => !presenti.some((x) => norm(x) === norm(t)));
+    return `<div><span class="muto">Amante dell'Arte</span> +4 a Intrattenere (Canto), (Oratoria, per la poesia) e
+      <select data-pf1="razza|strumento" data-id="${p.id}" data-ridisegna-pf1><option value="">— strumento a scelta —</option>${opz(STRUMENTI_ARTE.map((x) => [x, x]), d.razza.strumento || '')}</select>
+      ${mancano.length ? `<button class="btn-mini" data-azione="pf1-arte-tipi" data-id="${p.id}" title="Aggiunge questi tipi nella sezione Abilità">+ aggiungi ${esc(mancano.join(', '))} alle abilità</button>` : '<small class="muto">(già nella sezione Abilità)</small>'}</div>`;
+  }
   function sezioneRazza(p, d, c) {
     const id = p.id;
     const r = razzaDi(d);
@@ -1929,6 +1943,7 @@ window.creaPF1 = function creaPF1(ctx) {
         ${r.resistenze ? `<div><span class="muto">Resistenze</span> ${r.resistenze.map(([t, v, tr]) => `${esc((ENERGIE.find((e) => e[0] === t) || [t, t])[1])} ${v} <small class="muto">(${esc(tr)}, già nelle difese)</small>`).join(' · ')}</div>` : ''}
         ${r.volo ? `<div><span class="muto">Volare</span> ${esc(r.volo)}</div>` : ''}
         ${r.tipo ? `<div><span class="muto">Tipo</span> ${esc(r.tipo)}</div>` : ''}
+        ${r.arte ? rigaArte(p, d) : ''}
         ${r.soffio === 'ashardalon' ? soffioAshardalon(d, c) : ''}
         <div><span class="muto">Tratti</span> ${tratti.join(', ')}</div>
       </div>
@@ -5044,6 +5059,16 @@ window.creaPF1 = function creaPF1(ctx) {
       ctx.salva();
       ctx.render();
       ctx.toast(`<b>${esc(cl.nome || 'Classe')}</b> ora di livello ${nuovo}`);
+    },
+    'pf1-arte-tipi'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      if (!p) return;
+      const d = dati(p);
+      d.sottoAbil = d.sottoAbil || {};
+      const lista = d.sottoAbil.Intrattenere = d.sottoAbil.Intrattenere || [];
+      for (const t of ['Canto', 'Oratoria', d.razza.strumento].filter(Boolean)) if (!lista.some((x) => norm(x) === norm(t))) lista.push(t);
+      ctx.salva();
+      ctx.render();
     },
     'pf1-classe-elenco'(el) {
       const p = ctx.personaggio(el.dataset.id);
