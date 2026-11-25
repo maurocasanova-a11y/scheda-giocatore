@@ -165,12 +165,26 @@ window.creaSF = function creaSF(ctx) {
     if (ora.length === voluti.length && ora.every((x, i) => chiave(x) === chiave(voluti[i]))) return;
     d.incantesimi = [...d.incantesimi.filter((x) => !x.connessione), ...voluti];
   }
+  // Soldato: stili di combattimento (src/sf-stili.js, wiki «Soldato/Stili»). Lo stile primario usa il livello da soldato,
+  // quello secondario (dal 9°) il livello da soldato −8: le sue tecniche arrivano al 9°, 13° e 17°
+  const STILI = window.SF_STILI || {};
+  const livSoldato = (d) => d.classi.filter((cl) => nomeClasse(cl.nome) === 'Soldato').reduce((a, cl) => a + n(cl.livello), 0);
+  function stiliSoldato(d) {
+    const L = livSoldato(d);
+    const out = [];
+    if (!L) return out;
+    const pr = d.soldato?.primario, se = d.soldato?.secondario;
+    if (STILI[pr]) out.push({ nome: pr, liv: L, ruolo: 'primario' });
+    if (L >= 9 && STILI[se] && se !== pr) out.push({ nome: se, liv: L - 8, ruolo: 'secondario' });
+    return out;
+  }
+  const livStile = (d, nome) => stiliSoldato(d).find((x) => x.nome === nome)?.liv || 0;
   const livOperativo = (d) => d.classi.filter((cl) => nomeClasse(cl.nome) === 'Operativo').reduce((a, cl) => a + n(cl.livello), 0);
   const specDi = (d) => SPEC_OPERATIVO[d.operativo?.spec] || null;
   // Vantaggio dell'Operativo: +1, +2 al 3°, poi +1 ogni 4 livelli (7°, 11°, 15°, 19°)
   const vantaggioOp = (L) => (L >= 3 ? 2 + Math.floor((L - 3) / 4) : L ? 1 : 0);
   const predefiniti = () => ({
-    operativo: { spec: '' }, mistico: { connessione: '' },
+    operativo: { spec: '' }, mistico: { connessione: '' }, soldato: { primario: '', secondario: '', caccia: '' },
     razza: { nome: '', scelta: '', inclusi: false }, tema: { nome: '', car: '' }, chiave: '',
     classi: [], pf: { attuali: '', temp: '' }, ps: { attuali: '' }, pr: { usati: 0 },
     ca: { cae: '', cac: '' }, ts: { tempra: { varie: '' }, riflessi: { varie: '' }, volonta: { varie: '' } }, iniz: { varie: '' },
@@ -233,6 +247,11 @@ window.creaSF = function creaSF(ctx) {
     const conn = livMs ? connessioneDi(d) : null;
     const incanalare = conn ? incanalareMs(livMs, d.mistico.connessione === 'Akashica') : 0;
     if (incanalare) for (const a of conn.abil) eff.push({ bersaglio: 'abil:' + a, valore: incanalare, tipo: 'cognitivo', fonte: `Incanalare Abilità (${d.mistico.connessione})` });
+    // Soldato: Reazione Rapida (Incursore) +4 all'iniziativa; Vigilanza (Agguatatore) dà Iniziativa Migliorata come talento bonus
+    const livSo = livSoldato(d);
+    if (livStile(d, 'Incursore')) eff.push({ bersaglio: 'iniz', valore: 4, tipo: 'senza tipo', fonte: 'Reazione Rapida (Incursore)' });
+    if (livStile(d, 'Agguatatore')) eff.push({ bersaglio: 'iniz', valore: 4, tipo: 'senza tipo', fonte: 'Iniziativa Migliorata (Vigilanza, Agguatatore)' });
+    const guardia = livStile(d, 'Guardia') > 0; // Addestramento nell'Armatura: penalità −1 (minimo 0) e DES massima +1 dell'armatura
     const per = (...k) => eff.filter((e) => k.includes(e.bersaglio));
     const liv = livelloTot(d);
     const base = {}, punteggio = {}, m = {};
@@ -265,11 +284,12 @@ window.creaSF = function creaSF(ctx) {
     const carico = volume > forza ? 'sovraccarico' : volume > forza / 2 ? 'ingombrato' : '';
     // Armatura indossata e CA (il carico limita anche la DES alla CA: +2 ingombrato, +0 sovraccarico)
     const arm = d.armature.filter((a) => a.indossata);
-    const limiti = arm.map((a) => a.desMax).filter((v) => v !== '' && v != null).map(Number);
+    const suArmatura = (a) => (guardia && a.tipo !== 'scudo' ? 1 : 0);
+    const limiti = arm.filter((a) => a.desMax !== '' && a.desMax != null).map((a) => Number(a.desMax) + suArmatura(a));
     if (carico) limiti.push(carico === 'sovraccarico' ? 0 : 2);
     const desMax = limiti.length ? Math.min(...limiti) : null;
     const desCA = desMax === null ? m.DES : Math.min(m.DES, desMax);
-    const penalita = arm.reduce((a, x) => a + Math.abs(n(x.penalita)), 0);
+    const penalita = arm.reduce((a, x) => a + Math.max(0, Math.abs(n(x.penalita)) - suArmatura(x)), 0);
     const t = (TAGLIE.find((x) => x[0] === (d.taglia || razza?.taglia || 'Media')) || TAGLIE[2])[1];
     const caArm = (k) => arm.map((a) => ({ tipo: a.tipo === 'scudo' ? 'scudo' : 'armatura', valore: a[k], fonte: a.nome || 'armatura' }));
     const cae = 10 + desCA + t + n(d.ca.cae) + cumula([...caArm('cae'), ...per('ca', 'cae')]);
@@ -285,13 +305,20 @@ window.creaSF = function creaSF(ctx) {
     const diClasse = new Set(d.classi.flatMap((cl) => D.classi[nomeClasse(cl.nome)]?.abil || []));
     if (tema?.abil) diClasse.add(tema.abil);
     if (spec?.classe) diClasse.add(spec.classe);
+    // Cacciatore Competente: Percezione di classe e un grado gratuito per livello (dello stile) da usare in Percezione o Sopravvivenza.
+    // La divisione si sceglie nella sezione del soldato; se non è scelta, i gradi vanno prima a Percezione fin dove servono
+    const caccia = livStile(d, 'Cacciatore');
+    if (caccia) diClasse.add('Percezione');
+    const cacciaPerc = !caccia ? 0 : d.soldato.caccia !== '' && d.soldato.caccia != null ? Math.min(caccia, Math.max(0, n(d.soldato.caccia)))
+      : Math.min(caccia, Math.max(0, liv - n(d.abil.Percezione?.gradi)));
+    const gratisCaccia = { Percezione: cacciaPerc, Sopravvivenza: caccia - cacciaPerc };
     const abil = {};
     let gradiSpesi = 0;
     for (const [nome, car] of D.abilita) {
       const s = d.abil[nome] || {};
       gradiSpesi += n(s.gradi);
       // Specializzazione dell'operativo: un grado gratuito per livello da operativo nelle abilità associate (senza superare il massimo)
-      const gratis = spec?.abil.includes(nome) ? livOp : 0;
+      const gratis = (spec?.abil.includes(nome) ? livOp : 0) + (gratisCaccia[nome] || 0);
       const gr = Math.min(Math.max(liv, n(s.gradi)), n(s.gradi) + gratis);
       const classe = !!s.classe || diClasse.has(nome);
       // Penalità: la peggiore tra quella dell'armatura e quella del carico (−5 alle prove basate su FOR e DES), non si sommano
@@ -322,7 +349,7 @@ window.creaSF = function creaSF(ctx) {
       });
       return { classe: k, giorno, cd: (L) => 10 + L + mc };
     });
-    return { base, punteggio, m, liv, livOp, livMs, incanalare, chiave, bab, pfMax, psMax, prMax, pfAtt, psAtt, cae, cac, desMax, penalita, ts, iniz, abil, gradiSpesi, gradiDisp, armi, incantesimi, arm,
+    return { base, punteggio, m, liv, livOp, livMs, livSo, caccia, cacciaPerc, incanalare, chiave, bab, pfMax, psMax, prMax, pfAtt, psAtt, cae, cac, desMax, penalita, ts, iniz, abil, gradiSpesi, gradiDisp, armi, incantesimi, arm,
       volume, leggeri: vol.leggeri, carico, limiteVolume: forza / 2, forza,
       bonusAttivi: d.bonus.filter((b) => b.attivo).map((b) => b.nome), cumuli: { voci: eff } };
   }
@@ -625,6 +652,7 @@ window.creaSF = function creaSF(ctx) {
       ${sezione('attacchi', 'Attacchi', corpoAttacchi)}
       ${sezione('abilita', 'Abilità', corpoAbil, `<span class="ts-sommario">Gradi <b>${k('gradi')}</b> · max ${c.liv} per abilità</span>`)}
       ${c.livMs ? sezione('mistico', 'Mistico', sezioneMistico(p, d, c), `<small class="muto">${esc(d.mistico?.connessione || 'connessione da scegliere')}</small>`) : ''}
+      ${c.livSo ? sezione('soldato', 'Soldato', sezioneSoldato(p, d, c), `<small class="muto">${esc([d.soldato?.primario, c.livSo >= 9 ? d.soldato?.secondario : ''].filter(Boolean).join(' · ') || 'stile da scegliere')}</small>`) : ''}
       ${c.livOp ? sezione('operativo', 'Operativo', sezioneOperativo(p, d, c), `<small class="muto">${esc(d.operativo?.spec || 'specializzazione da scegliere')}</small>`) : ''}
       ${sezione('capacita', 'Talenti e capacità', corpoCap)}
       ${corpoInc ? sezione('incantesimi', 'Incantesimi', corpoInc) : ''}
@@ -700,6 +728,62 @@ window.creaSF = function creaSF(ctx) {
       </ul>`;
   }
 
+  // Sezione «Soldato»: stili di combattimento con le tecniche e privilegi calcolati dal livello (wiki «Soldato», «Soldato/Stili»)
+  function sezioneSoldato(p, d, c) {
+    const id = p.id;
+    const L = c.livSo;
+    const attivi = stiliSoldato(d);
+    const voce = (ok, nome, testo) => `<li class="${ok ? '' : 'muto'}"><b>${esc(nome)}</b>${testo ? ` — ${testo}` : ''}${ok ? '' : ' <small>(non ancora)</small>'}</li>`;
+    const scelta = (k, etich, escluso) => `<label>${etich} <select data-sf="soldato|${k}" data-id="${id}" data-ridisegna-sf>${opz([['', '— scegli —'], ...Object.keys(STILI).filter((x) => x !== escluso).map((x) => [x, x])], d.soldato?.[k] || '')}</select></label>`;
+    // Note sulle tecniche che la scheda calcola o che hanno numeri dal livello
+    const note = (nome, ls) => {
+      const r = [];
+      if (nome === 'Incursore') r.push('Reazione Rapida: +4 all\'iniziativa (già nella scheda) e +3 m alla velocità sul terreno');
+      if (nome === 'Agguatatore') {
+        r.push('Vigilanza: Iniziativa Migliorata come talento bonus (+4, già nella scheda)');
+        if (!c.abil['Furtività']?.classe) r.push('<span class="oltre">serve Furtività come abilità di classe per scegliere questo stile</span>');
+      }
+      if (nome === 'Guardia') {
+        r.push('Addestramento nell\'Armatura: penalità dell\'armatura −1 e DES massima +1 (già nella scheda)');
+        if (ls >= 13) r.push(`Resistenza Cinetica: <b>RD ${ls >= 17 ? 5 : 3}/-</b>`);
+      }
+      if (nome === 'Cacciatore') {
+        r.push(`Cacciatore Competente: Percezione è di classe; <b>${c.caccia}</b> gradi gratuiti tra Percezione e Sopravvivenza —
+          a Percezione <input type="number" min="0" max="${c.caccia}" class="pf-corto" data-sf="soldato|caccia" data-id="${id}" data-ridisegna-sf value="${esc(d.soldato?.caccia ?? '')}" placeholder="${c.cacciaPerc}">
+          (${c.cacciaPerc} a Percezione, ${c.caccia - c.cacciaPerc} a Sopravvivenza; vuoto = in automatico)`);
+      }
+      if (nome === 'Guerriero Collerico') r.push(`Combattimento Frenetico: 1d4 + ${Math.ceil(ls / 2)} round, <b>+${2 + Math.floor((ls - 1) / 4)}</b> danni in mischia, +2 TS Volontà, −1 CA (attivalo come bonus in «Bonus e condizioni»)`);
+      if (nome === 'Guerriero Provetto') r.push(`Rinforzare Resilienza: <b>RD ${Math.min(5, 1 + Math.floor((ls - 1) / 4))}/-</b> per round pari al modificatore di FOR o COS (+1 se hai RD da altre fonti)`);
+      if (nome === 'Mordi e Fuggi' && ls >= 13) r.push('Bersaglio Elusivo: +1 cognitivo alla CA nei turni in cui ti muovi');
+      if (nome === 'Tattico Multibraccia') r.push('serve avere almeno quattro braccia');
+      return r.length ? `<div class="muto pf-aiuto">${r.join(' · ')}</div>` : '';
+    };
+    const blocco = (k, etich) => {
+      const nome = d.soldato?.[k];
+      const st = STILI[nome];
+      if (!st) return '';
+      const ls = k === 'primario' ? L : L - 8;
+      return `<div class="fede-righe"><div><span class="muto">${etich} · ${esc(nome)}</span> ${st.filter(([, l]) => k === 'primario' || l + 8 <= 20).map(([t, l]) => `<span class="${ls >= l ? '' : 'muto'}">${esc(t)} (${k === 'primario' ? l : l + 8}°)</span>`).join(', ')}</div>${ls >= 1 ? note(nome, ls) : ''}</div>`;
+    };
+    const esperienze = L >= 3 ? 1 + Math.floor((L - 3) / 4) : 0;
+    return `<div class="pf-riga">
+        ${scelta('primario', 'Stile primario', L >= 9 ? d.soldato?.secondario : '')}
+        ${L >= 9 ? scelta('secondario', 'Stile secondario', d.soldato?.primario) : '<span class="muto">stile secondario dal 9° livello</span>'}
+        <a class="btn-piccolo" href="${esc(linkWiki('Soldato/Stili'))}" target="_blank" rel="noopener">📖 stili</a>
+        <a class="btn-piccolo" href="${esc(linkWiki('Soldato'))}" target="_blank" rel="noopener">📖 soldato</a>
+        <span class="muto">livello da soldato <b>${L}</b></span></div>
+      ${STILI[d.soldato?.primario] ? blocco('primario', 'Stile primario') : '<p class="oltre pf-aiuto">Scegli lo stile di combattimento primario: dà una tecnica al 1°, 5°, 9°, 13° e 17° livello. Una volta scelto non si cambia.</p>'}
+      ${L >= 9 ? (attivi.some((x) => x.ruolo === 'secondario') ? blocco('secondario', 'Stile secondario') : '<p class="oltre pf-aiuto">Scegli lo stile secondario: le sue tecniche arrivano al 9°, 13° e 17° livello (livello da soldato −8).</p>') : ''}
+      <ul class="op-privilegi">
+        ${voce(L >= 2, 'Talenti di Combattimento', `<b>${Math.floor(L / 2)}</b> talenti bonus di combattimento (al 2° e ogni 2 livelli) — scrivili in «Talenti e capacità»`)}
+        ${voce(L >= 3, 'Arma Specializzata', 'talento bonus per le armi della classe (danni già nella scheda)')}
+        ${voce(L >= 3, "Esperienza con l'Equipaggiamento", `<b>${esperienze}</b> (al 3° e ogni 4 livelli); al posto di ognuna puoi prendere un addestramento delle forze speciali o un'esperienza con il talento`)}
+        ${voce(L >= 9, 'Stile di Combattimento Secondario', 'tecniche al 9°, 13° e 17°')}
+        ${voce(L >= 11, 'Massacro del Soldato', 'attacco completo: fino a tre attacchi, con penalità −6 invece di −4')}
+        ${voce(L >= 20, 'Colpo Letale', 'azione standard: un attacco; se colpisce e non uccide, spendi 1 PR: TS su Tempra o muore (immune per 24 ore)')}
+      </ul>`;
+  }
+
   // Sezione «Mistico»: connessione, incantesimi conosciuti e privilegi calcolati dal livello (wiki «Mistico»)
   function sezioneMistico(p, d, c) {
     const id = p.id;
@@ -753,9 +837,12 @@ window.creaSF = function creaSF(ctx) {
     if (!d.classi.some((cl) => nomeClasse(cl.nome))) { manca.push('scegli la classe di 1° livello'); return manca; }
     if (livOperativo(d) && !specDi(d)) manca.push("scegli la specializzazione dell'operativo");
     if (livMistico(d) && !connessioneDi(d)) manca.push('scegli la connessione del mistico');
+    const livSo = livSoldato(d);
+    if (livSo && !STILI[d.soldato?.primario]) manca.push('scegli lo stile di combattimento primario del soldato');
+    if (livSo >= 9 && !stiliSoldato(d).some((x) => x.ruolo === 'secondario')) manca.push('scegli lo stile di combattimento secondario del soldato');
     if (c.gradiSpesi < c.gradiDisp) manca.push(`assegna i gradi di abilità (${c.gradiSpesi}/${c.gradiDisp})`);
     if (c.gradiSpesi > c.gradiDisp) manca.push(`hai assegnato più gradi del possibile (${c.gradiSpesi}/${c.gradiDisp})`);
-    const attesi = Math.floor((c.liv + 1) / 2) + (/^umano$/i.test(d.razza.nome) ? 1 : 0);
+    const attesi = Math.floor((c.liv + 1) / 2) + (/^umano$/i.test(d.razza.nome) ? 1 : 0) + Math.floor(livSo / 2); // + talenti di combattimento del soldato
     const presi = d.capacita.filter((x) => x.tipo === 'Talento').length;
     if (presi < attesi) manca.push(`scegli i talenti (${presi}/${attesi})`);
     return manca;
