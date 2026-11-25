@@ -519,10 +519,11 @@ window.creaPF1 = function creaPF1(ctx) {
     const per = slotIndossati(d);
     const pieni = SLOT_CORPO.filter(([k]) => per[k].length).length;
     const doppi = SLOT_CORPO.filter(([k]) => per[k].length > 1);
-    const riga = 30;
+    const riga = 40;
     const alto = 18 + SLOT_CORPO.length * riga;
-    // Ritaglio dell'immagine mostrato a sinistra: la figura (x 150-530, y 80-930 dell'immagine) riempie il riquadro
-    const S = alto / 850, OX = 150, OY = 80, LARGO = 210;
+    // Ritaglio dell'immagine mostrato a sinistra: la figura (x 150-530, y 80-930 dell'immagine) riempie il riquadro;
+    // l'elenco degli slot sta più a destra (TESTI), con le linee che lo collegano ai punti sul corpo
+    const S = alto / 850, OX = 150, OY = 80, LARGO = Math.round(380 * S), TESTI = LARGO + 170, LARGHEZZA = TESTI + 330;
     const px = (x) => Math.round((x - OX) * S * 10) / 10;
     const py = (y) => Math.round((y - OY) * S * 10) / 10;
     const voci = SLOT_CORPO.map(([k, nome, ix, iy], i) => {
@@ -533,10 +534,10 @@ window.creaPF1 = function creaPF1(ctx) {
       const testo = og.length ? og.join(', ') : '—';
       const breve = testo.length > 40 ? `${testo.slice(0, 38)}…` : testo;
       return `<g class="slot-${stato}"><title>${esc(nome)}: ${esc(testo)}</title>
-        <polyline points="${x},${y} ${LARGO + 4},${y} ${LARGO + 20},${ly} 232,${ly}" class="slot-linea"/>
-        <circle cx="${x}" cy="${y}" r="4" class="slot-punto"/>
-        <text x="238" y="${ly - 2}" class="slot-nome">${esc(nome)}${og.length > 1 ? ' ⚠' : ''}</text>
-        <text x="238" y="${ly + 11}" class="slot-ogg">${esc(breve)}</text></g>`;
+        <polyline points="${x},${y} ${LARGO + 10},${y} ${TESTI - 60},${ly} ${TESTI - 8},${ly}" class="slot-linea"/>
+        <circle cx="${x}" cy="${y}" r="5" class="slot-punto"/>
+        <text x="${TESTI}" y="${ly - 3}" class="slot-nome">${esc(nome)}${og.length > 1 ? ' ⚠' : ''}</text>
+        <text x="${TESTI}" y="${ly + 13}" class="slot-ogg">${esc(breve)}</text></g>`;
     }).join('');
     // Figura: l'immagine della sala con la sagoma luminosa, ritagliata e sfumata verso le scritte
     const sagoma = `<defs>
@@ -549,7 +550,7 @@ window.creaPF1 = function creaPF1(ctx) {
       </g>
       <rect x="0.5" y="0.5" width="${LARGO - 1}" height="${alto - 1}" rx="10" class="slot-cornice"/>`;
     return `<div class="slot-box">
-        <svg class="slot-schema" viewBox="0 0 500 ${alto}" role="img" aria-label="Oggetti magici indossati per slot del corpo">${sagoma}${voci}</svg>
+        <svg class="slot-schema" viewBox="0 0 ${LARGHEZZA} ${alto}" role="img" aria-label="Oggetti magici indossati per slot del corpo">${sagoma}${voci}</svg>
         <p class="muto pf-aiuto">${pieni} slot su ${SLOT_CORPO.length} occupati · contano gli oggetti nel luogo «Indossato», le armature e gli scudi indossati.
           ${doppi.length ? `<span class="oltre">⚠ Due oggetti nello stesso slot: ${esc(doppi.map(([, nm]) => nm).join(', '))} — di solito funziona solo il primo indossato.</span>` : ''}
           Lo slot si prende dal database del wiki; per gli altri oggetti sceglilo nella riga dell'oggetto.</p>

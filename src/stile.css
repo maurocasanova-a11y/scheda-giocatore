@@ -1035,15 +1035,16 @@ body.modo-giocatore .layout-scheda { grid-template-columns: minmax(0, 1fr); }
 /* ---------- Info point ---------- */
 /* Schema degli slot del corpo (oggetti magici indossati) */
 .slot-box { margin: 4px 0 14px; }
-.slot-schema { width: 100%; max-width: 560px; height: auto; display: block; }
+.slot-schema { width: 100%; max-width: 900px; height: auto; display: block; }
 .slot-cornice { fill: none; stroke: var(--oro-scuro); stroke-width: 1; }
-.slot-linea { fill: none; stroke: rgba(200, 200, 210, .45); stroke-width: 1; }
-.slot-punto { fill: rgba(225, 225, 235, .7); stroke: rgba(0, 0, 0, .75); stroke-width: 1.5; }
-.slot-nome { fill: var(--muto); font-size: 11px; font-weight: 700; }
-.slot-ogg { fill: var(--muto); font-size: 11px; opacity: .6; }
+.slot-linea { fill: none; stroke: rgba(212, 173, 90, .5); stroke-width: 1.2; }
+/* Slot liberi: pallini dorati ben visibili sulla figura; occupati: blu */
+.slot-punto { fill: #f0c75e; stroke: #3a2606; stroke-width: 2; filter: drop-shadow(0 0 4px rgba(255, 200, 80, .85)); }
+.slot-nome { fill: #d9b86a; font-size: 14px; font-weight: 700; letter-spacing: .02em; }
+.slot-ogg { fill: var(--muto); font-size: 13px; opacity: .6; }
 /* Slot con un oggetto indossato: blu acceso */
 .slot-pieno .slot-linea { stroke: #2f8fff; }
-.slot-pieno .slot-punto { fill: #4da3ff; }
+.slot-pieno .slot-punto { fill: #4da3ff; stroke: #06203f; filter: drop-shadow(0 0 5px rgba(77, 163, 255, .9)); }
 .slot-pieno .slot-nome { fill: #4da3ff; }
 .slot-pieno .slot-ogg { fill: #6db8ff; opacity: 1; font-weight: 600; }
 .slot-doppio .slot-linea { stroke: var(--rosso); }
