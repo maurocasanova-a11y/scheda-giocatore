@@ -121,7 +121,27 @@ window.creaSF = function creaSF(ctx) {
   const TIPOLOGIA = { 'da Mischia Base': ['mischia base', 'mischia'], 'da Mischia Avanzata': ['mischia avanzata', 'mischia'], Piccole: ['piccola', 'distanza'], Lunghe: ['lunga', 'distanza'], Pesanti: ['pesante', 'distanza'], 'di Precisione': ['precisione', 'distanza'], Speciali: ['speciale', 'distanza'] };
 
   // ---- Dati del personaggio ----
+  // Operativo: specializzazioni (wiki «Operativo/Specializzazioni»). abil: abilità associate; attacco: abilità per l'attacco
+  // ingannevole con il suo bonus; classe: abilità che diventa di classe; trucco: trucco della specializzazione (5°); potere: 11°
+  const SPEC_OPERATIVO = {
+    'Asso del Volante': { abil: ['Pilotare', 'Sopravvivenza'], attacco: ['Pilotare', 1, 'da un veicolo'], trucco: 'Acrobazia Spericolata', potere: "Tutt'uno con il Volante" },
+    Bandito: { abil: ['Intimidire', 'Intuizione'], attacco: ['Intimidire', 4], trucco: 'Comando Disarmante', potere: 'Presenza Autoritaria' },
+    Detective: { abil: ['Cultura', 'Intuizione'], attacco: ['Intuizione', 4], trucco: 'Scorgere la Verità', potere: 'Intuizione del Detective' },
+    Discepolo: { abil: ['Misticismo', 'Percezione'], attacco: ['Misticismo', 4], classe: 'Misticismo', trucco: 'Apprendimento Esperienziale', potere: 'Resistenza agli Incantesimi' },
+    'Esperto di Dispositivi': { abil: ['Ingegneria', 'Rapidità di Mano'], attacco: ['Ingegneria', 4], trucco: 'Cintura Portaoggetti', potere: 'Dispiegamento Rapido' },
+    Esploratore: { abil: ['Cultura', 'Sopravvivenza'], attacco: ['Sopravvivenza', 4], trucco: 'Sempre Vigile', potere: 'In Terre Inesplorate' },
+    Fantasma: { abil: ['Acrobazia', 'Furtività'], attacco: ['Furtività', 1], trucco: 'Campo di Ammantamento', potere: 'Fuga Fuori Fase' },
+    Hacker: { abil: ['Computer', 'Ingegneria'], attacco: ['Computer', 4], trucco: 'Hacker Elusivo', potere: 'Hackeraggio di Controllo' },
+    Ladro: { abil: ['Percezione', 'Rapidità di Mano'], attacco: ['Rapidità di Mano', 0], trucco: 'Distrazione Olografica', potere: 'Piano di Riserva' },
+    Spia: { abil: ['Camuffare', 'Raggirare'], attacco: ['Raggirare', 4], trucco: 'Maestro dei Travestimenti', potere: 'Ingannare Individuazione' },
+    Temerario: { abil: ['Acrobazia', 'Atletica'], attacco: ['Acrobazia', 0], trucco: 'Movimento Versatile', potere: 'Sfruttare il Terreno' },
+  };
+  const livOperativo = (d) => d.classi.filter((cl) => nomeClasse(cl.nome) === 'Operativo').reduce((a, cl) => a + n(cl.livello), 0);
+  const specDi = (d) => SPEC_OPERATIVO[d.operativo?.spec] || null;
+  // Vantaggio dell'Operativo: +1, +2 al 3°, poi +1 ogni 4 livelli (7°, 11°, 15°, 19°)
+  const vantaggioOp = (L) => (L >= 3 ? 2 + Math.floor((L - 3) / 4) : L ? 1 : 0);
   const predefiniti = () => ({
+    operativo: { spec: '' },
     razza: { nome: '', scelta: '', inclusi: false }, tema: { nome: '', car: '' }, chiave: '',
     classi: [], pf: { attuali: '', temp: '' }, ps: { attuali: '' }, pr: { usati: 0 },
     ca: { cae: '', cac: '' }, ts: { tempra: { varie: '' }, riflessi: { varie: '' }, volonta: { varie: '' } }, iniz: { varie: '' },
@@ -175,6 +195,10 @@ window.creaSF = function creaSF(ctx) {
       ...(razza?.bonus || []).map(([bersaglio, valore, tratto]) => ({ bersaglio, valore, tipo: 'razziale', fonte: `${tratto} (razza)` })),
       ...d.bonus.filter((b) => b.attivo).flatMap((b) => (b.effetti || []).map((e) => ({ ...e, fonte: b.nome || 'bonus', fonteId: b.id }))),
     ];
+    const livOp = livOperativo(d);
+    const spec = livOp ? specDi(d) : null;
+    if (livOp) { const v = vantaggioOp(livOp); eff.push({ bersaglio: 'iniz', valore: v, tipo: 'cognitivo', fonte: "Vantaggio dell'Operativo" }, { bersaglio: 'abilita', valore: v, tipo: 'cognitivo', fonte: "Vantaggio dell'Operativo" }); }
+    if (spec) for (const a of spec.abil) eff.push({ bersaglio: 'abil:' + a, valore: 3, tipo: 'cognitivo', fonte: `Abilità Focalizzata (${d.operativo.spec})` });
     const per = (...k) => eff.filter((e) => k.includes(e.bersaglio));
     const liv = livelloTot(d);
     const base = {}, punteggio = {}, m = {};
@@ -226,16 +250,19 @@ window.creaSF = function creaSF(ctx) {
     // Abilità
     const diClasse = new Set(d.classi.flatMap((cl) => D.classi[nomeClasse(cl.nome)]?.abil || []));
     if (tema?.abil) diClasse.add(tema.abil);
+    if (spec?.classe) diClasse.add(spec.classe);
     const abil = {};
     let gradiSpesi = 0;
     for (const [nome, car] of D.abilita) {
       const s = d.abil[nome] || {};
-      const gr = n(s.gradi);
-      gradiSpesi += gr;
+      gradiSpesi += n(s.gradi);
+      // Specializzazione dell'operativo: un grado gratuito per livello da operativo nelle abilità associate (senza superare il massimo)
+      const gratis = spec?.abil.includes(nome) ? livOp : 0;
+      const gr = Math.min(Math.max(liv, n(s.gradi)), n(s.gradi) + gratis);
       const classe = !!s.classe || diClasse.has(nome);
       // Penalità: la peggiore tra quella dell'armatura e quella del carico (−5 alle prove basate su FOR e DES), non si sommano
       const pen = Math.max(CON_PENALITA.has(nome) ? penalita : 0, carico && (car === 'FOR' || car === 'DES') ? 5 : 0);
-      abil[nome] = { tot: gr + (m[car] || 0) + (classe && gr > 0 ? 3 : 0) + n(s.varie) - pen + cumula(per('abilita', 'abil:' + nome)), classe };
+      abil[nome] = { tot: gr + (m[car] || 0) + (classe && gr > 0 ? 3 : 0) + n(s.varie) - pen + cumula(per('abilita', 'abil:' + nome)), classe, gratis: Math.max(0, gr - n(s.gradi)) };
     }
     const umano = razza && /^umano$/i.test(d.razza.nome) ? liv : 0; // tratto Esperto: +1 grado per livello
     const gradiDisp = d.classi.reduce((a, cl) => a + Math.max(1, n(D.classi[nomeClasse(cl.nome)]?.gradi) + m.INT) * n(cl.livello), 0) + umano + n(d.gradiExtra);
@@ -261,7 +288,7 @@ window.creaSF = function creaSF(ctx) {
       });
       return { classe: k, giorno, cd: (L) => 10 + L + mc };
     });
-    return { base, punteggio, m, liv, chiave, bab, pfMax, psMax, prMax, pfAtt, psAtt, cae, cac, desMax, penalita, ts, iniz, abil, gradiSpesi, gradiDisp, armi, incantesimi,
+    return { base, punteggio, m, liv, livOp, chiave, bab, pfMax, psMax, prMax, pfAtt, psAtt, cae, cac, desMax, penalita, ts, iniz, abil, gradiSpesi, gradiDisp, armi, incantesimi, arm,
       volume, leggeri: vol.leggeri, carico, limiteVolume: forza / 2, forza,
       bonusAttivi: d.bonus.filter((b) => b.attivo).map((b) => b.nome), cumuli: { voci: eff } };
   }
@@ -563,6 +590,7 @@ window.creaSF = function creaSF(ctx) {
       ${sezione('difese', 'Difese e tiri salvezza', corpoDifese, `<span class="ts-sommario">CAE <b>${c.cae}</b> · CAC <b>${c.cac}</b></span>`)}
       ${sezione('attacchi', 'Attacchi', corpoAttacchi)}
       ${sezione('abilita', 'Abilità', corpoAbil, `<span class="ts-sommario">Gradi <b>${k('gradi')}</b> · max ${c.liv} per abilità</span>`)}
+      ${c.livOp ? sezione('operativo', 'Operativo', sezioneOperativo(p, d, c), `<small class="muto">${esc(d.operativo?.spec || 'specializzazione da scegliere')}</small>`) : ''}
       ${sezione('capacita', 'Talenti e capacità', corpoCap)}
       ${corpoInc ? sezione('incantesimi', 'Incantesimi', corpoInc) : ''}
       ${sezione('bonus', 'Bonus e condizioni', corpoBonus)}
@@ -594,6 +622,49 @@ window.creaSF = function creaSF(ctx) {
   }
   // Scheda del giocatore (kit): si sale di livello solo dopo aver completato quello attuale. Restituisce cosa manca.
   const GIOCATORE = !!window.MODALITA_GIOCATORE && !window.gdr;
+  // Sezione «Operativo»: specializzazione e privilegi della classe calcolati dal livello (wiki «Operativo»)
+  function sezioneOperativo(p, d, c) {
+    const id = p.id;
+    const L = c.livOp;
+    const sp = specDi(d);
+    const dadi = L >= 5 ? `${Math.floor((L - 1) / 2) + 1}d8` : L >= 3 ? '1d8' : '1d4';
+    const pesante = (c.arm || []).some((a) => a.tipo && a.tipo !== 'leggera');
+    const svelto = L >= 15 ? 9 : L >= 9 ? 6 : L >= 3 ? 3 : 0;
+    const trucchi = Math.floor(L / 2);
+    const cdTs = 10 + Math.floor(L / 2) + c.m.DES;
+    const cdAbil = 10 + Math.floor(L * 1.5) + c.m.DES;
+    const tot = (a) => c.abil[a]?.tot ?? 0;
+    const prove = ['Furtività', 'Intimidire', 'Raggirare'].map((a) => [a, tot(a), '']);
+    if (sp && !prove.some(([a]) => a === sp.attacco[0])) prove.push([sp.attacco[0], tot(sp.attacco[0]) + sp.attacco[1], sp.attacco[2] || '']);
+    else if (sp) { const x = prove.find(([a]) => a === sp.attacco[0]); x[1] += sp.attacco[1]; }
+    const voce = (ok, nome, testo) => `<li class="${ok ? '' : 'muto'}"><b>${esc(nome)}</b>${testo ? ` — ${testo}` : ''}${ok ? '' : ' <small>(non ancora)</small>'}</li>`;
+    return `<div class="pf-riga">
+        <label>Specializzazione <select data-sf="operativo|spec" data-id="${id}" data-ridisegna-sf>${opz([['', '— scegli —'], ...Object.keys(SPEC_OPERATIVO).map((x) => [x, x])], d.operativo?.spec || '')}</select></label>
+        <a class="btn-piccolo" href="${esc(linkWiki('Operativo/Specializzazioni'))}" target="_blank" rel="noopener">📖 specializzazioni</a>
+        <a class="btn-piccolo" href="${esc(linkWiki('Operativo'))}" target="_blank" rel="noopener">📖 operativo</a>
+        <span class="muto">livello da operativo <b>${L}</b></span></div>
+      ${sp ? `<div class="fede-righe">
+        <div><span class="muto">Abilità associate</span> ${sp.abil.map((a) => `<b>${esc(a)}</b> ${segno(tot(a))}${c.abil[a]?.gratis ? ` <small class="muto">(${c.abil[a].gratis} gradi gratuiti)</small>` : ''}`).join(' · ')}
+          <small class="muto">— Abilità Focalizzata (+3 cognitivo) e un grado gratuito per livello da operativo${sp.classe ? `; ${esc(sp.classe)} è abilità di classe` : ''}</small></div>
+        <div><span class="muto">Trucco della specializzazione</span> ${esc(sp.trucco)} ${L >= 5 ? '' : '<small class="muto">(dal 5° livello)</small>'}
+          · <span class="muto">Potere</span> ${esc(sp.potere)} ${L >= 11 ? '' : '<small class="muto">(dall\'11° livello)</small>'}</div></div>` : '<p class="oltre pf-aiuto">Scegli la specializzazione: dà Abilità Focalizzata e gradi gratuiti nelle sue due abilità, un\'abilità per l\'attacco ingannevole, un trucco al 5° e un potere all\'11°.</p>'}
+      <ul class="op-privilegi">
+        ${voce(true, 'Attacco Ingannevole', `<b>+${dadi}</b> danni · azione completa: ti muovi alla tua velocità e attacchi con un'arma piccola o da mischia Operativo; prima tiri una prova (CD 20 + GS del nemico): ${prove.map(([a, v, nota]) => `${esc(a)} <b>${segno(v)}</b>${nota ? ` <small>(${esc(nota)})</small>` : ''}`).join(', ')}`)}
+        ${voce(true, "Vantaggio dell'Operativo", `<b>+${vantaggioOp(L)}</b> cognitivo all'iniziativa e a tutte le abilità (già nella scheda; non si somma all'Abilità Focalizzata, vale il più alto)`)}
+        ${voce(L >= 2, 'Eludere', 'con armatura leggera o nessuna e senza ingombro')}
+        ${voce(L >= 2, "Trucchi dell'operativo", `<b>${trucchi}</b>${L >= 5 && sp ? ` + ${esc(sp.trucco)}` : ''} · CD tiri salvezza <b>${cdTs}</b> · CD prove di abilità <b>${cdAbil}</b> — scrivili in «Talenti e capacità»`)}
+        ${voce(L >= 3, 'Movimento Svelto', svelto ? `<b>+${svelto} m</b> alla velocità sul terreno ${pesante || c.carico ? '<span class="oltre">— ora non vale (armatura non leggera o ingombrato)</span>' : '(armatura leggera o nessuna, non ingombrato)'}` : '+3 m dal 3°, +6 m dal 9°, +9 m dal 15°')}
+        ${voce(L >= 3, 'Arma Specializzata', 'talento bonus per le armi della classe (danni già nella scheda)')}
+        ${voce(L >= 4, 'Inganno Debilitante', 'se riescono prova e attacco ingannevole: il bersaglio è impreparato o deconcentrato fino al tuo prossimo turno')}
+        ${voce(L >= 7, 'Agilità Prodigiosa', 'immune a impreparato; nessun bonus a chi ti attacca ai fianchi o quando sei prono')}
+        ${voce(L >= 7, "Padronanza dell'Abilità della Specializzazione", 'prendere 10 anche sotto stress con le abilità di Abilità Focalizzata')}
+        ${voce(L >= 8, L >= 13 ? 'Quadruplo Attacco' : 'Triplo Attacco', `attacco completo con armi piccole o da mischia Operativo: fino a ${L >= 13 ? 4 : 3} attacchi`)}
+        ${voce(L >= 11, 'Potere della Specializzazione', sp ? esc(sp.potere) : '')}
+        ${voce(L >= 17, 'Doppia Debilitazione', 'due effetti di inganno debilitante')}
+        ${voce(L >= 20, 'Operativo Supremo', 'tiri due volte le prove delle abilità della specializzazione; 1 volta al giorno scambi un trucco per 24 ore')}
+      </ul>`;
+  }
+
   function mancaPerSalire(p, d, c) {
     const manca = [];
     if (!razzaDi(d)) manca.push('scegli la razza');
@@ -601,6 +672,7 @@ window.creaSF = function creaSF(ctx) {
     if (!d.tema?.nome) manca.push('scegli il tema');
     else if (!tema?.car && !d.tema.car) manca.push('scegli la caratteristica del tema (+1)');
     if (!d.classi.some((cl) => nomeClasse(cl.nome))) { manca.push('scegli la classe di 1° livello'); return manca; }
+    if (livOperativo(d) && !specDi(d)) manca.push("scegli la specializzazione dell'operativo");
     if (c.gradiSpesi < c.gradiDisp) manca.push(`assegna i gradi di abilità (${c.gradiSpesi}/${c.gradiDisp})`);
     if (c.gradiSpesi > c.gradiDisp) manca.push(`hai assegnato più gradi del possibile (${c.gradiSpesi}/${c.gradiDisp})`);
     const attesi = Math.floor((c.liv + 1) / 2) + (/^umano$/i.test(d.razza.nome) ? 1 : 0);
