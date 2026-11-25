@@ -179,12 +179,31 @@ window.creaSF = function creaSF(ctx) {
     return out;
   }
   const livStile = (d, nome) => stiliSoldato(d).find((x) => x.nome === nome)?.liv || 0;
+  // Abilità del tema (wiki, Conoscenza Specialistica): stringa = abilità fissa, elenco = a scelta. Senza Tema: qualsiasi, senza il +1.
+  // Truffatore: +1 a Professione; Quartiermastro: Professione (quartiermastro) di classe
+  const ABIL_TEMA = {
+    Biotecnologo: 'Medicina', 'Cercatore di Xeno': 'Scienza Biologica', 'Esploratore dello Spazio': 'Scienza Fisica', Fuorilegge: 'Rapidità di Mano',
+    Icona: 'Cultura', Mercenario: 'Atletica', 'Pilota Esperto': 'Pilotare', Sacerdote: 'Misticismo', Quartiermastro: 'Professione',
+    Atleta: ['Acrobazia', 'Atletica'], Burocrate: ['Cultura', 'Misticismo', 'Professione', 'Scienza Biologica', 'Scienza Fisica'],
+    Erudito: ['Scienza Biologica', 'Scienza Fisica'], 'Investigatore del Paranormale': ['Diplomazia', 'Scienza Biologica', 'Misticismo', 'Sopravvivenza'],
+    'Rampollo Nobile': ['Raggirare', 'Diplomazia'], 'Senza Tema': 'qualsiasi',
+  };
+  // Abilità del tema del personaggio: { nome, scelte (se a scelta), piu1 (vale la regola del +1) }
+  function abilTema(d) {
+    const nome = d.tema?.nome;
+    if (!nome) return null;
+    const x = ABIL_TEMA[nome] ?? D.temi[nome]?.abil;
+    const tutte = D.abilita.map(([a]) => a);
+    const scelte = x === 'qualsiasi' ? tutte : Array.isArray(x) ? x : null;
+    const abil = scelte ? (scelte.includes(d.tema.abil) ? d.tema.abil : '') : x || '';
+    return { nome: abil, scelte, piu1: nome !== 'Senza Tema' && nome !== 'Quartiermastro' };
+  }
   const livOperativo = (d) => d.classi.filter((cl) => nomeClasse(cl.nome) === 'Operativo').reduce((a, cl) => a + n(cl.livello), 0);
   const specDi = (d) => SPEC_OPERATIVO[d.operativo?.spec] || null;
   // Vantaggio dell'Operativo: +1, +2 al 3°, poi +1 ogni 4 livelli (7°, 11°, 15°, 19°)
   const vantaggioOp = (L) => (L >= 3 ? 2 + Math.floor((L - 3) / 4) : L ? 1 : 0);
   const predefiniti = () => ({
-    operativo: { spec: '' }, mistico: { connessione: '' }, soldato: { primario: '', secondario: '', caccia: '' },
+    operativo: { spec: '' }, mistico: { connessione: '' }, // tema.abil: abilità scelta per i temi che la lasciano libera soldato: { primario: '', secondario: '', caccia: '' },
     razza: { nome: '', scelta: '', inclusi: false }, tema: { nome: '', car: '' }, chiave: '',
     classi: [], pf: { attuali: '', temp: '' }, ps: { attuali: '' }, pr: { usati: 0 },
     ca: { cae: '', cac: '' }, ts: { tempra: { varie: '' }, riflessi: { varie: '' }, volonta: { varie: '' } }, iniz: { varie: '' },
@@ -303,7 +322,15 @@ window.creaSF = function creaSF(ctx) {
     const iniz = m.DES + n(d.iniz.varie) + cumula(per('iniz'));
     // Abilità
     const diClasse = new Set(d.classi.flatMap((cl) => D.classi[nomeClasse(cl.nome)]?.abil || []));
-    if (tema?.abil) diClasse.add(tema.abil);
+    // Tema: l'abilità diventa di classe; se lo è già per la classe presa al 1° livello, +1 alle prove
+    const at = abilTema(d);
+    let temaPiu1 = '';
+    if (at?.nome) {
+      const prima = D.classi[nomeClasse(d.classi[0]?.nome)]?.abil || [];
+      if (at.piu1 && prima.includes(at.nome)) { temaPiu1 = at.nome; eff.push({ bersaglio: 'abil:' + at.nome, valore: 1, tipo: 'senza tipo', fonte: `Tema ${d.tema.nome}` }); }
+      else diClasse.add(at.nome);
+    }
+    if (d.tema?.nome === 'Truffatore') eff.push({ bersaglio: 'abil:Professione', valore: 1, tipo: 'senza tipo', fonte: 'Tema Truffatore' });
     if (spec?.classe) diClasse.add(spec.classe);
     // Cacciatore Competente: Percezione di classe e un grado gratuito per livello (dello stile) da usare in Percezione o Sopravvivenza.
     // La divisione si sceglie nella sezione del soldato; se non è scelta, i gradi vanno prima a Percezione fin dove servono
@@ -351,7 +378,7 @@ window.creaSF = function creaSF(ctx) {
       });
       return { classe: k, giorno, cd: (L) => 10 + L + mc };
     });
-    return { base, punteggio, m, liv, livOp, livMs, livSo, caccia, cacciaPerc, incanalare, chiave, bab, pfMax, psMax, prMax, pfAtt, psAtt, cae, cac, desMax, penalita, ts, iniz, abil, gradiSpesi, gradiDisp, armi, incantesimi, arm,
+    return { base, punteggio, m, liv, livOp, livMs, livSo, temaPiu1, caccia, cacciaPerc, incanalare, chiave, bab, pfMax, psMax, prMax, pfAtt, psAtt, cae, cac, desMax, penalita, ts, iniz, abil, gradiSpesi, gradiDisp, armi, incantesimi, arm,
       volume, leggeri: vol.leggeri, carico, limiteVolume: forza / 2, forza,
       bonusAttivi: d.bonus.filter((b) => b.attivo).map((b) => b.nome), cumuli: { voci: eff } };
   }
@@ -427,7 +454,7 @@ window.creaSF = function creaSF(ctx) {
         <div><span class="muto">Caratteristiche</span> ${esc(Object.entries(razza.car).map(([s, x]) => `${NOMI_CAR[s]} ${segno(x)}`).join(', ') || (razza.scelta ? `+${razza.scelta} a scelta` : '—'))} · <span class="muto">PF razziali</span> <b>${razza.pf}</b> · <span class="muto">Taglia</span> ${esc(razza.taglia)}</div>
         ${razza.bonus.length ? `<div><span class="muto">Bonus sempre attivi</span> ${esc(razza.bonus.map(([b, x, t]) => `${b.replace(/^abil:/, '')} +${x} (${t})`).join(' · '))}</div>` : ''}
         <div><span class="muto">Tratti</span> ${esc(razza.tratti.join(', '))}</div></div>` : ''}
-      ${tema ? `<div class="fede-righe"><div><span class="muto">Tema</span> +1 ${esc(NOMI_CAR[tema.car] || '')}${tema.abil ? ` · ${esc(tema.abil)} diventa abilità di classe` : ''}</div>
+      ${tema ? `<div class="fede-righe"><div><span class="muto">Tema</span> +1 ${esc(NOMI_CAR[tema.car || d.tema.car] || '')}${rigaAbilTema(p, d, c)}${d.tema.nome === 'Truffatore' ? ' · +1 a Professione' : ''}</div>
         <div><span class="muto">Capacità</span> ${tema.capacita.map(([nome, L]) => `<span class="${L > c.liv ? 'muto' : ''}">${esc(nome)} (${L}°)</span>`).join(', ')}</div></div>` : ''}
       <label class="pf-chk pf-mini">${chk('razza|inclusi', d.razza.inclusi, 'data-ridisegna-sf')} I punteggi inseriti comprendono già i modificatori di razza e tema</label>`;
 
@@ -731,6 +758,16 @@ window.creaSF = function creaSF(ctx) {
       </ul>`;
   }
 
+  // Abilità del tema nella riga del tema: scelta (se libera) e cosa dà
+  function rigaAbilTema(p, d, c) {
+    const at = abilTema(d);
+    if (!at) return '';
+    const scelta = at.scelte ? ` · abilità <select data-sf="tema|abil" data-id="${p.id}" data-ridisegna-sf>${opz([['', '— scegli —'], ...at.scelte.map((x) => [x, x])], at.nome)}</select>` : '';
+    if (!at.nome) return scelta;
+    const cosa = c.temaPiu1 ? `+1 alle prove di ${esc(at.nome)} <small class="muto">(è già di classe per la classe del 1° livello)</small>` : `${esc(at.nome)} diventa abilità di classe`;
+    return `${scelta} · ${cosa}`;
+  }
+
   // Sezione «Soldato»: stili di combattimento con le tecniche e privilegi calcolati dal livello (wiki «Soldato», «Soldato/Stili»)
   function sezioneSoldato(p, d, c) {
     const id = p.id;
@@ -837,6 +874,7 @@ window.creaSF = function creaSF(ctx) {
     const tema = temaDi(d);
     if (!d.tema?.nome) manca.push('scegli il tema');
     else if (!tema?.car && !d.tema.car) manca.push('scegli la caratteristica del tema (+1)');
+    if (abilTema(d)?.scelte && !abilTema(d).nome) manca.push("scegli l'abilità del tema");
     if (!d.classi.some((cl) => nomeClasse(cl.nome))) { manca.push('scegli la classe di 1° livello'); return manca; }
     if (livOperativo(d) && !specDi(d)) manca.push("scegli la specializzazione dell'operativo");
     if (livMistico(d) && !connessioneDi(d)) manca.push('scegli la connessione del mistico');
@@ -1104,7 +1142,7 @@ window.creaSF = function creaSF(ctx) {
     // Razza, tema e classe scritti anche nei campi di testo del personaggio (per elenchi e ricerca)
     p.campi = p.campi || {};
     if (el.dataset.sf === 'razza|nome') { d.razza.scelta = ''; p.campi.Razza = d.razza.nome; const r = razzaDi(d); if (r) d.taglia = r.taglia; }
-    if (el.dataset.sf === 'tema|nome') { d.tema.car = ''; p.campi.Tema = d.tema.nome; }
+    if (el.dataset.sf === 'tema|nome') { d.tema.car = ''; d.tema.abil = ''; p.campi.Tema = d.tema.nome; }
     if (/^classi#/.test(el.dataset.sf)) { p.campi.Classe = d.classi.map((x) => `${x.nome} ${x.livello}`).join(' / '); p.campi.Livello = String(livelloTot(d)); }
     p.modificato = Date.now();
     ctx.salva();
