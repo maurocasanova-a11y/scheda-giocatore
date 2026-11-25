@@ -208,7 +208,7 @@ window.creaPF1 = function creaPF1(ctx) {
   const RAZZE = window.PF1_RAZZE || {};
   const razzaDi = (d) => RAZZE[d.razza?.nome] || null;
   // Razze con il tratto Talento Bonus (quanti talenti in più al 1° livello) e razze umane con Esperti (+1 grado per livello)
-  const TALENTI_RAZZA = { Umano: 1, 'Umano Azlanti': 2, 'Sangue di Ashardalon': 1 };
+  const TALENTI_RAZZA = { Umano: 1, 'Umano Azlanti': 2, 'Sangue di Ashardalon': 1, Celestiale: 1 };
   const ESPERTI = new Set(['Umano', 'Umano Azlanti']);
   const espertoUmano = (d) => ESPERTI.has(razzaDi(d)?.nome) && !sostituitiDa(d).has(chiaveTratto('Esperti'));
   // Tratti razziali alternativi scelti (solo quelli della razza attuale)
@@ -242,7 +242,7 @@ window.creaPF1 = function creaPF1(ctx) {
     const via = sostituitiDa(d);
     const alt = new Set(alternativiScelti(d).map((a) => chiaveTratto(a.nome)));
     const standard = new Set(r.tratti.map(chiaveTratto));
-    return ((window.PF1_RAZZE_TS || {})[r.nome] || []).filter(([t]) => {
+    return [...((window.PF1_RAZZE_TS || {})[r.nome] || []), ...(r.tsCond || [])].filter(([t]) => {
       const k = chiaveTratto(t);
       return alt.has(k) || (standard.has(k) && !via.has(k));
     }).map(([tratto, valore, tipo, ts, testo], i) => ({ id: `razza${i}`, testo, valore, tipo, ts, tratto, razza: true }));
@@ -1928,6 +1928,7 @@ window.creaPF1 = function creaPF1(ctx) {
         ${bonus ? `<div><span class="muto">Bonus sempre attivi</span> ${bonus}</div>` : ''}
         ${r.resistenze ? `<div><span class="muto">Resistenze</span> ${r.resistenze.map(([t, v, tr]) => `${esc((ENERGIE.find((e) => e[0] === t) || [t, t])[1])} ${v} <small class="muto">(${esc(tr)}, già nelle difese)</small>`).join(' · ')}</div>` : ''}
         ${r.volo ? `<div><span class="muto">Volare</span> ${esc(r.volo)}</div>` : ''}
+        ${r.tipo ? `<div><span class="muto">Tipo</span> ${esc(r.tipo)}</div>` : ''}
         ${r.soffio === 'ashardalon' ? soffioAshardalon(d, c) : ''}
         <div><span class="muto">Tratti</span> ${tratti.join(', ')}</div>
       </div>
