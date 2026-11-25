@@ -207,9 +207,10 @@ window.creaPF1 = function creaPF1(ctx) {
   // ---- Razze (dati in src/pf1-razze.js) ----
   const RAZZE = window.PF1_RAZZE || {};
   const razzaDi = (d) => RAZZE[d.razza?.nome] || null;
-  // Razze umane con i tratti Esperti (+1 grado per livello) e Talento Bonus (quanti talenti in più al 1° livello)
-  const TALENTI_UMANI = { Umano: 1, 'Umano Azlanti': 2 };
-  const espertoUmano = (d) => !!TALENTI_UMANI[razzaDi(d)?.nome] && !sostituitiDa(d).has(chiaveTratto('Esperti'));
+  // Razze con il tratto Talento Bonus (quanti talenti in più al 1° livello) e razze umane con Esperti (+1 grado per livello)
+  const TALENTI_RAZZA = { Umano: 1, 'Umano Azlanti': 2, 'Sangue di Ashardalon': 1 };
+  const ESPERTI = new Set(['Umano', 'Umano Azlanti']);
+  const espertoUmano = (d) => ESPERTI.has(razzaDi(d)?.nome) && !sostituitiDa(d).has(chiaveTratto('Esperti'));
   // Tratti razziali alternativi scelti (solo quelli della razza attuale)
   const alternativiScelti = (d) => {
     const r = razzaDi(d);
@@ -1873,7 +1874,17 @@ window.creaPF1 = function creaPF1(ctx) {
 
   // ---- Razza: tendina, modificatori, taglia, velocità, bonus e tratti ----
   const NOMI_CAR = { FOR: 'Forza', DES: 'Destrezza', COS: 'Costituzione', INT: 'Intelligenza', SAG: 'Saggezza', CAR: 'Carisma' };
-  function sezioneRazza(p, d) {
+  // Soffio di Ashardalon: Nube Sacra (9 m, 1d8 sacri ogni 2 livelli) e Soffio Elettrico (linea 36 m, 1d6 per livello);
+  // Riflessi CD 10 + ½ livello + COS. Il livello è quello del personaggio (la razza non ha livelli propri)
+  function soffioAshardalon(d, c) {
+    const L = livelloPersonaggio(d);
+    const cos = c ? c.m.COS : 0;
+    const cd = 10 + Math.floor(L / 2) + cos;
+    const nube = Math.floor(L / 2);
+    return `<div><span class="muto">Soffio di Ashardalon</span> Nube Sacra (emanazione 9 m) <b>${nube ? `${nube}d8` : '—'}</b> sacri${nube ? '' : ' <small class="muto">(dal 2° livello)</small>'}
+      · Soffio Elettrico (linea 36 m) <b>${L ? `${L}d6` : '—'}</b> elettricità · Riflessi <b>CD ${cd}</b> <small class="muto">(10 + ½ livello + COS)</small></div>`;
+  }
+  function sezioneRazza(p, d, c) {
     const id = p.id;
     const r = razzaDi(d);
     const gruppi = ['Razze Base', 'Razze Peculiari', 'Razze Insolite', 'Altre Razze', 'Razze del Master'];
@@ -1884,7 +1895,7 @@ window.creaPF1 = function creaPF1(ctx) {
     if (!r) return `<div class="pf-riga">${tendina}</div><p class="muto pf-aiuto">Scegli la razza: modificatori alle caratteristiche, taglia, velocità e bonus razziali si applicano da soli.</p>`;
     const mods = Object.entries(r.car).map(([s, v]) => `${NOMI_CAR[s]} ${segno(v)}`).join(', ');
     const scelta = r.scelta ? `<label>+${r.scelta} a <select data-pf1="razza|scelta" data-id="${id}" data-ridisegna-pf1><option value="">— scegli —</option>${opz(CARS.map((s) => [s, NOMI_CAR[s]]), d.razza.scelta)}</select></label>` : '';
-    const nomeBonus = (b) => `${b.bersaglio === 'ts' ? 'tutti i tiri salvezza' : b.bersaglio.replace(/^abil:/, '')} ${segno(b.valore)}`;
+    const nomeBonus = (b) => `${b.bersaglio === 'ts' ? 'tutti i tiri salvezza' : b.bersaglio === 'ca' ? 'CA' : b.bersaglio.replace(/^abil:/, '')} ${segno(b.valore)}${b.tipo && b.tipo !== 'razziale' ? ` ${b.tipo}` : ''}`;
     const bonus = effettiRazza(d).map((b) => `${nomeBonus(b)} <small class="muto">(${esc(b.tratto)})</small>`).join(' · ');
     const via = sostituitiDa(d);
     const scelti = alternativiScelti(d);
@@ -1915,6 +1926,9 @@ window.creaPF1 = function creaPF1(ctx) {
         <div><span class="muto">Caratteristiche</span> ${esc(mods || (r.scelta ? `+${r.scelta} a scelta` : 'nessun modificatore'))}</div>
         <div><span class="muto">Taglia</span> ${esc(r.taglia)} · <span class="muto">Velocità</span> ${metri(velocitaRazza(d))}</div>
         ${bonus ? `<div><span class="muto">Bonus sempre attivi</span> ${bonus}</div>` : ''}
+        ${r.resistenze ? `<div><span class="muto">Resistenze</span> ${r.resistenze.map(([t, v, tr]) => `${esc((ENERGIE.find((e) => e[0] === t) || [t, t])[1])} ${v} <small class="muto">(${esc(tr)}, già nelle difese)</small>`).join(' · ')}</div>` : ''}
+        ${r.volo ? `<div><span class="muto">Volare</span> ${esc(r.volo)}</div>` : ''}
+        ${r.soffio === 'ashardalon' ? soffioAshardalon(d, c) : ''}
         <div><span class="muto">Tratti</span> ${tratti.join(', ')}</div>
       </div>
       ${sezAlt}
@@ -2153,7 +2167,7 @@ window.creaPF1 = function creaPF1(ctx) {
     let talentiOk = true, talentiTesto = '';
     if (!livelli.length) {
       let attesi = 1;
-      if (TALENTI_UMANI[razzaDi(d)?.nome] && !sostituitiDa(d).has(chiaveTratto('Talento Bonus'))) attesi += TALENTI_UMANI[razzaDi(d).nome];
+      if (TALENTI_RAZZA[razzaDi(d)?.nome] && !sostituitiDa(d).has(chiaveTratto('Talento Bonus'))) attesi += TALENTI_RAZZA[razzaDi(d).nome];
       const k = nomeClasse(d.classi[0].nome);
       const t = k && (window.PF1_PROGRESSIONE || {})[k];
       if (t) attesi += pezziPrivilegi(t.righe[0]?.[4 + colonnaPrivilegi(t)]).filter((f) => /Talento Bonus/i.test(f)).length;
@@ -3330,6 +3344,8 @@ window.creaPF1 = function creaPF1(ctx) {
   // Fonti automatiche: armature e scudi indossati, creati nell'officina o con la capacità scritta nel nome
   function fontiAutomatiche(d) {
     const out = [];
+    // Resistenze all'energia date dalla razza (razze del master)
+    for (const [tipo, valore, tratto] of razzaDi(d)?.resistenze || []) out.push({ id: `auto-razza-${tipo}`, nome: `${tratto} (razza)`, tipo, valore, auto: true });
     // Mastro Chimico con Mutageno Draconico, in forma mutagena: resistenza 20 all'energia del drago scelto
     const drago = livMC(d) && d.alchimista?.mutageno?.attivo && avanzatoMC(d, 'Mutageno Draconico') ? DRAGHI_MC.find((x) => x[0] === d.chimico?.drago) : null;
     if (drago) out.push({ id: 'auto-mc-drago', nome: `Mutageno Draconico (${drago[0]})`, tipo: drago[1], valore: 20, auto: true });
@@ -4755,7 +4771,7 @@ window.creaPF1 = function creaPF1(ctx) {
       </div>
       ${GIOCATORE && salita?.pgId !== id ? (() => { const manca = mancaPerSalire(p, d, c); return manca.length ? `<div class="pannello pf-da-completare"><b>${d.classi.length ? `Per completare il ${c.liv}° livello` : 'Per iniziare'}</b>${d.classi.length ? ' (poi potrai salire al successivo)' : ''}:<ul>${manca.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''; })() : ''}
       ${salita?.pgId === id ? sezioneSalita(p, d, c, r) : ''}
-      ${sezione('razza', 'Razza', sezioneRazza(p, d))}
+      ${sezione('razza', 'Razza', sezioneRazza(p, d, c))}
       ${sezione('classi', 'Classi e livelli', corpoClassi)}
       ${sezione('preferita', 'Classe preferita', sezionePreferite(p, d), prefPrese(d).length ? `<small class="muto">${prefPrese(d).length} bonus razziali</small>` : '')}
       ${sezione('avanzamento', 'Riepilogo dell\'avanzamento', sezioneAvanzamento(p, d, c), (() => { const m = controlloAumenti(d, c).mancanti.length; return m ? `<small class="oltre">⚠ ${m} aument${m > 1 ? 'i' : 'o'} mancant${m > 1 ? 'i' : 'e'}</small>` : d.avanzamento.length ? `<small class="muto">${d.avanzamento.filter((r) => r.tipo === 'livello').length} livelli registrati</small>` : ''; })())}
