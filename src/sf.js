@@ -323,7 +323,9 @@ window.creaSF = function creaSF(ctx) {
       const classe = !!s.classe || diClasse.has(nome);
       // Penalità: la peggiore tra quella dell'armatura e quella del carico (−5 alle prove basate su FOR e DES), non si sommano
       const pen = Math.max(CON_PENALITA.has(nome) ? penalita : 0, carico && (car === 'FOR' || car === 'DES') ? 5 : 0);
-      abil[nome] = { tot: gr + (m[car] || 0) + (classe && gr > 0 ? 3 : 0) + n(s.varie) - pen + cumula(per('abilita', 'abil:' + nome)), classe, gratis: Math.max(0, gr - n(s.gradi)) };
+      // Gradi spesi che non servono: i gradi gratuiti arrivano già al massimo (livello del personaggio)
+      const sprecati = gratis ? Math.max(0, Math.min(n(s.gradi), n(s.gradi) + gratis - liv)) : 0;
+      abil[nome] = { tot: gr + (m[car] || 0) + (classe && gr > 0 ? 3 : 0) + n(s.varie) - pen + cumula(per('abilita', 'abil:' + nome)), classe, gratis: Math.max(0, gr - n(s.gradi)), gratisMax: gratis, sprecati };
     }
     const umano = razza && /^umano$/i.test(d.razza.nome) ? liv : 0; // tratto Esperto: +1 grado per livello
     const gradiDisp = d.classi.reduce((a, cl) => a + Math.max(1, n(D.classi[nomeClasse(cl.nome)]?.gradi) + m.INT) * n(cl.livello), 0) + umano + n(d.gradiExtra);
@@ -505,9 +507,10 @@ window.creaSF = function creaSF(ctx) {
       return `<div class="pf-abil${a.classe ? ' di-classe' : ''}">
         <label class="pf-chk" title="Abilità di classe (spunta per quelle extra)">${chk(`abil|${nome}|classe`, s.classe || a.classe, a.classe && !s.classe ? 'disabled' : 'data-ridisegna-sf')}</label>
         <span class="pf-abil-nome">${esc(nome)} <small class="muto">${car}${senza ? '' : ' · solo addestrata'}${CON_PENALITA.has(nome) ? ' · pen.' : ''}</small></span>
-        <label title="Gradi">${num(`abil|${nome}|gradi`, s.gradi, `min="0" max="${c.liv}" class="pf-corto"`)}</label>
+        <label title="Gradi${a.gratisMax ? ` (più ${a.gratis} gratuiti)` : ''}">${num(`abil|${nome}|gradi`, s.gradi, `min="0" max="${c.liv}" class="pf-corto"${a.gratisMax ? ' data-ridisegna-sf' : ''}`)}</label>
         <label title="Varie">${num(`abil|${nome}|varie`, s.varie, 'class="pf-corto"')}</label>
-        <b class="pf-tot">${k('abil:' + nome)}</b>${dado('abil:' + nome, nome)}</div>`;
+        <b class="pf-tot">${k('abil:' + nome)}</b>${dado('abil:' + nome, nome)}
+        ${a.gratisMax ? `<small class="${a.sprecati ? 'oltre' : 'muto'} sf-abil-gratis">${a.sprecati ? `⚠ ${a.sprecati} ${a.sprecati === 1 ? 'grado sprecato' : 'gradi sprecati'}: i gradi gratuiti (${Math.min(a.gratisMax, c.liv)}) la portano già al massimo di ${c.liv}; spostali su un'altra abilità` : `+${a.gratis} gradi gratuiti`}</small>` : ''}</div>`;
     }).join('');
     const corpoAbil = `<div class="pf-griglia-abil">${righeAbil}</div><div class="pf-piede"><label>Gradi extra ${num('gradiExtra', d.gradiExtra)}</label></div>`;
 
@@ -840,6 +843,8 @@ window.creaSF = function creaSF(ctx) {
     const livSo = livSoldato(d);
     if (livSo && !STILI[d.soldato?.primario]) manca.push('scegli lo stile di combattimento primario del soldato');
     if (livSo >= 9 && !stiliSoldato(d).some((x) => x.ruolo === 'secondario')) manca.push('scegli lo stile di combattimento secondario del soldato');
+    const sprecati = Object.entries(c.abil).filter(([, a]) => a.sprecati);
+    if (sprecati.length) manca.push(`sposta i gradi sprecati in ${sprecati.map(([x, a]) => `${x} (${a.sprecati})`).join(', ')}: hanno già i gradi gratuiti al massimo`);
     if (c.gradiSpesi < c.gradiDisp) manca.push(`assegna i gradi di abilità (${c.gradiSpesi}/${c.gradiDisp})`);
     if (c.gradiSpesi > c.gradiDisp) manca.push(`hai assegnato più gradi del possibile (${c.gradiSpesi}/${c.gradiDisp})`);
     const attesi = Math.floor((c.liv + 1) / 2) + (/^umano$/i.test(d.razza.nome) ? 1 : 0) + Math.floor(livSo / 2); // + talenti di combattimento del soldato

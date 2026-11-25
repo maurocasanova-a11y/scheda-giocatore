@@ -1434,3 +1434,5 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
 @media (hover: none) { .salto-sposta { opacity: 1; } }
 .car-prova { font-size: 11px; color: var(--verde); min-height: 0; }
 .car-prova:empty { display: none; }
+.sf-abil-gratis { flex-basis: 100%; grid-column: 1 / -1; font-size: 12px; padding-left: 30px; }
+.pf-abil:has(.sf-abil-gratis) { flex-wrap: wrap; }
