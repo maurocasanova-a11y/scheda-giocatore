@@ -584,9 +584,12 @@
     try { const v = localStorage.getItem('salti-aperti'); if (v !== null) aperta = v === '1'; } catch { /* niente */ }
     if (aperta) nav.classList.add('aperta');
     document.body.classList.toggle('salti-aperti', aperta);
+    const pid = location.hash.slice(1).split('?')[0].split('/').filter(Boolean)[1] || '';
     nav.innerHTML = `<button class="salti-apri" data-azione="salti-apri" title="Mostra o nascondi l'indice della scheda">☰</button>
-      <div class="salti-elenco">${voci.map((v) => `<button class="salto" data-azione="salta-blocco" data-blocco="${esc(v.k)}" title="${esc(v.t)}">${esc(v.t)}</button>`).join('')}
-        <button class="salto salto-su" data-azione="salta-blocco" data-blocco="" title="Torna in cima">▲ In cima</button></div>`;
+      <div class="salti-elenco">${voci.map((v, i) => `<div class="salto-riga" data-blocco="${esc(v.k)}">
+          <button class="salto" data-azione="salta-blocco" data-vai="${esc(v.k)}" draggable="true" data-blocco-trascina="${esc(v.k)}" title="${esc(v.t)} — clic per andarci, trascina per spostarla">${esc(v.t)}</button>
+          <span class="salto-sposta"><button class="btn-mini" data-azione="blocco-sposta" data-indice data-id="${esc(pid)}" data-k="${esc(v.k)}" data-d="-1" ${i === 0 ? 'disabled' : ''} title="Sposta su">▲</button><button class="btn-mini" data-azione="blocco-sposta" data-indice data-id="${esc(pid)}" data-k="${esc(v.k)}" data-d="1" ${i === voci.length - 1 ? 'disabled' : ''} title="Sposta giù">▼</button></span></div>`).join('')}
+        <button class="salto salto-su" data-azione="salta-blocco" data-vai="" title="Torna in cima">▲ In cima</button></div>`;
     document.body.appendChild(nav);
     document.body.classList.add('con-salti');
     // La voce della parte che si sta leggendo resta evidenziata. Si osserva dentro #contenuto (che scorre):
@@ -595,13 +598,13 @@
       for (const e of entrate) {
         if (!e.isIntersecting) continue;
         nav.querySelectorAll('.salto.attuale').forEach((x) => x.classList.remove('attuale'));
-        nav.querySelector(`.salto[data-blocco="${CSS.escape(e.target.dataset.blocco)}"]`)?.classList.add('attuale');
+        nav.querySelector(`.salto[data-vai="${CSS.escape(e.target.dataset.blocco)}"]`)?.classList.add('attuale');
       }
     }, { root: $('#contenuto'), rootMargin: '-10% 0px -80% 0px' });
     b.blocchi.forEach((el) => osservaSalti.observe(el));
   }
   // Ordine attuale (dalla pagina) con un blocco spostato in una nuova posizione
-  function spostaBlocco(p, k, verso) {
+  function spostaBlocco(p, k, verso, scorri = true) {
     const b = blocchiScheda($('#contenuto'));
     if (!b) return;
     const ordine = b.blocchi.map((x) => x.dataset.blocco);
@@ -614,8 +617,8 @@
     p.modificato = Date.now();
     salva();
     render();
-    // Il blocco spostato resta sotto gli occhi
-    setTimeout(() => $(`[data-blocco="${CSS.escape(k)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 30);
+    // Il blocco spostato resta sotto gli occhi (non se lo si sposta dall'indice)
+    if (scorri) setTimeout(() => $(`[data-blocco="${CSS.escape(k)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 30);
   }
 
   // Raccolte di pagine: la Lore di una campagna ("campagna:ID") o i documenti di un personaggio ("personaggio:ID")
@@ -1766,10 +1769,10 @@
       const quanti = pf1.aggiungiMostro(c, p, qta);
       toast(`⚔ ${quanti > 1 ? `${quanti} × ` : ''}<b>${esc(p.nome)}</b> nello scontro · <a href="#/campagna/${c.id}/combattimento">apri il combattimento</a>`);
     },
-    'blocco-sposta'(el) { const p = personaggio(el.dataset.id); if (p) spostaBlocco(p, el.dataset.k, Number(el.dataset.d)); },
+    'blocco-sposta'(el) { const p = personaggio(el.dataset.id); if (p) spostaBlocco(p, el.dataset.k, Number(el.dataset.d), el.dataset.indice === undefined); },
     // Indice laterale: apre la sezione se è chiusa e ci porta la pagina
     'salta-blocco'(el) {
-      const k = el.dataset.blocco;
+      const k = el.dataset.vai ?? el.dataset.blocco;
       const dest = k ? $(`#contenuto [data-blocco="${CSS.escape(k)}"]`) : null;
       if (!k) { const c = $('#contenuto'); c.scrollTo({ top: 0, behavior: 'smooth' }); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
       if (!dest) return;
@@ -2719,7 +2722,7 @@
       while (s && (!s.dataset.blocco || s.dataset.blocco === k)) s = s.nextElementSibling;
       prima = s ? s.dataset.blocco : '';
     }
-    spostaBlocco(p, k, { prima });
+    spostaBlocco(p, k, { prima }, !t.classList.contains('salto-riga'));
   });
   document.addEventListener('dragend', () => { bloccoTrascinato = null; pulisciTrascina(); });
 
