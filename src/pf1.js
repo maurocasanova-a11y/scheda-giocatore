@@ -7973,6 +7973,8 @@ window.creaPF1 = function creaPF1(ctx) {
     editorMostro,
     creaMostroVuoto: NUOVO_MOSTRO,
     iniziativa: (p) => calcola(p, ctx.regDi(p)).init,
+    // Calcoli completi della scheda (usati dalle prove in prove/)
+    calcola: (p) => calcola(p, ctx.regDi(p)),
     vistaScheda,
     vistaTavolo,
     vistaIncontro,
