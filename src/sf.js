@@ -198,6 +198,26 @@ window.creaSF = function creaSF(ctx) {
     const abil = scelte ? (scelte.includes(d.tema.abil) ? d.tema.abil : '') : x || '';
     return { nome: abil, scelte, piu1: nome !== 'Senza Tema' && nome !== 'Quartiermastro' };
   }
+  // +1 a una caratteristica del tema: quelle tra cui scegliere (null = fissa dai dati; Senza Tema: tutte)
+  function sceltaCarTema(d) {
+    const nome = d.tema?.nome;
+    if (nome === 'Atleta') return ['FOR', 'DES', 'COS'];
+    if (nome === 'Guardiano') return ['FOR', 'DES'];
+    if (nome === 'Burocrate') {
+      const a = abilTema(d)?.nome;
+      if (!a) return [];
+      const car = D.abilita.find(([x]) => x === a)?.[1];
+      return car ? [car] : ['INT', 'SAG', 'CAR']; // Professione: dipende dal mestiere
+    }
+    return D.temi[nome]?.car ? null : CARS;
+  }
+  // Caratteristica del tema che riceve il +1 ('' = ancora da scegliere)
+  function carTemaDi(d) {
+    if (!d.tema?.nome || !D.temi[d.tema.nome]) return '';
+    const sc = sceltaCarTema(d);
+    if (!sc) return D.temi[d.tema.nome].car;
+    return sc.length === 1 ? sc[0] : sc.includes(d.tema.car) ? d.tema.car : '';
+  }
   const livOperativo = (d) => d.classi.filter((cl) => nomeClasse(cl.nome) === 'Operativo').reduce((a, cl) => a + n(cl.livello), 0);
   const specDi = (d) => SPEC_OPERATIVO[d.operativo?.spec] || null;
   // Vantaggio dell'Operativo: +1, +2 al 3°, poi +1 ogni 4 livelli (7°, 11°, 15°, 19°)
@@ -278,7 +298,7 @@ window.creaSF = function creaSF(ctx) {
       const v = p.caratteristiche?.[s];
       base[s] = v === '' || v == null ? 10 : n(v);
       const mRazza = razza && !d.razza.inclusi ? n(razza.car[s]) + (razza.scelta && d.razza.scelta === s ? razza.scelta : 0) : 0;
-      const carTema = tema?.car || d.tema.car;
+      const carTema = carTemaDi(d);
       const mTema = d.tema.nome && !d.razza.inclusi && carTema === s ? 1 : 0;
       punteggio[s] = base[s] + mRazza + mTema + cumula(per(s));
       m[s] = Math.floor((punteggio[s] - 10) / 2);
@@ -447,14 +467,14 @@ window.creaSF = function creaSF(ctx) {
         ${razza?.scelta ? `<label>+${razza.scelta} a ${sel('razza|scelta', [['', '— scegli —'], ...CARS.map((s) => [s, NOMI_CAR[s]])], d.razza.scelta, 'data-ridisegna-sf')}</label>` : ''}
         ${razza ? wiki(razza.pagina) : ''}
         <label>Tema ${sel('tema|nome', [['', '— nessuno —'], ...Object.keys(D.temi).sort((a, b) => a.localeCompare(b, 'it')).map((x) => [x, x])], d.tema.nome, 'data-ridisegna-sf')}</label>
-        ${d.tema.nome && !tema?.car ? `<label>+1 a ${sel('tema|car', [['', '— scegli —'], ...CARS.map((s) => [s, NOMI_CAR[s]])], d.tema.car, 'data-ridisegna-sf')}</label>` : ''}
+        ${tema && sceltaCarTema(d)?.length > 1 ? `<label>+1 a ${sel('tema|car', [['', '— scegli —'], ...sceltaCarTema(d).map((s) => [s, NOMI_CAR[s]])], carTemaDi(d), 'data-ridisegna-sf')}</label>` : ''}
         ${tema ? wiki(d.tema.nome) : ''}
       </div>
       ${razza ? `<div class="fede-righe">
         <div><span class="muto">Caratteristiche</span> ${esc(Object.entries(razza.car).map(([s, x]) => `${NOMI_CAR[s]} ${segno(x)}`).join(', ') || (razza.scelta ? `+${razza.scelta} a scelta` : '—'))} · <span class="muto">PF razziali</span> <b>${razza.pf}</b> · <span class="muto">Taglia</span> ${esc(razza.taglia)}</div>
         ${razza.bonus.length ? `<div><span class="muto">Bonus sempre attivi</span> ${esc(razza.bonus.map(([b, x, t]) => `${b.replace(/^abil:/, '')} +${x} (${t})`).join(' · '))}</div>` : ''}
         <div><span class="muto">Tratti</span> ${esc(razza.tratti.join(', '))}</div></div>` : ''}
-      ${tema ? `<div class="fede-righe"><div><span class="muto">Tema</span> +1 ${esc(NOMI_CAR[tema.car || d.tema.car] || '')}${rigaAbilTema(p, d, c)}${d.tema.nome === 'Truffatore' ? ' · +1 a Professione' : ''}</div>
+      ${tema ? `<div class="fede-righe"><div><span class="muto">Tema</span> +1 ${esc(NOMI_CAR[carTemaDi(d)] || (d.tema.nome === 'Burocrate' ? "alla caratteristica dell'abilità scelta" : 'da scegliere'))}${rigaAbilTema(p, d, c)}${d.tema.nome === 'Truffatore' ? ' · +1 a Professione' : ''}</div>
         <div><span class="muto">Capacità</span> ${tema.capacita.map(([nome, L]) => `<span class="${L > c.liv ? 'muto' : ''}">${esc(nome)} (${L}°)</span>`).join(', ')}</div></div>` : ''}
       <label class="pf-chk pf-mini">${chk('razza|inclusi', d.razza.inclusi, 'data-ridisegna-sf')} I punteggi inseriti comprendono già i modificatori di razza e tema</label>`;
 
@@ -873,7 +893,7 @@ window.creaSF = function creaSF(ctx) {
     if (!razzaDi(d)) manca.push('scegli la razza');
     const tema = temaDi(d);
     if (!d.tema?.nome) manca.push('scegli il tema');
-    else if (!tema?.car && !d.tema.car) manca.push('scegli la caratteristica del tema (+1)');
+    else if (!carTemaDi(d)) manca.push('scegli la caratteristica del tema (+1)');
     if (abilTema(d)?.scelte && !abilTema(d).nome) manca.push("scegli l'abilità del tema");
     if (!d.classi.some((cl) => nomeClasse(cl.nome))) { manca.push('scegli la classe di 1° livello'); return manca; }
     if (livOperativo(d) && !specDi(d)) manca.push("scegli la specializzazione dell'operativo");
