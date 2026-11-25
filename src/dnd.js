@@ -5,6 +5,9 @@
 window.creaDND = function creaDND(ctx) {
   const { esc, uid, norm } = ctx;
   const D = window.DND_DATI || { abilita: [], classi: {}, razze: {} };
+  // Fatti del Manuale del Giocatore (src/dnd-manuale.js): hanno la precedenza sui dati del wiki
+  const MAN = window.DND_MANUALE || { classi: {}, razze: {}, background: {} };
+  const RAZZE = Object.keys(MAN.razze).length ? MAN.razze : D.razze;
   const WIKI = 'https://dungeonsanddragons.fandom.com/it/wiki/';
   const n = (v) => (v === '' || v == null || isNaN(Number(v)) ? 0 : Number(v));
   const segno = (v) => (v >= 0 ? '+' : '') + v;
@@ -14,7 +17,7 @@ window.creaDND = function creaDND(ctx) {
   const ABIL_CAR = { Acrobazia: 'DES', 'Addestrare Animali': 'SAG', Arcano: 'INT', Atletica: 'FOR', Furtività: 'DES', Indagare: 'INT', Inganno: 'CAR', Intimidire: 'CAR', Intrattenere: 'CAR', Intuizione: 'SAG', Medicina: 'SAG', Natura: 'INT', Percezione: 'SAG', Persuasione: 'CAR', 'Rapidità di Mano': 'DES', Religione: 'INT', Sopravvivenza: 'SAG', Storia: 'INT' };
   const ABILITA = Object.keys(ABIL_CAR);
   // Background del Manuale del Giocatore (il wiki ha solo l'Accolito, gli altri sono homebrew): solo i dati di regola
-  const BACKGROUND = {
+  const BACKGROUND = Object.keys(MAN.background || {}).length ? MAN.background : {
     Accolito: { abil: ['Intuizione', 'Religione'], strumenti: '', lingue: 2, privilegio: 'Rifugio dei Fedeli' },
     'Artigiano di Gilda': { abil: ['Intuizione', 'Persuasione'], strumenti: 'un tipo di strumenti da artigiano', lingue: 1, privilegio: 'Membro di una Gilda' },
     Ciarlatano: { abil: ['Inganno', 'Rapidità di Mano'], strumenti: 'kit per il camuffamento, kit da falsario', lingue: 0, privilegio: 'Falsa Identità' },
@@ -49,8 +52,56 @@ window.creaDND = function creaDND(ctx) {
     const k = Object.keys(BASE).find((x) => norm(x) === norm(String(nome || '').trim()));
     if (!k) return null;
     const w = D.classi[k] || {};
-    return { nome: k, ...w, ...BASE[k], abil: BASE[k].abil || w.abil || [], quante: BASE[k].quante || w.quante || 2 };
+    const m = MAN.classi[k] || {};
+    const abil = m.abil === null ? ABILITA : m.abil || BASE[k].abil || w.abil || [];
+    return { nome: k, ...w, ...BASE[k], ...m, abil, quante: m.quante || BASE[k].quante || w.quante || 2 };
   };
+  // Competenze di classe nelle armi e armature (Manuale, cap. 3) e quelle che dà una classe presa in multiclasse (cap. 6)
+  const SEMPLICI_MAGO = ['Balestra Leggera', 'Bastone Ferrato', 'Dardo', 'Fionda', 'Pugnale'];
+  const COMPETENZE = {
+    Artefice: { armi: ['semplice'], armature: ['leggera', 'media', 'scudo'], multi: { armi: [], armature: ['leggera', 'media', 'scudo'] } },
+    Barbaro: { armi: ['semplice', 'guerra'], armature: ['leggera', 'media', 'scudo'], multi: { armi: ['semplice', 'guerra'], armature: ['scudo'] } },
+    Bardo: { armi: ['semplice', 'Balestra a Mano', 'Spada Corta', 'Spada Lunga', 'Stocco'], armature: ['leggera'], multi: { armi: [], armature: ['leggera'], abil: 1 } },
+    Chierico: { armi: ['semplice'], armature: ['leggera', 'media', 'scudo'], multi: { armi: [], armature: ['leggera', 'media', 'scudo'] } },
+    Druido: { armi: ['Bastone Ferrato', 'Dardo', 'Falcetto', 'Fionda', 'Giavellotto', 'Lancia', 'Mazza', 'Pugnale', 'Randello', 'Scimitarra'], armature: ['leggera', 'media', 'scudo'], multi: { armi: [], armature: ['leggera', 'media', 'scudo'] } },
+    Guerriero: { armi: ['semplice', 'guerra'], armature: ['leggera', 'media', 'pesante', 'scudo'], multi: { armi: ['semplice', 'guerra'], armature: ['leggera', 'media', 'scudo'] } },
+    Ladro: { armi: ['semplice', 'Balestra a Mano', 'Spada Corta', 'Spada Lunga', 'Stocco'], armature: ['leggera'], multi: { armi: [], armature: ['leggera'], abil: 1 } },
+    Mago: { armi: SEMPLICI_MAGO, armature: [], multi: { armi: [], armature: [] } },
+    Monaco: { armi: ['semplice', 'Spada Corta'], armature: [], multi: { armi: ['semplice', 'Spada Corta'], armature: [] } },
+    Paladino: { armi: ['semplice', 'guerra'], armature: ['leggera', 'media', 'pesante', 'scudo'], multi: { armi: ['semplice', 'guerra'], armature: ['leggera', 'media', 'scudo'] } },
+    Ranger: { armi: ['semplice', 'guerra'], armature: ['leggera', 'media', 'scudo'], multi: { armi: ['semplice', 'guerra'], armature: ['leggera', 'media', 'scudo'], abil: 1 } },
+    Stregone: { armi: SEMPLICI_MAGO, armature: [], multi: { armi: [], armature: [] } },
+    Warlock: { armi: ['semplice'], armature: ['leggera'], multi: { armi: ['semplice'], armature: ['leggera'] } },
+  };
+  // Sottoclassi che danno competenze in più (Manuale): domini del chierico, Collegio del Valore
+  const COMPETENZE_SOTTO = [
+    [/Dominio della (Guerra|Tempesta)/i, { armi: ['guerra'], armature: ['pesante'] }],
+    [/Dominio della (Vita|Natura)/i, { armi: [], armature: ['pesante'] }],
+    [/Collegio del Valore/i, { armi: ['guerra'], armature: ['media', 'scudo'] }],
+  ];
+  const sottoclasse = (d, classe, re) => d.classi.some((cl) => classeDi(cl.nome)?.nome === classe && re.test(cl.sottoclasse || ''));
+  function competenzeDi(d) {
+    const armi = new Set(), armature = new Set();
+    d.classi.forEach((cl, i) => {
+      const k = classeDi(cl.nome)?.nome;
+      const c = COMPETENZE[k];
+      if (!c) return;
+      const fonte = i === 0 ? c : c.multi;
+      fonte.armi.forEach((x) => armi.add(x));
+      fonte.armature.forEach((x) => armature.add(x));
+      for (const [re, extra] of COMPETENZE_SOTTO) if (re.test(cl.sottoclasse || '')) { extra.armi.forEach((x) => armi.add(x)); extra.armature.forEach((x) => armature.add(x)); }
+    });
+    const r = razzaDi(d), s = sottoDi(d);
+    for (const x of [...(r?.armi || []), ...(s?.armi || [])]) armi.add(x);
+    for (const x of [...(r?.armature || []), ...(s?.armature || [])]) armature.add(x);
+    return { armi, armature };
+  }
+  // Competenza in un'arma: per categoria (semplice / da guerra) o per nome
+  function competenteArma(comp, nome) {
+    const a = ARMI_BASE.find((x) => norm(x[0]) === norm(nome || ''));
+    if (!a) return null; // arma non del manuale: decide il giocatore
+    return comp.armi.has(a[0]) || (/^semplice/.test(a[1]) && comp.armi.has('semplice')) || (/^da guerra/.test(a[1]) && comp.armi.has('guerra'));
+  }
   // Slot incantesimo per livello d'incantatore (tabella dell'incantatore multiclasse) e Magia del Patto del warlock
   const SLOT = [[], [2], [3], [4, 2], [4, 3], [4, 3, 2], [4, 3, 3], [4, 3, 3, 1], [4, 3, 3, 2], [4, 3, 3, 3, 1], [4, 3, 3, 3, 2], [4, 3, 3, 3, 2, 1], [4, 3, 3, 3, 2, 1],
     [4, 3, 3, 3, 2, 1, 1], [4, 3, 3, 3, 2, 1, 1], [4, 3, 3, 3, 2, 1, 1, 1], [4, 3, 3, 3, 2, 1, 1, 1], [4, 3, 3, 3, 2, 1, 1, 1, 1], [4, 3, 3, 3, 3, 1, 1, 1, 1], [4, 3, 3, 3, 3, 2, 1, 1, 1], [4, 3, 3, 3, 3, 2, 2, 1, 1]];
@@ -61,10 +112,17 @@ window.creaDND = function creaDND(ctx) {
 
   // ---- Contenuti: incantesimi e oggetti magici dal wiki (src/dnd-contenuti.js), armi e armature del regolamento base ----
   const C = window.DND_CONTENUTI || { incantesimi: [], oggetti: [] };
-  const INCANTESIMI = C.incantesimi.map(([nome, livello, scuola, tempo, gittata, componenti, durata, conc, rituale, classi]) => ({ nome, livello, scuola, tempo, gittata, componenti, durata, conc, rituale, classi: classi.split(',') }));
+  const INCANTESIMI = C.incantesimi.map(([nome, livello, scuola, tempo, gittata, componenti, durata, conc, rituale, classi, wiki]) => ({ nome, livello, scuola, tempo, gittata, componenti, durata, conc, rituale, classi: classi.split(','), wiki: wiki === undefined ? nome : wiki }));
+  // Pulsante "i": pagina del wiki se c'è, altrimenti solo i dati dell'incantesimo (dal manuale)
+  const infoInc = (v, nome) => {
+    const dati = v ? [v.scuola, v.tempo && `tempo: ${v.tempo}`, v.gittata && `gittata: ${v.gittata}`, v.componenti && `componenti: ${v.componenti}`, v.durata && `durata: ${v.durata}`].filter(Boolean).join(' · ') : '';
+    return v?.wiki ? `<a class="btn-mini" href="${esc(WIKI + v.wiki.replace(/ /g, '_'))}" target="_blank" rel="noopener" title="${esc(dati ? dati + ' — ' : '')}Descrizione sul wiki">i</a>`
+      : `<span class="btn-mini dnd-info-inc" title="${esc(dati || nome)} (descrizione sul Manuale del Giocatore)">i</span>`;
+  };
   const incantesimoDi = (nome) => INCANTESIMI.find((x) => norm(x.nome) === norm(nome || '')) || null;
   // Lista di incantesimi usata da una classe (Cavaliere Mistico e Mistificatore Arcano usano quella del mago)
-  const listaDi = (cl) => { const k = classeDi(cl.nome)?.nome; return k === 'Artefice' ? '' : BASE[k]?.inc ? k : cl.terzo ? 'Mago' : ''; };
+  const terzoDi = (cl) => !!cl.terzo || /Cavaliere Mistico|Mistificatore Arcano/i.test(cl.sottoclasse || '');
+  const listaDi = (cl) => { const k = classeDi(cl.nome)?.nome; return k === 'Artefice' ? '' : BASE[k]?.inc ? k : terzoDi(cl) ? 'Mago' : ''; };
   // Incantatori che preparano gli incantesimi ogni giorno (gli altri li conoscono)
   const PREPARANO = { Chierico: 1, Druido: 1, Mago: 1, Paladino: 0.5, Artefice: 0.5 };
   // [nome, categoria, danni, tipo di danno, proprietà]
@@ -89,11 +147,11 @@ window.creaDND = function creaDND(ctx) {
     ['Balestra Pesante', 'da guerra a distanza', '1d10', 'perforanti', 'munizioni (30/120 m), pesante, ricarica, a due mani'], ['Cerbottana', 'da guerra a distanza', '1', 'perforanti', 'munizioni (7,5/30 m), ricarica'],
     ['Rete', 'da guerra a distanza', '', '', 'speciale, lancio (1,5/4,5 m)'],
   ];
-  // [nome, tipo, CA base, svantaggio a Furtività]
+  // [nome, tipo, CA base, svantaggio a Furtività, Forza richiesta] (Manuale, cap. 5)
   const ARMATURE_BASE = [
     ['Imbottita', 'leggera', 11, 1], ['Cuoio', 'leggera', 11, 0], ['Cuoio Borchiato', 'leggera', 12, 0],
     ['Pelle', 'media', 12, 0], ['Giaco di Maglia', 'media', 13, 0], ['Corazza di Scaglie', 'media', 14, 1], ['Corazza di Piastre', 'media', 14, 0], ['Mezza Armatura', 'media', 15, 1],
-    ['Cotta ad Anelli', 'pesante', 14, 1], ['Cotta di Maglia', 'pesante', 16, 1], ['Corazza a Strisce', 'pesante', 17, 1], ['Armatura Completa', 'pesante', 18, 1],
+    ['Corazza ad Anelli', 'pesante', 14, 1], ['Cotta di Maglia', 'pesante', 16, 1, 13], ['Corazza a Strisce', 'pesante', 17, 1, 15], ['Armatura Completa', 'pesante', 18, 1, 15],
     ['Scudo', 'scudo', 2, 0],
   ];
   const sfoglia = {}; // classe -> livello mostrato nell'elenco
@@ -104,12 +162,12 @@ window.creaDND = function creaDND(ctx) {
     razza: { nome: '', sotto: '', scelte: [], inclusi: false }, background: '', classi: [],
     pf: { attuali: '', temp: '', metodo: 'media', varie: '' }, dadiUsati: {}, ispirazione: false, morte: { successi: 0, fallimenti: 0 }, indebolimento: 0,
     ts: {}, abil: {}, iniz: { varie: '' }, ca: { varie: '' }, armi: [], armature: [], capacita: [], oggetti: [], monete: { mp: '', mo: '', ma: '', mr: '' },
-    slotUsati: {}, pattoUsati: 0, incantesimi: [], condizioni: [],
+    slotUsati: {}, pattoUsati: 0, incantesimi: [], condizioni: [], risorseUsate: {},
   });
   function dati(p) {
     if (!p.dnd) {
       p.dnd = predefiniti();
-      const r = Object.keys(D.razze).find((k) => norm(k) === norm(p.campi?.['Specie / Razza'] || ''));
+      const r = Object.keys(RAZZE).find((k) => norm(k) === norm(p.campi?.['Specie / Razza'] || ''));
       if (r) { p.dnd.razza.nome = r; p.dnd.razza.inclusi = true; }
       const k = classeDi(p.campi?.Classe);
       if (k) p.dnd.classi.push({ id: uid(), nome: k.nome, livello: Math.max(1, parseInt(p.campi?.Livello, 10) || 1), sottoclasse: '', terzo: false });
@@ -118,9 +176,12 @@ window.creaDND = function creaDND(ctx) {
     const d = p.dnd;
     const def = predefiniti();
     for (const key of Object.keys(def)) if (d[key] === undefined) d[key] = def[key];
+    // Nomi delle sottorazze come nel Manuale (le schede vecchie usavano quelli del wiki)
+    if (d.razza.sotto === 'Gnomo della foresta') d.razza.sotto = 'Gnomo delle Foreste';
+    if (d.razza.nome && RAZZE[d.razza.nome] && d.razza.sotto && !RAZZE[d.razza.nome].sotto?.[d.razza.sotto]) d.razza.sotto = '';
     return d;
   }
-  const razzaDi = (d) => D.razze[d.razza?.nome] || null;
+  const razzaDi = (d) => RAZZE[d.razza?.nome] || null;
   const sottoDi = (d) => razzaDi(d)?.sotto?.[d.razza?.sotto] || null;
   const livelloTot = (d) => d.classi.reduce((a, c) => a + n(c.livello), 0);
   const competenza = (liv) => 2 + Math.floor((Math.max(1, liv) - 1) / 4);
@@ -142,23 +203,43 @@ window.creaDND = function creaDND(ctx) {
       m[s] = Math.floor((punteggio[s] - 10) / 2);
     }
     const prima = classeDi(d.classi[0]?.nome);
-    // Tiri salvezza: competenze della prima classe (regola del multiclasse) più quelle segnate a mano
+    const livDi = (nome) => d.classi.filter((cl) => classeDi(cl.nome)?.nome === nome).reduce((a, cl) => a + n(cl.livello), 0);
+    const haTalento = (re) => d.capacita.some((x) => re.test(x.nome || ''));
+    const esaurimento = n(d.indebolimento);
+    // Tiri salvezza: competenze della prima classe (regola del multiclasse) più quelle segnate a mano;
+    // Anima Adamantina (monaco 14°): competenza in tutti; Aura di Protezione (paladino 6°): + mod. di Carisma (minimo +1)
+    const animaAdamantina = livDi('Monaco') >= 14;
+    const aura = livDi('Paladino') >= 6 ? Math.max(1, m.CAR) : 0;
     const ts = {};
     for (const s of CARS) {
-      const auto = !!prima?.ts.includes(s);
+      const auto = !!prima?.ts.includes(s) || animaAdamantina;
       const c = auto || !!d.ts[s]?.comp;
-      ts[s] = { comp: c, auto, tot: m[s] + (c ? comp : 0) + n(d.ts[s]?.varie) };
+      ts[s] = { comp: c, auto, tot: m[s] + (c ? comp : 0) + aura + n(d.ts[s]?.varie) };
     }
-    // Abilità: competenza, maestria (doppia), Factotum del bardo dal 2° livello (metà competenza alle altre)
-    const factotum = d.classi.some((cl) => classeDi(cl.nome)?.nome === 'Bardo' && n(cl.livello) >= 2);
+    // Abilità: competenze della razza (automatiche), segnate a mano (classe, background…), maestria (doppia);
+    // Factotum del bardo dal 2° livello: metà competenza (per difetto) alle prove senza competenza;
+    // Atleta Straordinario del Campione (guerriero 7°): metà competenza (per eccesso) alle prove di FOR, DES e COS senza competenza
+    const factotum = livDi('Bardo') >= 2;
+    const atleta = livDi('Guerriero') >= 7 && sottoclasse(d, 'Guerriero', /Campione/i);
+    const daRazza = new Set([...(razza?.abil || []), ...(sotto?.abil || [])]);
+    // Armatura indossata: competenza, Forza richiesta, svantaggio alla Furtività
+    const competenze = competenzeDi(d);
+    const arm = d.armature.filter((a) => a.indossata && a.tipo !== 'scudo')[0];
+    const scudiIndossati = d.armature.filter((a) => a.indossata && a.tipo === 'scudo');
+    const nonCompetente = [arm, ...scudiIndossati].filter((a) => a && d.classi.length && !competenze.armature.has(a.tipo)).map((a) => a.nome || a.tipo);
+    const svantaggioFurtivita = [arm, ...scudiIndossati].some((a) => a?.furtivita);
     const abil = {};
     for (const a of ABILITA) {
       const s = d.abil[a] || {};
-      const molt = s.maestria ? 2 : s.comp ? 1 : 0;
-      abil[a] = { comp: !!s.comp, maestria: !!s.maestria, tot: m[ABIL_CAR[a]] + molt * comp + (!molt && factotum ? Math.floor(comp / 2) : 0) + n(s.varie) };
+      const razziale = daRazza.has(a);
+      const molt = s.maestria ? 2 : s.comp || razziale ? 1 : 0;
+      const fisico = ['FOR', 'DES', 'COS'].includes(ABIL_CAR[a]);
+      const meta = !molt ? (atleta && fisico ? Math.ceil(comp / 2) : factotum ? Math.floor(comp / 2) : 0) : 0;
+      abil[a] = { comp: !!s.comp || razziale, razziale, maestria: !!s.maestria, tot: m[ABIL_CAR[a]] + molt * comp + meta + n(s.varie), svantaggio: a === 'Furtività' && svantaggioFurtivita };
     }
-    const passiva = 10 + abil.Percezione.tot;
-    // Punti ferita: massimo del dado al 1° livello, poi media (dado/2 + 1) per livello, + COS per livello
+    const passiva = 10 + abil.Percezione.tot + (haTalento(/^osservatore\b/i) ? 5 : 0);
+    // Punti ferita: massimo del dado al 1° livello, poi media (dado/2 + 1) o massimo per livello, + COS per livello;
+    // Robustezza Nanica (+1/livello), Resilienza Draconica dello stregone (+1 per livello da stregone), talento Robusto (+2/livello)
     let pfMax = 0;
     d.classi.forEach((cl, i) => {
       const k = classeDi(cl.nome);
@@ -166,34 +247,52 @@ window.creaDND = function creaDND(ctx) {
       for (let l = 0; l < n(cl.livello); l++) pfMax += i === 0 && l === 0 ? dado : d.pf.metodo === 'massimo' ? dado : Math.floor(dado / 2) + 1;
     });
     pfMax += m.COS * liv + n(d.pf.varie);
-    if (d.razza.sotto === 'Nano delle Colline') pfMax += liv; // Robustezza Nanica
+    if (d.razza.sotto === 'Nano delle Colline') pfMax += liv;
+    const draconico = sottoclasse(d, 'Stregone', /Discendenza Draconica/i);
+    if (draconico) pfMax += livDi('Stregone');
+    if (haTalento(/^robusto\b/i)) pfMax += 2 * liv;
     pfMax = Math.max(liv ? 1 : 0, pfMax);
-    const pfAtt = d.pf.attuali === '' ? pfMax : n(d.pf.attuali);
+    if (esaurimento >= 4) pfMax = Math.floor(pfMax / 2); // indebolimento 4: PF massimi dimezzati
+    const pfAtt = d.pf.attuali === '' ? pfMax : Math.min(pfMax, n(d.pf.attuali));
     // Classe armatura: armatura indossata (leggera + DES, media + DES max 2, pesante), scudo, difese senza armatura
-    const arm = d.armature.filter((a) => a.indossata && a.tipo !== 'scudo')[0];
-    const scudo = d.armature.filter((a) => a.indossata && a.tipo === 'scudo').reduce((a, x) => a + n(x.ca) + n(x.magia), 0);
+    const scudo = scudiIndossati.reduce((a, x) => a + n(x.ca) + n(x.magia), 0);
     const opzioni = [];
-    if (arm) opzioni.push([n(arm.ca) + n(arm.magia) + (arm.tipo === 'leggera' ? m.DES : arm.tipo === 'media' ? Math.min(2, m.DES) : 0), arm.nome || 'armatura']);
+    if (arm) opzioni.push([n(arm.ca) + n(arm.magia) + (arm.tipo === 'leggera' ? m.DES : arm.tipo === 'media' ? Math.min(haTalento(/^esperto delle armature medie/i) ? 3 : 2, m.DES) : 0), arm.nome || 'armatura']);
     else {
       opzioni.push([10 + m.DES, 'senza armatura']);
-      if (d.classi.some((cl) => classeDi(cl.nome)?.nome === 'Barbaro')) opzioni.push([10 + m.DES + m.COS, 'Difesa Senza Armatura (barbaro)']);
-      if (d.classi.some((cl) => classeDi(cl.nome)?.nome === 'Monaco') && !scudo) opzioni.push([10 + m.DES + m.SAG, 'Difesa Senza Armatura (monaco)']);
+      if (livDi('Barbaro')) opzioni.push([10 + m.DES + m.COS, 'Difesa Senza Armatura (barbaro)']);
+      if (livDi('Monaco') && !scudo) opzioni.push([10 + m.DES + m.SAG, 'Difesa Senza Armatura (monaco)']);
+      if (draconico) opzioni.push([13 + m.DES, 'Resilienza Draconica']);
     }
     const migliore = opzioni.reduce((a, b) => (b[0] > a[0] ? b : a));
     const ca = migliore[0] + scudo + n(d.ca.varie);
-    const iniz = m.DES + n(d.iniz.varie);
-    const vel = n(sotto?.vel) || n(razza?.vel) || 9;
-    // Attacchi: FOR (o DES per armi a distanza/accurate), + competenza se competente, + bonus magico
+    // Iniziativa: DES, Factotum / Atleta Straordinario (è una prova di Destrezza), talento Allerta (+5)
+    const iniz = m.DES + (atleta ? Math.ceil(comp / 2) : factotum ? Math.floor(comp / 2) : 0) + (haTalento(/^allerta\b/i) ? 5 : 0) + n(d.iniz.varie);
+    // Velocità: razza; armatura pesante senza la Forza richiesta −3 m (non per i nani); Movimento Veloce del barbaro (5°, senza
+    // armatura pesante); Movimento Senza Armatura del monaco (2°, senza armatura né scudo); indebolimento 2 (dimezzata) e 5 (0)
+    let vel = n(sotto?.vel) || n(razza?.vel) || 9;
+    const note = [];
+    const forzaRichiesta = arm && arm.tipo === 'pesante' ? n(arm.forza) || n(ARMATURE_BASE.find((x) => norm(x[0]) === norm(arm.nome || ''))?.[4]) : 0;
+    if (forzaRichiesta && punteggio.FOR < forzaRichiesta && !razza?.pesante) { vel -= 3; note.push(`armatura pesante senza FOR ${forzaRichiesta}: −3 m`); }
+    if (livDi('Barbaro') >= 5 && arm?.tipo !== 'pesante') { vel += 3; note.push('Movimento Veloce +3 m'); }
+    const lm = livDi('Monaco');
+    if (lm >= 2 && !arm && !scudo) { const extra = lm >= 18 ? 9 : lm >= 14 ? 7.5 : lm >= 10 ? 6 : lm >= 6 ? 4.5 : 3; vel += extra; note.push(`Movimento Senza Armatura +${String(extra).replace('.', ',')} m`); }
+    if (haTalento(/^mobile\b/i)) { vel += 3; note.push('talento Mobile +3 m'); }
+    if (esaurimento >= 5) { vel = 0; note.push('indebolimento 5: velocità 0'); } else if (esaurimento >= 2) { vel = vel / 2; note.push('indebolimento: velocità dimezzata'); }
+    // Attacchi: FOR (o DES per armi a distanza/accurate), + competenza se competente, + bonus magico.
+    // Le armi del manuale sono competenti o no in base a classe e razza (si può forzare a mano)
     const armi = d.armi.map((a) => {
       const car = a.car === 'accurata' ? (m.DES > m.FOR ? 'DES' : 'FOR') : a.car || 'FOR';
-      const colpo = m[car] + (a.comp !== false ? comp : 0) + n(a.magia) + n(a.bonus);
+      const auto = competenteArma(competenze, a.nome);
+      const ok = a.compForzata === true || a.compForzata === false ? a.compForzata : auto ?? a.comp !== false;
+      const colpo = m[car] + (ok ? comp : 0) + n(a.magia) + n(a.bonus);
       const danniB = m[car] + n(a.magia) + n(a.bonusDanni);
-      return { id: a.id, colpo, danni: `${a.danni || '1d4'}${danniB ? (danniB > 0 ? '+' : '') + danniB : ''}${a.tipoDanno ? ' ' + a.tipoDanno : ''}`, car };
+      return { id: a.id, colpo, comp: ok, auto, danni: `${a.danni || '1d4'}${danniB ? (danniB > 0 ? '+' : '') + danniB : ''}${a.tipoDanno ? ' ' + a.tipoDanno : ''}`, car };
     });
     // Incantesimi: CD e attacco per classe; slot dalla tabella dell'incantatore multiclasse
     let livInc = 0;
     const incantatori = [];
-    const soloUno = d.classi.filter((cl) => { const k = classeDi(cl.nome); return k?.tipo && k.tipo !== 'patto' || cl.terzo; }).length === 1;
+    const soloUno = d.classi.filter((cl) => { const k = classeDi(cl.nome); return k?.tipo && k.tipo !== 'patto' || terzoDi(cl); }).length === 1;
     for (const cl of d.classi) {
       const k = classeDi(cl.nome);
       const L = n(cl.livello);
@@ -201,13 +300,14 @@ window.creaDND = function creaDND(ctx) {
       if (k.tipo === 'pieno') livInc += L;
       else if (k.tipo === 'mezzo') livInc += soloUno ? (L >= 2 ? Math.ceil(L / 2) : 0) : Math.floor(L / 2);
       else if (k.tipo === 'mezzo-su') livInc += Math.ceil(L / 2);
-      else if (cl.terzo) livInc += soloUno ? (L >= 3 ? Math.ceil(L / 3) : 0) : Math.floor(L / 3);
-      const car = k.inc || (cl.terzo ? 'INT' : '');
+      else if (terzoDi(cl)) livInc += soloUno ? (L >= 3 ? Math.ceil(L / 3) : 0) : Math.floor(L / 3);
+      const car = k.inc || (terzoDi(cl) ? 'INT' : '');
       if (car) {
         // Quanti incantesimi preparare (mod. + livello, o metà livello per paladino e artefice) o quanti se ne conoscono (tabella di classe)
         const riga = rigaClasse(cl) || [];
         const col = (re) => { const i = (k.colonne || []).findIndex((x) => re.test(x)); return i >= 0 ? n(String(riga[i]).replace(/[^\d]/g, '')) : null; };
-        const prep = PREPARANO[k.nome] ? Math.max(1, m[car] + Math.floor(L * PREPARANO[k.nome])) : null;
+        // paladino: metà livello per difetto; artefice: metà livello per eccesso
+        const prep = PREPARANO[k.nome] ? Math.max(1, m[car] + (k.nome === 'Artefice' ? Math.ceil(L / 2) : Math.floor(L * PREPARANO[k.nome]))) : null;
         incantatori.push({ classe: k.nome, idClasse: cl.id, lista: listaDi(cl), car, cd: 8 + comp + m[car], attacco: comp + m[car], prep, trucchetti: col(/Trucchetti/i), conosciuti: prep ? null : col(/Incantesimi Conosciuti/i) });
       }
     }
@@ -217,7 +317,42 @@ window.creaDND = function creaDND(ctx) {
     // Dadi vita per tipo
     const dadi = {};
     for (const cl of d.classi) { const k = classeDi(cl.nome); if (k) dadi[k.dado] = (dadi[k.dado] || 0) + n(cl.livello); }
-    return { base, punteggio, m, liv, comp, ts, abil, passiva, pfMax, pfAtt, ca, caFonte: migliore[1], iniz, vel, armi, incantatori, slot, patto, dadi, factotum };
+    return { base, punteggio, m, liv, comp, ts, abil, passiva, pfMax, pfAtt, ca, caFonte: migliore[1], iniz, vel, noteVel: note, armi, incantatori, slot, patto, dadi, factotum, atleta,
+      competenze, nonCompetente, aura, animaAdamantina, risorse: risorseDi(d, m, livDi) };
+  }
+  // Risorse di classe da segnare (Manuale, cap. 3): usi, dado o riserva; si recuperano con un riposo breve o lungo
+  function risorseDi(d, m, livDi) {
+    const r = [];
+    const add = (chiave, nome, max, riposo, nota = '') => { if (max) r.push({ chiave, nome, max, riposo, nota }); };
+    const lb = livDi('Barbaro');
+    if (lb >= 20) r.push({ chiave: 'ira', nome: 'Ira', max: 0, riposo: '', nota: "ire illimitate · danni dell'ira +4" });
+    else if (lb) add('ira', 'Ira', lb >= 17 ? 6 : lb >= 12 ? 5 : lb >= 6 ? 4 : lb >= 3 ? 3 : 2, 'lungo', `danni dell'ira ${lb >= 16 ? '+4' : lb >= 9 ? '+3' : '+2'}`);
+    const lbd = livDi('Bardo');
+    if (lbd) add('ispirazione', 'Ispirazione Bardica', Math.max(1, m.CAR), lbd >= 5 ? 'breve' : 'lungo', `dado d${lbd >= 15 ? 12 : lbd >= 10 ? 10 : lbd >= 5 ? 8 : 6}${lbd >= 2 ? ` · Canto di Riposo d${lbd >= 17 ? 12 : lbd >= 13 ? 10 : lbd >= 9 ? 8 : 6}` : ''}`);
+    const lc = livDi('Chierico');
+    if (lc >= 2) add('incanalare-chierico', 'Incanalare Divinità', lc >= 18 ? 3 : lc >= 6 ? 2 : 1, 'breve', lc >= 5 ? `Distruggere Non Morti GS ${lc >= 17 ? 4 : lc >= 14 ? 3 : lc >= 11 ? 2 : lc >= 8 ? 1 : '1/2'}` : '');
+    if (lc >= 10) add('intervento', 'Intervento Divino', 1, 'lungo', lc >= 20 ? 'riesce sempre' : `riesce con d100 ≤ ${lc}; se riesce, 7 giorni di attesa`);
+    const ld = livDi('Druido');
+    if (ld >= 20) r.push({ chiave: 'forma', nome: 'Forma Selvatica', max: 0, riposo: '', nota: 'usi illimitati (Arcidruido)' });
+    if (ld >= 2 && ld < 20) add('forma', 'Forma Selvatica', 2, 'breve', `GS massimo ${ld >= 8 ? 1 : ld >= 4 ? '1/2' : '1/4'}${ld >= 8 ? ', volo' : ld >= 4 ? ', nuoto' : ''}`);
+    const lg = livDi('Guerriero');
+    if (lg) add('recuperare', 'Recuperare Energie', 1, 'breve', `1d10 + ${lg} PF`);
+    if (lg >= 2) add('impetuosa', 'Azione Impetuosa', lg >= 17 ? 2 : 1, 'breve');
+    if (lg >= 9) add('indomito', 'Indomito', lg >= 17 ? 3 : lg >= 13 ? 2 : 1, 'lungo');
+    const lm = livDi('Monaco');
+    if (lm >= 2) add('ki', 'Punti Ki', lm, 'breve', `arti marziali ${lm >= 17 ? '1d10' : lm >= 11 ? '1d8' : lm >= 5 ? '1d6' : '1d4'} · CD ki ${8 + 2 + Math.floor((Math.max(1, d.classi.reduce((a, c) => a + n(c.livello), 0)) - 1) / 4) + m.SAG}`);
+    const lp = livDi('Paladino');
+    if (lp) { add('mani', 'Imposizione delle Mani', 5 * lp, 'lungo', 'riserva di PF'); add('divino', 'Percezione del Divino', 1 + Math.max(0, m.CAR), 'lungo'); }
+    if (lp >= 3) add('incanalare-paladino', 'Incanalare Divinità', 1, 'breve');
+    const ls = livDi('Stregone');
+    if (ls >= 2) add('stregoneria', 'Punti Stregoneria', ls, 'lungo');
+    const lw = livDi('Warlock');
+    for (const [L, liv] of [[11, 6], [13, 7], [15, 8], [17, 9]]) if (lw >= L) add(`arcanum${liv}`, `Arcanum Mistico (${liv}°)`, 1, 'lungo');
+    const lmg = livDi('Mago');
+    if (lmg) add('recupero', 'Recupero Arcano', 1, 'lungo', `slot per un totale di ${Math.ceil(lmg / 2)} livell${Math.ceil(lmg / 2) === 1 ? 'o' : 'i'} (nessuno di 6° o più)`);
+    const ll = livDi('Ladro');
+    if (ll) r.push({ chiave: 'furtivo', nome: 'Attacco Furtivo', max: 0, riposo: '', nota: `${Math.ceil(ll / 2)}d6 una volta per turno` });
+    return r;
   }
   function mappa(c) {
     const o = { liv: String(c.liv), comp: segno(c.comp), ca: String(c.ca), iniz: segno(c.iniz), pfmax: String(c.pfMax), passiva: String(c.passiva) };
@@ -271,8 +406,8 @@ window.creaDND = function creaDND(ctx) {
     // Razza e background
     const sceltaCar = razza?.scelta ? `<div class="pf-riga"><span class="muto">+1 a ${razza.scelta} caratteristiche a scelta:</span> ${CARS.filter((s) => !n(razza.car[s])).map((s) => `<label class="pf-chk"><input type="checkbox" data-azione="dnd-scelta-car" data-id="${id}" data-car="${s}" ${d.razza.scelte.includes(s) ? 'checked' : ''}> ${s}</label>`).join('')} <span class="muto">${d.razza.scelte.length}/${razza.scelta}</span></div>` : '';
     const corpoRazza = `<div class="pf-riga">
-        <label>Razza ${sel('razza|nome', [['', '— scegli —'], ...Object.keys(D.razze).map((x) => [x, x])], d.razza.nome, 'data-ridisegna-dnd')}</label>
-        ${razza && Object.keys(razza.sotto).length ? `<label>Sottorazza ${sel('razza|sotto', [['', '— scegli —'], ...Object.keys(razza.sotto).map((x) => [x, x])], d.razza.sotto, 'data-ridisegna-dnd')}</label>` : ''}
+        <label>Razza ${sel('razza|nome', [['', '— scegli —'], ...Object.keys(RAZZE).map((x) => [x, x])], d.razza.nome, 'data-ridisegna-dnd')}</label>
+        ${razza && Object.keys(razza.sotto).length ? `<label>${esc(razza.etichettaSotto || 'Sottorazza')} ${sel('razza|sotto', [['', '— scegli —'], ...Object.keys(razza.sotto).map((x) => [x, x])], d.razza.sotto, 'data-ridisegna-dnd')}</label>` : ''}
         ${razza ? wiki(d.razza.nome) : ''}
         <label>Background ${sel('background', [['', '— scegli —'], ...Object.keys(BACKGROUND).map((x) => [x, x]), ...(d.background && !BACKGROUND[d.background] ? [[d.background, d.background]] : []), ['…', 'Altro (scrivi tu)']], d.background, 'data-ridisegna-dnd')}</label>
         ${d.bgLibero || (d.background && !BACKGROUND[d.background]) ? `<label>Nome del background ${campo('background', d.background, 'class="pf-largo" placeholder="es. Cacciatore di Taglie" data-ridisegna-dnd')}</label>` : ''}
@@ -282,7 +417,10 @@ window.creaDND = function creaDND(ctx) {
         <div><span class="muto">Privilegio</span> ${esc(b.privilegio)}</div></div>`; })() : ''}
       ${razza ? `<div class="fede-righe"><div><span class="muto">Aumenti</span> ${esc(Object.entries({ ...razza.car }).map(([s, x]) => `${NOMI_CAR[s]} +${x}`).concat(Object.entries(sotto?.car || {}).map(([s, x]) => `${NOMI_CAR[s]} +${x} (sottorazza)`)).join(', ') || '—')}
         · <span class="muto">Taglia</span> ${esc(razza.taglia)} · <span class="muto">Velocità</span> ${String(c.vel).replace('.', ',')} m</div>
-        <div><span class="muto">Tratti</span> ${esc([...razza.tratti, ...(sotto?.tratti || [])].join(', ') || '—')}</div></div>` : ''}
+        <div><span class="muto">Tratti</span> ${esc([...razza.tratti, ...(sotto?.tratti || [])].join(', ') || '—')}</div>
+        ${[...(razza.abil || []), ...(sotto?.abil || [])].length ? `<div><span class="muto">Competenza</span> ${esc([...(razza.abil || []), ...(sotto?.abil || [])].join(', '))} <small class="muto">(automatica)</small></div>` : ''}
+        ${razza.abilScelta ? `<div class="muto">Competenza in ${razza.abilScelta === 1 ? "un'abilità" : `${razza.abilScelta} abilità`} a scelta: spuntala tra le abilità.</div>` : ''}
+        ${razza.talento ? '<div class="muto">Un talento a scelta al 1° livello: aggiungilo in «Privilegi, talenti e capacità».</div>' : ''}</div>` : ''}
       <label class="pf-chk pf-mini">${chk('razza|inclusi', d.razza.inclusi, 'data-ridisegna-dnd')} I punteggi inseriti comprendono già gli aumenti della razza</label>`;
 
     // Classi
@@ -292,16 +430,20 @@ window.creaDND = function creaDND(ctx) {
         ${sel(`classi#${cl.id}|nome`, [['', '— classe —'], ...Object.keys(BASE).map((x) => [x, x])], kk?.nome || cl.nome, 'data-ridisegna-dnd')}
         ${window.MODALITA_GIOCATORE && !window.gdr ? `<span class="pf-liv-fisso" title="Nella scheda del giocatore i livelli si prendono uno alla volta con «⬆ Sali di livello»">Livello <b>${Number(cl.livello) || 1}</b></span>`
           : `<label>Livello ${num(`classi#${cl.id}|livello`, cl.livello, 'min="1" max="20" class="pf-corto" data-ridisegna-dnd')}</label>`}
-        <label>Sottoclasse ${campo(`classi#${cl.id}|sottoclasse`, cl.sottoclasse, `placeholder="${kk ? `dal ${kk.sotto}° livello` : ''}"`)}</label>
-        ${kk && !kk.inc ? `<label class="pf-chk" title="Cavaliere Mistico o Mistificatore Arcano: incantatore a un terzo (INT)">${chk(`classi#${cl.id}|terzo`, cl.terzo, 'data-ridisegna-dnd')} incantatore (⅓)</label>` : ''}
+        <label>Sottoclasse ${campo(`classi#${cl.id}|sottoclasse`, cl.sottoclasse, `placeholder="${kk ? `dal ${kk.sotto}° livello` : ''}" list="dnd-sotto-${esc(kk?.nome || '')}" data-ridisegna-dnd`)}</label>
+        ${kk?.sottoclassi ? `<datalist id="dnd-sotto-${esc(kk.nome)}">${kk.sottoclassi.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>` : ''}
+        ${kk && !kk.inc && !/Cavaliere Mistico|Mistificatore Arcano/i.test(cl.sottoclasse || '') ? `<label class="pf-chk" title="Cavaliere Mistico o Mistificatore Arcano: incantatore a un terzo (INT)">${chk(`classi#${cl.id}|terzo`, cl.terzo, 'data-ridisegna-dnd')} incantatore (⅓)</label>` : ''}
         ${kk ? `<span class="muto">d${kk.dado}</span>${wiki(kk.nome)}` : ''}${togli('classi', cl.id)}</div>`;
     }).join('');
-    const corpoClassi = `${classi || '<p class="muto">Nessuna classe.</p>'}
+    const kp = classeDi(d.classi[0]?.nome);
+    const compClassi = kp ? `<div class="fede-righe"><div><span class="muto">Competenze (${esc(kp.nome)})</span> armature: ${esc(kp.armature || '—')} · armi: ${esc(kp.armi || '—')}${kp.attrezzi && kp.attrezzi !== 'Nessuno' ? ` · strumenti: ${esc(kp.attrezzi)}` : ''} · tiri salvezza: ${esc((kp.ts || []).map((x) => NOMI_CAR[x]).join(', '))}</div>${d.classi.length > 1 ? '<div class="muto">Le classi prese in multiclasse danno solo alcune competenze (Manuale, cap. 6): la scheda le conta da sola.</div>' : ''}</div>` : '';
+    const corpoClassi = `${classi || '<p class="muto">Nessuna classe.</p>'}${compClassi}
       <div class="pf-piede">${window.MODALITA_GIOCATORE && !window.gdr && d.classi.length ? '<span class="muto">Le altre classi si aggiungono con «⬆ Sali di livello».</span>' : aggiungi('classi', 'Classe')}<span class="muto">Livello <b>${k('liv')}</b> · Bonus di competenza <b>${k('comp')}</b></span>
         ${GIOCATORE && mancaPerSalire(p, d).length ? '<button class="primario" disabled title="Completa prima il livello attuale">⬆ Sali di livello</button>' : `<button class="primario" data-azione="dnd-livello-apri" data-id="${id}">⬆ Sali di livello</button>`}</div>
       ${GIOCATORE && salita?.pgId !== id ? boxDaCompletare(mancaPerSalire(p, d), d.classi.length ? c.liv : 0) : ''}`;
 
     // Caratteristiche e tiri salvezza
+    const notaTs = [c.aura ? `Aura di Protezione: +${c.aura} a tutti i tiri salvezza` : '', c.animaAdamantina ? 'Anima Adamantina: competenza in tutti i tiri salvezza' : ''].filter(Boolean).join(' · ');
     const car = CARS.map((s) => `<div class="car">
         <div class="car-sigla">${s}</div>
         <div class="car-valori"><input type="number" value="${esc(p.caratteristiche?.[s] ?? 10)}" data-bind="personaggio" data-id="${id}" data-sez="caratteristiche" data-chiave="${s}" data-tipo="numero" aria-label="${NOMI_CAR[s]}">
@@ -320,7 +462,8 @@ window.creaDND = function creaDND(ctx) {
         <div class="pf-mini"><input type="number" min="0" class="dnd-quanti mini" placeholder="0"><button class="btn-piccolo" data-azione="dnd-danno" data-id="${id}" data-segno="-1">Danno</button><button class="btn-piccolo" data-azione="dnd-danno" data-id="${id}" data-segno="1">Cura</button></div>
         <div class="muto pf-mini">Il danno toglie prima i PF temporanei.</div></div>
       <div class="pf-box"><div class="pf-etich">Dadi vita</div><div class="pf-riga">${dadiVita || '<span class="muto">—</span>'}</div>
-        <button class="btn-piccolo" data-azione="dnd-riposo-lungo" data-id="${id}" title="PF al massimo, metà dei dadi vita, slot, tiri contro la morte e un livello di indebolimento">🌙 Riposo lungo</button></div>
+        <button class="btn-piccolo" data-azione="dnd-riposo-breve" data-id="${id}" title="Slot del patto e risorse che si recuperano con un riposo breve (Ki, Incanalare Divinità, Recuperare Energie…); i dadi vita si spendono qui sopra">☕ Riposo breve</button>
+        <button class="btn-piccolo" data-azione="dnd-riposo-lungo" data-id="${id}" title="PF al massimo, metà dei dadi vita, slot, risorse, tiri contro la morte e un livello di indebolimento">🌙 Riposo lungo</button></div>
       <div class="pf-box"><div class="pf-etich">Tiri contro la morte</div>
         <div class="pf-riga"><span class="muto">Successi</span> <span class="pf-pallini">${pallini('successi', n(d.morte.successi))}</span></div>
         <div class="pf-riga"><span class="muto">Fallimenti</span> <span class="pf-pallini">${pallini('fallimenti', n(d.morte.fallimenti))}</span></div>
@@ -334,19 +477,20 @@ window.creaDND = function creaDND(ctx) {
 
     // Difese
     const corpoDifese = `<div class="pf-griglia">
-      <div class="pf-box"><div class="pf-etich">Classe armatura</div><div class="pf-valore">${k('ca')}</div><div class="muto pf-mini">${esc(c.caFonte)}</div><div class="pf-mini"><label>Varie ${num('ca|varie', d.ca.varie, 'class="pf-corto"')}</label></div></div>
+      <div class="pf-box"><div class="pf-etich">Classe armatura</div><div class="pf-valore">${k('ca')}</div><div class="muto pf-mini">${esc(c.caFonte)}</div>${c.nonCompetente.length ? `<div class="oltre pf-mini" title="Senza competenza: svantaggio alle prove, ai tiri salvezza e ai tiri per colpire con FOR o DES, e niente incantesimi">⚠ senza competenza: ${esc(c.nonCompetente.join(', '))}</div>` : ''}<div class="pf-mini"><label>Varie ${num('ca|varie', d.ca.varie, 'class="pf-corto"')}</label></div></div>
       <div class="pf-box"><div class="pf-etich">Iniziativa ${dado('iniz', 'Iniziativa')}</div><div class="pf-valore">${k('iniz')}</div><div class="pf-mini"><label>Varie ${num('iniz|varie', d.iniz.varie, 'class="pf-corto"')}</label></div></div>
-      <div class="pf-box"><div class="pf-etich">Velocità</div><div class="pf-valore">${String(c.vel).replace('.', ',')} m</div></div>
+      <div class="pf-box"><div class="pf-etich">Velocità</div><div class="pf-valore">${String(c.vel).replace('.', ',')} m</div>${c.noteVel.length ? `<div class="muto pf-mini">${esc(c.noteVel.join(' · '))}</div>` : ''}</div>
       <div class="pf-box"><div class="pf-etich">Percezione passiva</div><div class="pf-valore">${k('passiva')}</div></div>
     </div>`;
 
     // Abilità
     const prima = classeDi(d.classi[0]?.nome);
-    const corpoAbil = `<p class="muto pf-aiuto">Spunta le competenze (●) e la maestria (★, competenza doppia).${prima ? ` ${esc(prima.nome)}: scegli ${prima.quante} tra ${esc(prima.abil.join(', '))}.` : ''}${c.factotum ? ' Factotum: metà competenza alle abilità senza competenza.' : ''}</p>
+    const sceltiClasse = prima ? prima.abil.filter((a) => d.abil[a]?.comp && !(d.bgAbil || []).includes(a) && !c.abil[a].razziale).length : 0;
+    const corpoAbil = `<p class="muto pf-aiuto">Spunta le competenze (●) e la maestria (★, competenza doppia).${prima ? ` ${esc(prima.nome)}: scegli ${prima.quante} tra ${esc(prima.abil.length === ABILITA.length ? 'tutte le abilità' : prima.abil.join(', '))} — scelte <b class="${sceltiClasse > prima.quante ? 'oltre' : ''}">${sceltiClasse}/${prima.quante}</b>.` : ''}${d.bgAbil?.length ? ` Dal background: ${esc(d.bgAbil.join(', '))}.` : ''}${c.factotum && !c.atleta ? " Factotum: metà competenza alle prove senza competenza (anche l'iniziativa)." : ''}${c.atleta ? " Atleta Straordinario: metà competenza (per eccesso) alle prove di FOR, DES e COS senza competenza (anche l'iniziativa)." : ''}</p>
       <div class="pf-griglia-abil">${ABILITA.map((a) => `<div class="pf-abil${c.abil[a].comp ? ' di-classe' : ''}">
-        <label class="pf-chk" title="Competenza">${chk(`abil|${a}|comp`, c.abil[a].comp, 'data-ridisegna-dnd')}</label>
+        <label class="pf-chk" title="${c.abil[a].razziale ? 'Competenza della razza' : 'Competenza'}">${chk(`abil|${a}|comp`, c.abil[a].comp, `${c.abil[a].razziale ? 'disabled' : ''} data-ridisegna-dnd`)}</label>
         <label class="pf-chk" title="Maestria">${chk(`abil|${a}|maestria`, c.abil[a].maestria, 'data-ridisegna-dnd')}★</label>
-        <span class="pf-abil-nome">${esc(a)} <small class="muto">${ABIL_CAR[a]}</small></span>
+        <span class="pf-abil-nome">${esc(a)} <small class="muto">${ABIL_CAR[a]}</small>${c.abil[a].svantaggio ? ' <small class="oltre" title="Svantaggio per l&#39;armatura indossata">svantaggio</small>' : ''}</span>
         <label title="Varie">${num(`abil|${a}|varie`, d.abil[a]?.varie, 'class="pf-corto"')}</label>
         <b class="pf-tot">${k('abil:' + a)}</b>${dado('abil:' + a, a)}</div>`).join('')}</div>`;
 
@@ -356,7 +500,7 @@ window.creaDND = function creaDND(ctx) {
         <label>Caratteristica ${sel(`armi#${a.id}|car`, [['FOR', 'FOR (mischia)'], ['DES', 'DES (distanza)'], ['accurata', 'accurata (la migliore)'], ...['INT', 'SAG', 'CAR'].map((x) => [x, x])], a.car, 'data-ridisegna-dnd')}</label>
         <label>Danni ${campo(`armi#${a.id}|danni`, a.danni, 'class="pf-corto" placeholder="1d8"')}</label>
         <label>Tipo ${campo(`armi#${a.id}|tipoDanno`, a.tipoDanno, 'class="pf-corto" placeholder="taglienti"')}</label>
-        <label class="pf-chk">${chk(`armi#${a.id}|comp`, a.comp !== false, 'data-ridisegna-dnd')} competente</label>
+        ${(() => { const x = c.armi.find((y) => y.id === a.id); const forzata = a.compForzata === true || a.compForzata === false; return `<label class="pf-chk" title="${x?.auto === null ? 'Arma non del manuale: decidi tu' : `Secondo classe e razza: ${x?.auto ? 'competente' : 'non competente'}`}">${chk(`armi#${a.id}|compForzata`, x?.comp, 'data-ridisegna-dnd')} competente${x?.auto !== null && forzata && a.compForzata !== x?.auto ? ' <small class="oltre">(a mano)</small>' : ''}</label>`; })()}
         <label>Magia ${num(`armi#${a.id}|magia`, a.magia, 'class="pf-corto" min="0" max="3"')}</label>
         <label>Proprietà ${campo(`armi#${a.id}|proprieta`, a.proprieta, 'class="pf-largo" placeholder="versatile, lancio (6/18 m)…"')}</label>
         ${togli('armi', a.id)}</div>
@@ -380,7 +524,7 @@ window.creaDND = function creaDND(ctx) {
         const v = incantesimoDi(s.nome);
         return `<span class="chip${x.prep && L > 0 && !s.preparato ? ' muto' : ''}" title="${esc(v ? [v.scuola, v.tempo, v.gittata, v.componenti, v.durata].filter(Boolean).join(' · ') : '')}">
           ${x.prep && L > 0 ? `<input type="checkbox" data-azione="dnd-prepara" data-id="${id}" data-inc="${s.id}" ${s.preparato ? 'checked' : ''} title="Preparato">` : ''}${esc(s.nome)}${v?.conc ? ' <small title="Concentrazione">Ⓒ</small>' : ''}${v?.rituale ? ' <small title="Rituale">Ⓡ</small>' : ''}
-          <a class="btn-mini" href="${esc(WIKI + s.nome.replace(/ /g, '_'))}" target="_blank" rel="noopener" title="Descrizione sul wiki">i</a>
+          ${infoInc(v, s.nome)}
           ${L > 0 ? `<button class="btn-mini" data-azione="dnd-lancia" data-id="${id}" data-inc="${s.id}" title="Lancia: usa lo slot più basso disponibile">✨</button>` : ''}
           <button class="chip-x" data-azione="dnd-rimuovi" data-id="${id}" data-lista="incantesimi" data-elem="${s.id}" title="Togli">×</button></span>`;
       }).join(' ')}</div>`).join('');
@@ -389,14 +533,14 @@ window.creaDND = function creaDND(ctx) {
       const elenco = x.lista && Lv !== '' ? INCANTESIMI.filter((v) => v.classi.includes(x.lista) && v.livello === Number(Lv) && (!q || norm(v.nome).includes(q))) : [];
       return `<h4>${esc(x.classe)} <small class="muto">${NOMI_CAR[x.car]} · CD ${x.cd} · attacco ${segno(x.attacco)}${conta ? ' · ' : ''}${conta}</small> ${dado('incatt:' + x.classe, `attacco con incantesimo (${x.classe})`)}</h4>
         ${perLiv || '<p class="muto">Nessun incantesimo: aggiungili dall\'elenco qui sotto.</p>'}
-        ${x.lista ? `<div class="pf-elenco-inc"><div class="pf-riga"><b>Elenco del wiki (${esc(x.lista)})</b>
+        ${x.lista ? `<div class="pf-elenco-inc"><div class="pf-riga"><b>Incantesimi da ${esc(x.lista.toLowerCase())}</b>
           <label>Livello <select data-dnd-sfoglia="${esc(x.classe)}">${opz([['', '— chiuso —'], ...Array.from({ length: maxSlot + 1 }, (_, i) => [String(i), i ? `${i}°` : 'trucchetti'])], Lv)}</select></label>
-          ${Lv !== '' ? `<label>Cerca <input type="search" data-dnd-cerca="${esc(x.classe)}" value="${esc(filtroInc[x.classe] || '')}"></label><span class="muto">${elenco.length} incantesimi</span>` : `<span class="muto">${INCANTESIMI.filter((v) => v.classi.includes(x.lista)).length} incantesimi sul wiki</span>`}</div>
+          ${Lv !== '' ? `<label>Cerca <input type="search" data-dnd-cerca="${esc(x.classe)}" value="${esc(filtroInc[x.classe] || '')}"></label><span class="muto">${elenco.length} incantesimi</span>` : `<span class="muto">${INCANTESIMI.filter((v) => v.classi.includes(x.lista)).length} incantesimi (Manuale del Giocatore)</span>`}</div>
           ${elenco.length ? `<div class="pf-voci-inc">${elenco.map((v) => {
             const preso = noti.some((s) => s.nome === v.nome);
             return `<div class="pf-voce-inc${preso ? ' presa' : ''}"><button class="btn-mini" data-azione="dnd-inc-aggiungi" data-id="${id}" data-classe="${esc(x.classe)}" data-nome="${esc(v.nome)}" data-livello="${v.livello}" ${preso ? 'disabled' : ''}>+</button>
               <span>${esc(v.nome)}${v.conc ? ' <small>Ⓒ</small>' : ''}${v.rituale ? ' <small>Ⓡ</small>' : ''}</span><small class="muto">${esc(v.scuola)}</small>
-              <a class="btn-mini" href="${esc(WIKI + v.nome.replace(/ /g, '_'))}" target="_blank" rel="noopener">i</a></div>`;
+              ${infoInc(v, v.nome)}</div>`;
           }).join('')}</div>` : ''}</div>` : ''}`;
     }).join('');
     const corpoInc = c.incantatori.length || c.patto ? `${blocchiInc}
@@ -460,15 +604,16 @@ window.creaDND = function creaDND(ctx) {
       const L = n(cl.livello);
       return `<h4>${esc(kk.nome)} <small class="muto">livello ${L}</small></h4><div class="prog-scorri"><table class="prog-tabella"><thead><tr><th>Liv</th>${kk.colonne.map((x) => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>
         ${kk.righe.map((r, i) => `<tr class="${i + 1 === L ? 'prog-attuale' : i + 1 > L ? 'prog-futuro' : ''}"><td><b>${i + 1}°</b></td>${r.map((x) => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-    }).join('') + '<p class="muto pf-aiuto">Tabelle dal wiki Fandom italiano di D&D.</p>';
+    }).join('') + "<p class=\"muto pf-aiuto\">Tabelle del Manuale del Giocatore (l'Artefice dal wiki Fandom italiano).</p>";
 
     return `<div class="pf1-scheda" data-dnd-scheda="${id}">
       ${salita?.pgId === id ? sezioneSalita(p, d, c) : ''}
       ${sezione('razza', 'Razza e background', corpoRazza)}
       ${sezione('classi', 'Classi e livelli', corpoClassi)}
-      ${sezione('caratteristiche', 'Caratteristiche e tiri salvezza', `<div class="griglia-car">${car}</div>`)}
+      ${sezione('caratteristiche', 'Caratteristiche e tiri salvezza', `<div class="griglia-car">${car}</div>${notaTs ? `<p class="muto pf-aiuto">${esc(notaTs)}</p>` : ''}`)}
       ${sezione('salute', 'Salute', corpoSalute, `<span class="ts-sommario">PF <b>${c.pfAtt}${n(d.pf.temp) ? `+${n(d.pf.temp)}` : ''}/${c.pfMax}</b>${d.ispirazione ? ' · ✨ ispirazione' : ''}${n(d.indebolimento) ? ` · indebolimento ${d.indebolimento}` : ''}${d.condizioni.length ? ` · ${esc(d.condizioni.join(', '))}` : ''}</span>`)}
       ${sezione('difese', 'Difese', corpoDifese, `<span class="ts-sommario">CA <b>${c.ca}</b> · iniz. <b>${segno(c.iniz)}</b></span>`)}
+      ${c.risorse.length ? sezione('risorse', 'Risorse di classe', corpoRisorse(p, d, c)) : ''}
       ${sezione('abilita', 'Abilità', corpoAbil)}
       ${sezione('attacchi', 'Attacchi', corpoAttacchi)}
       ${corpoInc ? sezione('incantesimi', 'Incantesimi', corpoInc) : ''}
@@ -476,6 +621,21 @@ window.creaDND = function creaDND(ctx) {
       ${sezione('progressione', 'Progressione di classe', corpoProg)}
       ${sezione('equip', 'Equipaggiamento', corpoEquip)}
     </div>`;
+  }
+
+  // Risorse di classe: pallini per gli usi (fino a 20), un campo numerico per le riserve grandi (Imposizione delle Mani)
+  function corpoRisorse(p, d, c) {
+    const id = p.id;
+    const righe = c.risorse.map((x) => {
+      const usati = n(d.risorseUsate[x.chiave]);
+      const resto = Math.max(0, x.max - usati);
+      const quando = x.riposo === 'breve' ? 'riposo breve' : x.riposo === 'lungo' ? 'riposo lungo' : '';
+      let ctrl = '';
+      if (x.max > 20) ctrl = `<label>restano <input type="number" class="pf-corto" min="0" max="${x.max}" value="${resto}" data-dnd-risorsa="${esc(x.chiave)}" data-id="${id}" data-max="${x.max}"> / ${x.max}</label>`;
+      else if (x.max) ctrl = `<span class="pf-pallini">${Array.from({ length: x.max }, (_, i) => `<button class="pallino${i < usati ? ' usato' : ''}" data-azione="dnd-risorsa" data-id="${id}" data-k="${esc(x.chiave)}" data-i="${i + 1}" title="${i < usati ? 'Usato' : 'Disponibile'}"></button>`).join('')}</span> <b>${resto}/${x.max}</b>`;
+      return `<div class="pf-riga dnd-risorsa"><b>${esc(x.nome)}</b> ${ctrl} ${quando ? `<small class="muto">si recupera con un ${quando}</small>` : ''} ${x.nota ? `<span class="muto">· ${esc(x.nota)}</span>` : ''}</div>`;
+    }).join('');
+    return `${righe}<p class="muto pf-aiuto">Clicca un pallino per segnare un uso (o per toglierlo). I riposi nella sezione Salute le ricaricano.</p>`;
   }
 
   // ---- Salita di livello ----
@@ -489,7 +649,8 @@ window.creaDND = function creaDND(ctx) {
     const riga = k?.righe?.[dopo - 1];
     const privilegi = iP >= 0 && riga ? String(riga[iP]).split(/,\s*/).map((x) => x.replace(/"/g, '').trim()).filter((x) => x && !/^[-—─]+$/.test(x)) : [];
     const asi = privilegi.some((x) => /Aumento dei Punteggi/i.test(x));
-    const pf = (c.liv === 0 ? k.dado : d.pf.metodo === 'massimo' ? k.dado : Math.floor(k.dado / 2) + 1) + c.m.COS + (d.razza.sotto === 'Nano delle Colline' ? 1 : 0);
+    const pf = (c.liv === 0 ? k.dado : d.pf.metodo === 'massimo' ? k.dado : Math.floor(k.dado / 2) + 1) + c.m.COS + (d.razza.sotto === 'Nano delle Colline' ? 1 : 0)
+      + (k.nome === 'Stregone' && /Discendenza Draconica/i.test(esistente?.sottoclasse || '') ? 1 : 0) + (d.capacita.some((x) => /^robusto/i.test(x.nome || '')) ? 2 : 0);
     // Multiclasse: requisito di 13 nella caratteristica principale (qui solo promemoria)
     return { k, esistente, dopo, livTot, privilegi, asi, pf, compPrima: c.comp, compDopo: competenza(livTot), sotto: dopo === k.sotto };
   }
@@ -506,6 +667,13 @@ window.creaDND = function creaDND(ctx) {
       const kk = classeDi(cl.nome);
       if (kk && n(cl.livello) >= n(kk.sotto) && n(kk.sotto) > 0 && !String(cl.sottoclasse || '').trim()) manca.push(`scegli la sottoclasse di ${kk.nome} (dal ${kk.sotto}° livello)`);
     }
+    // Abilità di classe scelte (oltre a quelle di background e razza) e talento dell'umano variante
+    const k0 = classeDi(d.classi[0]?.nome);
+    if (k0) {
+      const scelte = k0.abil.filter((a) => d.abil[a]?.comp && !(d.bgAbil || []).includes(a) && !(razza?.abil || []).includes(a)).length;
+      if (scelte < k0.quante) manca.push(`scegli le abilità di classe (${scelte}/${k0.quante})`);
+    }
+    if (razza?.talento && !d.capacita.some((x) => x.tipo === 'Talento' && x.nome && !/^Talento \(livello/.test(x.nome))) manca.push("scegli il talento dell'umano (variante)");
     for (const x of d.capacita || []) {
       const m = String(x.nome || '').match(/^Talento \(livello (\d+)\)$/);
       if (m) manca.push(`scrivi quale talento hai preso al ${m[1]}° livello (in "Privilegi, talenti e capacità")`);
@@ -649,10 +817,29 @@ window.creaDND = function creaDND(ctx) {
       for (const dv of Object.keys(c.dadi).sort((a, b) => b - a)) { const via = Math.min(rec, n(d.dadiUsati[dv])); d.dadiUsati[dv] = n(d.dadiUsati[dv]) - via; rec -= via; }
       d.slotUsati = {};
       d.pattoUsati = 0;
+      d.risorseUsate = {};
       d.morte = { successi: 0, fallimenti: 0 };
       if (n(d.indebolimento) > 0) d.indebolimento = n(d.indebolimento) - 1;
       ctx.salva(); ctx.render();
-      ctx.toast('🌙 Riposo lungo: PF al massimo, slot e metà dei dadi vita recuperati');
+      ctx.toast('🌙 Riposo lungo: PF al massimo, slot, risorse e metà dei dadi vita recuperati');
+    },
+    // Riposo breve: slot del patto e risorse che si recuperano con un riposo breve (i dadi vita si spendono a parte)
+    'dnd-riposo-breve'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      const d = dati(p);
+      const c = calcola(p);
+      d.pattoUsati = 0;
+      const brevi = c.risorse.filter((x) => x.riposo === 'breve');
+      for (const x of brevi) delete d.risorseUsate[x.chiave];
+      ctx.salva(); ctx.render();
+      ctx.toast(`☕ Riposo breve${c.patto ? ': slot del patto' : ''}${brevi.length ? `${c.patto ? ',' : ':'} ${esc(brevi.map((x) => x.nome).join(', '))}` : ''} recuperati. Spendi i dadi vita per curarti.`);
+    },
+    'dnd-risorsa'(el) {
+      const d = dati(ctx.personaggio(el.dataset.id));
+      const k = el.dataset.k;
+      const i = Number(el.dataset.i);
+      d.risorseUsate[k] = n(d.risorseUsate[k]) >= i ? i - 1 : i;
+      ctx.salva(); ctx.render();
     },
     'dnd-morte'(el) {
       const d = dati(ctx.personaggio(el.dataset.id));
@@ -741,7 +928,7 @@ window.creaDND = function creaDND(ctx) {
       const d = dati(p);
       // Indossando una nuova armatura (non scudo) si toglie quella indossata prima
       if (a[1] !== 'scudo') for (const x of d.armature) if (x.tipo !== 'scudo') x.indossata = false;
-      d.armature.push({ ...NUOVI.armature(), nome: a[0], tipo: a[1], ca: a[2], furtivita: !!a[3] });
+      d.armature.push({ ...NUOVI.armature(), nome: a[0], tipo: a[1], ca: a[2], furtivita: !!a[3], ...(a[4] ? { forza: a[4] } : {}) });
       ctx.salva(); ctx.render();
     },
     'dnd-oggetto-magico'(el) {
@@ -846,6 +1033,7 @@ window.creaDND = function creaDND(ctx) {
       if (el.dataset.dndSfoglia !== undefined) { sfoglia[el.dataset.dndSfoglia] = el.value; ctx.render(); return true; }
       if (el.dataset.dndCerca !== undefined) { filtroInc[el.dataset.dndCerca] = el.value; return true; }
       if (el.dataset.dndSalita) { if (salita) { salita[el.dataset.dndSalita] = el.value; salita.car = []; } ctx.render(); return true; }
+      if (el.dataset.dndRisorsa !== undefined) { const p = ctx.personaggio(el.dataset.id); if (p) { const d = dati(p); const max = n(el.dataset.max); d.risorseUsate[el.dataset.dndRisorsa] = Math.max(0, Math.min(max, max - n(el.value))); ctx.salva(); } return true; }
       if (el.dataset.dnd) { applica(el); return true; }
       const sch = el.closest('[data-dnd-scheda]');
       if (sch) { const p = ctx.personaggio(sch.dataset.dndScheda); if (p) aggiorna(p); }
@@ -856,6 +1044,7 @@ window.creaDND = function creaDND(ctx) {
       // La ricerca negli incantesimi si applica alla conferma (Invio o uscita dal campo), così il campo non perde il fuoco mentre si scrive
       if (el.dataset.dndCerca !== undefined) { filtroInc[el.dataset.dndCerca] = el.value; ctx.render(); return true; }
       if (el.dataset.dndSalita) return true;
+      if (el.dataset.dndRisorsa !== undefined) { ctx.render(); return true; }
       if (el.dataset.dnd) { if (el.dataset.ridisegnaDnd !== undefined) ctx.render(); return true; }
       return false;
     },
