@@ -556,6 +556,140 @@
 }
 
 /* =====================================================================
+   Tema «Grimorio arcano»: solo per le campagne di D&D 5e (body.tema-dnd)
+   Cuoio scuro rilegato, oro, rune viola che brillano, capilettera miniati e sigilli arcani.
+   ===================================================================== */
+@media screen {
+  body.tema-dnd {
+    --sfondo: #110c16;
+    --barra: #140e1a;
+    --pannello: #1d1424;
+    --pannello-2: #251a2f;
+    --bordo: #4a3562;
+    --bordo-chiaro: #6b4a8a;
+    --testo: #ece0f5;
+    --muto: #a996bb;
+    --oro: #e3c27a;
+    --oro-chiaro: #f6e2ac;
+    --oro-scuro: #9c7f3e;
+    --arcano: #c9a0ff;
+    --arcano-scuro: #7a52b3;
+    --rosso: #e56a7a;
+    --verde: #8fd8a0;
+    --viola: #c9a0ff;
+    --raggio: 3px;
+    --ombra: 0 6px 24px rgba(0, 0, 0, .6);
+    --filo-oro: inset 0 0 0 1px rgba(201, 160, 255, .12), inset 0 1px 0 rgba(246, 226, 172, .06);
+    --metallo: linear-gradient(180deg, #f8e6b2 0%, #e3c27a 45%, #a07c34 100%);
+    --cuoio: linear-gradient(180deg, #221829 0%, #18111e 100%);
+    --titoli: 'Cinzel', 'Trajan Pro', Georgia, serif;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23b98cf0' stroke-width='0.5' stroke-opacity='0.11' stroke-linejoin='round'%3E%3Ccircle cx='50' cy='50' r='47'/%3E%3Ccircle cx='50' cy='50' r='41'/%3E%3Cpath d='M50.0 10.0L78.3 78.3L10.0 50.0L78.3 21.7L50.0 90.0L21.7 21.7L90.0 50.0L21.7 78.3Z'/%3E%3C/g%3E%3C/svg%3E") left -160px bottom -160px / 560px 560px no-repeat,
+      radial-gradient(ellipse at 50% -10%, rgba(201, 160, 255, .12), transparent 55%),
+      radial-gradient(ellipse at 110% 110%, rgba(227, 194, 122, .07), transparent 50%),
+      repeating-linear-gradient(45deg, rgba(255, 255, 255, .012) 0 2px, transparent 2px 7px),
+      var(--sfondo);
+    background-attachment: fixed;
+  }
+  /* Titoli: oro con il capolettera miniato in viola */
+  body.tema-dnd h1 > span[data-titolo] { display: inline-block; }
+  body.tema-dnd h1::first-letter, body.tema-dnd h1 > span[data-titolo]::first-letter { font-size: 1.3em; background: linear-gradient(180deg, #ecd9ff, #b98cf0 55%, #6f45a8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  body.tema-dnd h1 { text-shadow: 0 0 24px rgba(201, 160, 255, .22); }
+  body.tema-dnd h2 { color: var(--oro); }
+  body.tema-dnd h3 { color: var(--arcano); letter-spacing: .16em; }
+  body.tema-dnd h4 { color: var(--oro-chiaro); }
+  body.tema-dnd a { color: var(--oro-chiaro); }
+  body.tema-dnd ::selection { background: rgba(201, 160, 255, .32); }
+  body.tema-dnd ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #6b4a8a, #3a2850); }
+  /* Sotto i titoli: filo d'oro con il sigillo arcano */
+  body.tema-dnd .intest:not(.intest-ritratto)::after {
+    height: 18px;
+    background:
+      linear-gradient(90deg, transparent, var(--arcano-scuro) 12%, var(--oro) 50%, var(--arcano-scuro) 88%, transparent) center / 100% 1px no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23e3c27a' stroke-width='5' stroke-opacity='1' stroke-linejoin='round'%3E%3Ccircle cx='50' cy='50' r='47'/%3E%3Ccircle cx='50' cy='50' r='41'/%3E%3Cpath d='M50.0 10.0L78.3 78.3L10.0 50.0L78.3 21.7L50.0 90.0L21.7 21.7L90.0 50.0L21.7 78.3Z'/%3E%3C/g%3E%3C/svg%3E") center / 18px 18px no-repeat;
+  }
+
+  /* Barra laterale: dorso del libro */
+  body.tema-dnd #barra { background: linear-gradient(180deg, #1a1221, #0c0810); box-shadow: inset -1px 0 0 rgba(201, 160, 255, .2), 4px 0 20px rgba(0, 0, 0, .55); }
+  body.tema-dnd .logo-icona { filter: drop-shadow(0 0 8px rgba(201, 160, 255, .7)); }
+  body.tema-dnd #nav a.attiva { background: linear-gradient(90deg, rgba(201, 160, 255, .16), transparent); border-left-color: var(--arcano); }
+  body.tema-dnd #nav a.attiva::before { content: '✦ '; color: var(--arcano); }
+  body.tema-dnd #barra-campagne a.attiva { background: linear-gradient(90deg, rgba(201, 160, 255, .12), transparent); }
+
+  /* Pannelli: pagine di cuoio con cucitura e angoli d'oro */
+  body.tema-dnd .pannello, body.tema-dnd .scheda, body.tema-dnd .voce-sessione, body.tema-dnd .comb, body.tema-dnd .info-box, body.tema-dnd .sch-carta, body.tema-dnd .intest-ritratto, body.tema-dnd .inc-barra {
+    background:
+      radial-gradient(ellipse at 15% 0%, rgba(201, 160, 255, .06), transparent 55%),
+      repeating-linear-gradient(135deg, rgba(255, 255, 255, .01) 0 2px, transparent 2px 6px),
+      var(--cuoio);
+    border-color: var(--bordo);
+  }
+  body.tema-dnd .pannello::before, body.tema-dnd .scheda::before, body.tema-dnd .voce-sessione::before, body.tema-dnd .comb::before, body.tema-dnd .info-box::before, body.tema-dnd .sch-carta::before {
+    inset: 5px; opacity: .75; border: 1px dashed rgba(227, 194, 122, .22); border-radius: 2px;
+    background:
+      linear-gradient(var(--oro), var(--oro)) top left / 14px 1px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) top left / 1px 14px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) bottom right / 14px 1px no-repeat,
+      linear-gradient(var(--oro), var(--oro)) bottom right / 1px 14px no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23c9a0ff' stroke-width='4' stroke-opacity='1' stroke-linejoin='round'%3E%3Ccircle cx='50' cy='50' r='47'/%3E%3Ccircle cx='50' cy='50' r='41'/%3E%3Cpath d='M50.0 10.0L78.3 78.3L10.0 50.0L78.3 21.7L50.0 90.0L21.7 21.7L90.0 50.0L21.7 78.3Z'/%3E%3C/g%3E%3C/svg%3E") top 4px right 4px / 14px 14px no-repeat;
+  }
+  body.tema-dnd .intest-ritratto::before, body.tema-dnd .intest-ritratto::after { background: linear-gradient(90deg, transparent, var(--arcano-scuro) 15%, var(--oro) 50%, var(--arcano-scuro) 85%, transparent); }
+  body.tema-dnd .intest-iniz { border-color: var(--arcano-scuro); background: radial-gradient(circle at 50% 30%, rgba(201, 160, 255, .2), transparent 70%), linear-gradient(180deg, #2a1d36, #150f1b); box-shadow: inset 0 0 0 1px rgba(201, 160, 255, .25), 0 0 18px rgba(201, 160, 255, .15); }
+  body.tema-dnd .intest-iniz-et { color: var(--arcano); }
+  body.tema-dnd .intest-iniz-val { color: var(--oro); text-shadow: 0 0 12px rgba(227, 194, 122, .35); }
+
+  /* Controlli */
+  body.tema-dnd input, body.tema-dnd select, body.tema-dnd textarea { background: linear-gradient(180deg, #0d0911, #150f1b); background-color: #120d17; border-color: #3a2a4d; border-bottom-color: #5a4078; }
+  body.tema-dnd select option, body.tema-dnd select optgroup { background-color: #1d1424; color: var(--testo); }
+  body.tema-dnd select optgroup { color: var(--oro); }
+  body.tema-dnd select option:checked { background-color: #4a3562; color: var(--oro-chiaro); }
+  body.tema-dnd input:focus, body.tema-dnd select:focus, body.tema-dnd textarea:focus { border-color: var(--arcano); box-shadow: inset 0 2px 4px rgba(0, 0, 0, .5), 0 0 0 2px rgba(201, 160, 255, .25), 0 0 14px rgba(201, 160, 255, .25); }
+  body.tema-dnd button, body.tema-dnd .bottone { background: linear-gradient(180deg, #2b1f36, #1b1322); border-color: var(--bordo-chiaro); }
+  body.tema-dnd button:hover, body.tema-dnd .bottone:hover { border-color: var(--arcano); color: #ecd9ff; box-shadow: inset 0 1px 0 rgba(201, 160, 255, .15), 0 0 12px rgba(201, 160, 255, .3); }
+  body.tema-dnd .primario, body.tema-dnd button.primario { background: var(--metallo); color: #23180a; border-color: #f8e6b2; }
+  body.tema-dnd .primario:hover, body.tema-dnd button.primario:hover { color: #23180a; box-shadow: 0 0 0 1px #5a431f, 0 0 18px rgba(201, 160, 255, .45); }
+  body.tema-dnd .btn-dado { filter: hue-rotate(230deg) saturate(1.2); }
+  body.tema-dnd .comb-azioni button[data-segno="-1"] { border-color: #8a2a4a; color: #ffc0d2; background: linear-gradient(180deg, #2c0e1b, #18070f); }
+  body.tema-dnd .comb-azioni button[data-segno="1"] { border-color: #3f8a5f; color: #c4f2d4; background: linear-gradient(180deg, #102719, #09170f); }
+
+  /* Schede, chip e badge */
+  body.tema-dnd .schede a.attiva, body.tema-dnd .schede a:hover { color: var(--oro-chiaro); }
+  body.tema-dnd .badge-pg { color: #23180a; }
+
+  /* Scheda personaggio: caratteristiche come tavolette con sigla in viola e valore d'oro */
+  body.tema-dnd .car { background: radial-gradient(circle at 50% 0%, rgba(201, 160, 255, .14), transparent 65%), linear-gradient(180deg, #281c33, #18111e); border-color: var(--bordo); box-shadow: inset 0 0 0 1px rgba(201, 160, 255, .14), var(--ombra); }
+  body.tema-dnd .car-sigla { color: var(--arcano); letter-spacing: .14em; text-shadow: 0 0 10px rgba(201, 160, 255, .45); }
+  body.tema-dnd .car-mod { color: #23180a; }
+  body.tema-dnd .pf-box { border-left: 2px solid var(--arcano-scuro); }
+  body.tema-dnd .pf-box { background: linear-gradient(180deg, #251a2f, #150f1b); }
+  body.tema-dnd .pf-inc, body.tema-dnd .pf-libro { background: linear-gradient(180deg, #221829, #150f1b); }
+  body.tema-dnd .ritratto { background: radial-gradient(circle at 35% 30%, #4a3562, #110c16 70%); }
+  body.tema-dnd .pf-valore, body.tema-dnd .pf-tot, body.tema-dnd .pf-max { color: var(--oro); text-shadow: 0 0 10px rgba(227, 194, 122, .25); }
+  body.tema-dnd .pf-etich { color: var(--arcano); }
+  body.tema-dnd .pf-sez > summary { background: linear-gradient(90deg, rgba(201, 160, 255, .13), rgba(201, 160, 255, .02) 55%, transparent); }
+  body.tema-dnd .pf-sez > summary h3::before { content: ''; display: inline-block; width: 13px; height: 13px; margin-right: 8px; vertical-align: -1px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23e3c27a' stroke-width='5' stroke-opacity='1' stroke-linejoin='round'%3E%3Ccircle cx='50' cy='50' r='47'/%3E%3Ccircle cx='50' cy='50' r='41'/%3E%3Cpath d='M50.0 10.0L78.3 78.3L10.0 50.0L78.3 21.7L50.0 90.0L21.7 21.7L90.0 50.0L21.7 78.3Z'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat; transition: transform .3s; }
+  body.tema-dnd .pf-sez[open] > summary h3::before { transform: rotate(22.5deg); filter: drop-shadow(0 0 4px rgba(227, 194, 122, .6)); }
+  body.tema-dnd .prog-tabella th { background: linear-gradient(180deg, #2b1f36, #1d1424); color: var(--oro); }
+  body.tema-dnd .prog-tabella tr.prog-attuale td { background: linear-gradient(90deg, rgba(201, 160, 255, .22), rgba(201, 160, 255, .05)); }
+  body.tema-dnd .pallino.usato { box-shadow: 0 0 8px rgba(201, 160, 255, .7); }
+  body.tema-dnd .ritratto, body.tema-dnd .ritratto-grande { border-color: var(--oro-scuro); box-shadow: 0 0 0 3px #110c16, 0 0 0 4px var(--arcano-scuro), 0 0 20px rgba(201, 160, 255, .25); }
+
+  /* Tracker e schermo */
+  body.tema-dnd .comb-iniz, body.tema-dnd .sch-iniz { background: radial-gradient(circle at 50% 35%, #4a3562, #1a1221); border-color: var(--arcano-scuro); color: var(--oro); }
+  body.tema-dnd .comb.attivo .comb-iniz, body.tema-dnd .sch-carta.attivo .sch-iniz { background: radial-gradient(circle at 50% 35%, #e3c27a, #6b5220); color: #23180a; }
+  body.tema-dnd .comb.attivo, body.tema-dnd .sch-carta.attivo { border-color: var(--arcano); box-shadow: 0 0 0 1px var(--arcano), 0 0 22px rgba(201, 160, 255, .35); }
+  body.tema-dnd .comb.attivo::after { content: '✦'; color: var(--arcano); text-shadow: 0 0 10px rgba(201, 160, 255, .8); }
+  body.tema-dnd .barra-pf, body.tema-dnd .sch-vita { background: #140e1a; border-color: var(--bordo); }
+  body.tema-dnd .barra-pf span, body.tema-dnd .sch-vita-verde span { background-color: #5fbf86; }
+  body.tema-dnd .sch-vita-gialla span { background-color: var(--oro); }
+  body.tema-dnd .sch-vita-rossa span { background-color: #d84a64; }
+  body.tema-dnd .azione-turno { color: #23180a; background: var(--metallo); }
+  body.tema-dnd .sch-testa::after { background: linear-gradient(90deg, var(--oro), rgba(201, 160, 255, .3) 60%, transparent) center / 100% 1px no-repeat; }
+  body.tema-dnd .sch-scena img { border-color: var(--oro-scuro); }
+}
+/* ---- fine tema Grimorio arcano ---- */
+
+/* =====================================================================
    Tema «Rovine di Thassilon»: solo per le campagne di Pathfinder 1 (body.tema-pf1)
    Pietra antica incisa, giada e oro antico, la stella a sette punte dell'impero di Thassilon.
    ===================================================================== */
@@ -659,6 +793,9 @@
   body.tema-pf1 .car-sigla { color: var(--oro); letter-spacing: .16em; }
   body.tema-pf1 .car-mod { color: #1e1a08; }
   body.tema-pf1 .pf-box { border-radius: 0; border-left: 2px solid var(--oro-scuro); }
+  body.tema-pf1 .pf-box { background: linear-gradient(180deg, #1c2b26, #111a17); }
+  body.tema-pf1 .pf-inc, body.tema-pf1 .pf-libro { background: linear-gradient(180deg, #1a2723, #111a17); }
+  body.tema-pf1 .ritratto { background: radial-gradient(circle at 35% 30%, #2f4c40, #0d1512 70%); box-shadow: 0 0 0 2px #0d1512, 0 0 10px rgba(143, 214, 168, .2); }
   body.tema-pf1 .pf-valore, body.tema-pf1 .pf-tot, body.tema-pf1 .pf-max { color: var(--oro-antico); text-shadow: 0 0 10px rgba(217, 194, 122, .25); }
   body.tema-pf1 .pf-etich { color: var(--oro); letter-spacing: .1em; }
   body.tema-pf1 .pf-sez > summary { background: linear-gradient(90deg, rgba(143, 214, 168, .12), rgba(143, 214, 168, .02) 55%, transparent); }
