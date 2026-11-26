@@ -1494,6 +1494,7 @@
           <div class="scheda-titolo">🚀 ${esc(v.nome)}</div>
           <div class="scheda-sotto">${esc(v.struttura || 'struttura da scegliere')} · categoria ${esc(v.categoria)} · PS ${k.psMax - (v.combattimento?.danni || 0)}/${k.psMax} · CA ${k.ca} · AB ${k.ab}</div></a>`; }).join('')}</div>`
         : '<p class="muto">Nessuna astronave. Creane una: struttura, sistemi e armi si scelgono dal wiki, con i Punti Costruzione e l\'energia controllati da soli.</p>'}
+      ${navi.length ? mp.vista(c) : ''}
       <p class="muto pf-aiuto">L'equipaggio si sceglie tra i personaggi della campagna: le prove di ogni ruolo vengono dalle loro schede. Per farla vedere ai giocatori, apri l'astronave e premi «💾 File per i giocatori»: lo importano nel kit con «📥 Importa scheda».</p>`;
   }
   function vistaNave(id) {
@@ -1725,6 +1726,18 @@
     sfCalcola: (p) => sf.calcola(p),
   });
 
+  // Mappa a esagoni del combattimento tra astronavi (src/sf-mappa.js), una per campagna
+  const mp = window.creaMappaSpaziale({
+    esc, uid,
+    salva: () => salva(),
+    render: () => render(),
+    toast: (h, t) => toast(h, t),
+    campagna: (id) => campagna(id),
+    nave,
+    navi: (cid) => S.astronavi.filter((x) => x.campagnaId === cid),
+    calcolaNave: (v) => nv.calcola(v, equipaggioDi(v)),
+  });
+
   // Modulo D&D 5e (src/dnd.js)
   const dnd = window.creaDND({
     esc, uid, norm,
@@ -1797,6 +1810,7 @@
       if (eseguiTiro(d.get('espr'), d.get('etichetta').trim())) { render(); $('#espr-dado')?.select(); }
     },
   };
+  Object.assign(moduli, mp.moduli);
 
   const azioni = {
     'nuova-sessione'(el) {
@@ -2856,6 +2870,7 @@
   Object.assign(moduli, pf1.moduli);
   Object.assign(azioni, sf.azioni);
   Object.assign(azioni, nv.azioni);
+  Object.assign(azioni, mp.azioni);
   Object.assign(azioni, dnd.azioni);
   Object.assign(azioni, pf2.azioni);
   Object.assign(moduli, sf.moduli);

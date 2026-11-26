@@ -1478,3 +1478,33 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
 .nv-conti td, .nv-conti th { padding: 3px 10px; border-bottom: 1px solid var(--bordo); text-align: left; }
 .nv-conti td:last-child, .nv-conti th:last-child { text-align: right; }
 .nv-note textarea { width: 100%; }
+
+/* ---------- Mappa del combattimento tra astronavi (src/sf-mappa.js) ---------- */
+.mp { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.mp > .pf-riga { flex-wrap: wrap; }
+.mp h3 { margin: 0; }
+.mp-scorri { overflow: auto; max-height: 70vh; border: 1px solid var(--bordo); border-radius: var(--raggio); background: rgba(0, 0, 0, .25); touch-action: pan-x pan-y; }
+.mp-mappa { display: block; }
+.mp-es { fill: transparent; stroke: rgba(150, 170, 200, .22); stroke-width: 1; cursor: pointer; }
+.mp-es:hover { fill: rgba(255, 255, 255, .06); }
+.mp-es.arco-prua { fill: rgba(69, 160, 255, .22); }
+.mp-es.arco-tribordo { fill: rgba(76, 220, 140, .2); }
+.mp-es.arco-poppa { fill: rgba(255, 90, 100, .2); }
+.mp-es.arco-babordo { fill: rgba(255, 200, 70, .22); }
+.mp-es.confine { stroke: rgba(255, 255, 255, .55); stroke-dasharray: 3 3; }
+.mp-pedina { cursor: pointer; }
+.mp-pedina circle { fill: #10243a; stroke: #45d6ff; stroke-width: 2; }
+.mp-pedina.nemico circle { fill: #3a1016; stroke: #ff5d73; }
+.mp-pedina.sel circle { stroke: #ffe066; stroke-width: 3.5; }
+.mp-pedina .mp-prua { fill: #d9ecf7; }
+.mp-pedina text { fill: var(--testo); font-size: 11px; text-anchor: middle; paint-order: stroke; stroke: rgba(0, 0, 0, .8); stroke-width: 3px; pointer-events: none; }
+.mp-legenda { display: inline-flex; align-items: center; gap: 4px 6px; flex-wrap: wrap; font-size: 12px; color: var(--muto); }
+.mp-legenda i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-left: 6px; }
+.mp-legenda i.arco-prua { background: rgba(69, 160, 255, .6); }
+.mp-legenda i.arco-tribordo { background: rgba(76, 220, 140, .6); }
+.mp-legenda i.arco-poppa { background: rgba(255, 90, 100, .6); }
+.mp-legenda i.arco-babordo { background: rgba(255, 200, 70, .6); }
+.mp-pannello .barra-azioni button.attivo { border-color: var(--oro); box-shadow: 0 0 10px rgba(69, 214, 255, .4); }
+.mp-tabella { width: 100%; }
+.mp-aggiungi { flex-wrap: wrap; gap: 8px 14px; }
+.mp-aggiungi .riga-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
