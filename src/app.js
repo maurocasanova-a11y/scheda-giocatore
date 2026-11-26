@@ -97,6 +97,7 @@
         if (ok === false) { statoSalvataggio('🔒 Non salvato (sola lettura)'); return; }
         statoSalvataggio(`Salvato alle ${new Date().toLocaleTimeString('it-IT')}`);
         avvisoGrave(null);
+        programmaCopiaOnline();
       } catch (e) {
         console.error(e);
         registra(`salvataggio fallito: ${e.stack || e}`);
@@ -1343,6 +1344,78 @@
     }
   }
 
+  // ---------- Copia di sicurezza online (src/copia-online.js) ----------
+  // Configurazione nei dati (S.copiaOnline = { codice }): così vale su tutti i PC che usano la stessa cartella dati.
+  // Nel database: backup/<impronta del codice>/ultima (aggiornata 1 minuto dopo ogni modifica), giorni/<aaaa-mm-gg>
+  // (una al giorno, si tengono le ultime 7) e indice (le date presenti).
+  const CO = window.CopiaOnline;
+  const co = { timer: null, inCorso: false, ultima: 0, errore: '', giornoFatto: '', mostra: false, trovate: null, codiceCercato: '' };
+  const GIORNI_TENUTI = 7;
+  const oggi = () => new Date().toISOString().slice(0, 10);
+  function programmaCopiaOnline(subito = false) {
+    if (GIOCATORE || SCHERMO || !S.copiaOnline?.codice || !dvAttivo() || !CO) return;
+    clearTimeout(co.timer);
+    co.timer = setTimeout(caricaCopiaOnline, subito ? 0 : 60000);
+  }
+  async function caricaCopiaOnline() {
+    if (co.inCorso || !S.copiaOnline?.codice) return;
+    co.inCorso = true;
+    try {
+      const codice = S.copiaOnline.codice;
+      const id = await CO.idDa(codice);
+      const pacchetto = { ...(await CO.cifra(S, codice)), quando: DV.ORA, pc: String(statoDati?.pc || '').slice(0, 80) };
+      await DV.scrivi(`backup/${id}/ultima`, pacchetto);
+      const g = oggi();
+      if (co.giornoFatto !== g) {
+        await DV.scrivi(`backup/${id}/giorni/${g}`, pacchetto);
+        const indice = [...new Set([...((await DV.leggi(`backup/${id}/indice`)) || []), g])].sort();
+        for (const vecchio of indice.slice(0, Math.max(0, indice.length - GIORNI_TENUTI))) await DV.cancella(`backup/${id}/giorni/${vecchio}`);
+        await DV.scrivi(`backup/${id}/indice`, indice.slice(-GIORNI_TENUTI));
+        co.giornoFatto = g;
+      }
+      co.ultima = Date.now();
+      co.errore = '';
+      registra('copia online salvata');
+    } catch (e) {
+      co.errore = /401|403|Permission|permesso/i.test(String(e.message || e)) ? 'il database rifiuta la scrittura: vanno aggiornate le regole di Firebase (vedi sotto)' : String(e.message || e);
+      registra(`copia online non riuscita: ${co.errore}`);
+    } finally {
+      co.inCorso = false;
+      if (location.hash.startsWith('#/impostazioni')) render();
+    }
+  }
+  function sezioneCopiaOnline() {
+    if (!CO) return '';
+    if (!dvAttivo()) return `<section class="pannello imp-dati"><h3>☁ Copia di sicurezza online</h3><p class="muto">Serve il database Firebase della sessione dal vivo, che qui non è configurato.</p></section>`;
+    const cod = S.copiaOnline?.codice;
+    const ora = (t) => new Date(t).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+    const trovate = co.trovate ? `<div class="co-trovate">${co.trovate.length ? co.trovate.map((x) => `<div class="pf-riga"><b>${esc(x.nome)}</b> <span class="muto">${[x.quando ? ora(x.quando) : '', x.pc ? `da ${esc(x.pc)}` : '', x.dimensione ? `${Math.max(1, Math.round(x.dimensione / 1024))} KB di dati` : ''].filter(Boolean).join(' · ')}</span>
+        <button data-azione="co-ripristina" data-quale="${esc(x.chiave)}">↩ Ripristina questa</button></div>`).join('') : '<p class="oltre">Nessuna copia trovata con questo codice.</p>'}</div>` : '';
+    return `<section class="pannello imp-dati">
+        <h3>☁ Copia di sicurezza online</h3>
+        <p class="muto">Una copia di tutti i dati (campagne, diario, personaggi, astronavi, regolamenti) sul tuo database Firebase, <b>cifrata</b> con un codice di ripristino che hai solo tu: senza il codice nessuno può leggerla, nemmeno dalla console di Firebase. Si aggiorna da sola un minuto dopo ogni modifica, e ogni giorno ne resta una copia (le ultime ${GIORNI_TENUTI}).</p>
+        ${cod ? `<p>Codice di ripristino: <b class="co-codice">${co.mostra ? esc(cod) : esc(cod.slice(0, 4)) + '-••••-••••-••••-••••-••••'}</b>
+            <button class="btn-mini" data-azione="co-mostra">${co.mostra ? 'Nascondi' : 'Mostra'}</button>${co.mostra ? ' <button class="btn-mini" data-azione="co-copia">📋 Copia</button>' : ''}</p>
+          <p>${co.inCorso ? '⏳ Salvataggio in corso…' : co.errore ? `<span class="oltre">⚠ Ultimo tentativo non riuscito: ${esc(co.errore)}</span>` : co.ultima ? `✅ Ultima copia alle ${new Date(co.ultima).toLocaleTimeString('it-IT')}` : 'In attesa della prossima modifica (o premi «Salva adesso»).'}</p>
+          <div class="barra-azioni"><button class="primario" data-azione="co-salva">☁ Salva adesso</button><button data-azione="co-disattiva">Disattiva</button></div>
+          <p class="muto pf-aiuto">Scrivi il codice su carta o in un posto sicuro fuori da questo PC: se il PC si rompe, è l'unico modo per riavere i dati. Chi ha il codice può leggere la copia.</p>`
+        : `<div class="barra-azioni"><button class="primario" data-azione="co-attiva">☁ Attiva la copia online</button></div>`}
+        <details class="pf-alternativi"${co.trovate ? ' open' : ''}><summary>Ripristina da una copia online</summary>
+          <form class="riga-form" data-form="co-cerca" autocomplete="off"><input name="codice" placeholder="Codice di ripristino (es. K7QM-2XRA-…)" value="${esc(co.codiceCercato)}" required>
+            <button>Cerca le copie</button></form>
+          ${trovate}
+          <p class="muto pf-aiuto">Ripristinare <b>sostituisce tutti i dati di questo PC</b> con quelli della copia: prima conviene usare «Esporta backup».</p></details>
+        <details class="pf-alternativi"><summary>Regole del database (da aggiornare una volta)</summary>
+          <p class="muto">Nella console di Firebase › Realtime Database › Regole, accanto a «sessioni» serve anche questo blocco (il file completo è <b>firebase-regole.json</b> nella cartella del programma):</p>
+          <pre class="co-regole">"backup": {
+  "$id": {
+    ".read": "auth != null && $id.length === 40",
+    ".write": "auth != null && $id.length === 40"
+  }
+}</pre></details>
+      </section>`;
+  }
+
   function vistaImpostazioni() {
     const s = statoDati;
     if (!window.gdr?.statoDati) return '<header class="intest"><h1>Impostazioni</h1></header><p class="vuoto">Le impostazioni dei dati sono disponibili solo nell\'app.</p>';
@@ -1370,6 +1443,7 @@
           <b>Per tablet e telefoni (Android, iPhone, iPad):</b> se la cartella «… (tablet e telefoni)» è già collegata a GitHub, il pulsante la rigenera e carica subito la nuova versione sul sito (il link viene copiato); altrimenti la crea da pubblicare a mano (istruzioni nel LEGGIMI). I giocatori aprono il link e installano la scheda con «Aggiungi alla schermata Home»; poi funziona anche senza connessione e si aggiorna da sola.<br>
           In entrambi i kit i mostri del tuo Manuale dei Mostri non vengono inclusi, e il file della scheda è lo stesso.</p>
       </section>
+      ${sezioneCopiaOnline()}
       <section class="pannello imp-dati">
         <h3>Uso su più PC</h3>
         <p>Questo PC: <b>${esc(s.pc)}</b>${s.solaLettura ? ' · <span class="oltre">aperto in sola lettura</span>' : ''}</p>
@@ -1680,6 +1754,21 @@
       location.hash = `#/campagna/${c.id}/diario`;
     },
     'dv-collega'(d) { dvGCollega(d.get('codice'), d.get('pg')); },
+    async 'co-cerca'(d) {
+      co.codiceCercato = String(d.get('codice') || '');
+      const codice = CO.normCodice(co.codiceCercato);
+      if (!codice) { toast('Il codice ha 24 caratteri, in 6 gruppi da 4 (es. K7QM-2XRA-9TBC-…)', 'errore'); return; }
+      try {
+        const id = await CO.idDa(codice);
+        const ultima = await DV.leggi(`backup/${id}/ultima`);
+        const indice = (await DV.leggi(`backup/${id}/indice`)) || [];
+        const trovate = [];
+        if (ultima) trovate.push({ chiave: 'ultima', nome: 'Ultima copia', quando: ultima.quando, pc: ultima.pc, dimensione: ultima.dimensione });
+        for (const g of [...indice].reverse()) trovate.push({ chiave: `giorni/${g}`, nome: `Copia del ${g.split('-').reverse().join('/')}`, quando: 0, pc: '', dimensione: 0 });
+        co.trovate = trovate;
+      } catch (e) { co.trovate = null; toast(`Ricerca non riuscita: ${esc(e.message || e)}`, 'errore'); }
+      render();
+    },
     'giocatore-nuovo'(d) {
       const nome = d.get('nome').trim();
       if (!nome) return;
@@ -2053,6 +2142,45 @@
       } catch (e) { toast(esc(e.message), 'errore'); }
     },
     'apri-cartella'() { archivio.apriCartella(); },
+    'co-attiva'() {
+      const codice = CO.nuovoCodice();
+      S.copiaOnline = { codice, attivata: Date.now() };
+      co.mostra = true;
+      salva();
+      programmaCopiaOnline(true);
+      render();
+      toast(`☁ Copia online attivata. Codice di ripristino: <b>${esc(codice)}</b> — scrivilo in un posto sicuro`);
+    },
+    'co-salva'() { programmaCopiaOnline(true); toast('☁ Copia online in partenza…'); },
+    'co-mostra'() { co.mostra = !co.mostra; render(); },
+    async 'co-copia'() { try { await navigator.clipboard.writeText(S.copiaOnline?.codice || ''); toast('📋 Codice copiato'); } catch { toast('Copia non riuscita: selezionalo e copialo a mano', 'errore'); } },
+    'co-disattiva'() {
+      if (!S.copiaOnline || !confirm('Disattivare la copia online? Le copie già salvate restano sul database e si possono ancora ripristinare con il codice.')) return;
+      delete S.copiaOnline;
+      clearTimeout(co.timer);
+      co.ultima = 0; co.errore = ''; co.mostra = false;
+      salva();
+      render();
+    },
+    async 'co-ripristina'(el) {
+      const quale = el.dataset.quale;
+      const codice = CO.normCodice(co.codiceCercato);
+      if (!codice || !quale) return;
+      try {
+        const id = await CO.idDa(codice);
+        const pacchetto = await DV.leggi(`backup/${id}/${quale}`);
+        const d = await CO.decifra(pacchetto, codice);
+        if (!Array.isArray(d.campagne) || !Array.isArray(d.regolamenti)) throw new Error('la copia non contiene dati di Cronache del Master');
+        if (!confirm(`Sostituire TUTTI i dati di questo PC con la copia online (${d.campagne.length} ${d.campagne.length === 1 ? 'campagna' : 'campagne'})? Conviene esportare prima un backup dei dati attuali.`)) return;
+        S = normalizza(d);
+        S.copiaOnline = { ...(S.copiaOnline || {}), codice };
+        co.trovate = null;
+        salva();
+        location.hash = '#/campagne';
+        render();
+        toast(`↩ Dati ripristinati dalla copia online (${d.campagne.length} ${d.campagne.length === 1 ? 'campagna' : 'campagne'})`);
+      } catch (e) { toast(`Ripristino non riuscito: ${esc(e.message || e)}`, 'errore'); }
+    },
     'pg-esporta'(el) {
       const p = personaggio(el.dataset.id);
       if (!p) return;
