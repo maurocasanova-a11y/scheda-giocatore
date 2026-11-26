@@ -54,10 +54,10 @@
   const statoIniziale = () => ({
     versione: 1,
     regolamenti: JSON.parse(JSON.stringify(window.REGOLAMENTI_PREDEFINITI)),
-    campagne: [], personaggi: [], sessioni: [], tiri: [],
+    campagne: [], personaggi: [], sessioni: [], tiri: [], astronavi: [],
   });
   const normalizza = (d) => {
-    for (const k of ['regolamenti', 'campagne', 'personaggi', 'sessioni', 'tiri']) if (!Array.isArray(d[k])) d[k] = [];
+    for (const k of ['regolamenti', 'campagne', 'personaggi', 'sessioni', 'tiri', 'astronavi']) if (!Array.isArray(d[k])) d[k] = [];
     d.versione = d.versione || 1;
     // Il Pathfinder 1 precaricato usa la scheda con calcoli automatici
     for (const r of d.regolamenti) if (r.id === 'pf1' && !r.scheda) r.scheda = 'pf1';
@@ -338,12 +338,14 @@
     const c = campagna(id);
     if (!c) return nonTrovato();
     const r = regolamento(c.regolamentoId);
-    const schede = [['diario', 'Diario delle sessioni'], ['personaggi', 'Personaggi'], ['lore', `Lore${c.lore?.length ? ` (${c.lore.length})` : ''}`], ['combattimento', 'Combattimento'], ['dettagli', 'Dettagli']];
+    const navi = S.astronavi.filter((x) => x.campagnaId === c.id);
+    const schede = [['diario', 'Diario delle sessioni'], ['personaggi', 'Personaggi'], ['lore', `Lore${c.lore?.length ? ` (${c.lore.length})` : ''}`], ['combattimento', 'Combattimento'], ...(r?.scheda === 'sf' ? [['astronavi', `Astronavi${navi.length ? ` (${navi.length})` : ''}`]] : []), ['dettagli', 'Dettagli']];
     let corpo = '';
     if (scheda === 'personaggi') corpo = schedaPersonaggi(c, sotto);
     else if (scheda === 'lore') corpo = schedaLore(c, sotto);
     else if (scheda === 'combattimento') corpo = pf1.vistaIncontro(c);
     else if (scheda === 'dettagli') corpo = schedaDettagli(c);
+    else if (scheda === 'astronavi') corpo = schedaAstronavi(c);
     else corpo = schedaDiario(c);
     return `<div class="briciole"><a href="#/campagne">Campagne</a></div>
       <header class="intest"><h1><span data-titolo="campagna:${c.id}">${esc(c.nome)}</span> <button class="btn-rinomina" data-azione="rinomina-campagna" data-id="${c.id}" title="Cambia il nome della campagna">✏️</button> <button class="btn-cestino" data-azione="elimina-campagna" data-id="${c.id}" title="Elimina la campagna con sessioni e personaggi">🗑</button></h1>
@@ -1276,7 +1278,7 @@
     const q = new URLSearchParams(qs);
     const p = percorso.split('/').filter(Boolean);
     let html;
-    if (GIOCATORE && !['personaggio', 'dadi', 'grimorio', 'breviario', 'olografico'].includes(p[0])) html = vistaGiocatore();
+    if (GIOCATORE && !['personaggio', 'dadi', 'grimorio', 'breviario', 'olografico', 'astronave'].includes(p[0])) html = vistaGiocatore();
     else switch (p[0]) {
       case 'campagna': html = vistaCampagna(p[1], p[2], p[3]); break;
       case 'sessione': html = vistaSessione(p[1], p[2] === 'modifica', q.get('evidenzia')); break;
@@ -1290,6 +1292,7 @@
       case 'grimorio': html = pf1.vistaGrimorio(personaggio(p[1]), p[2]); break;
       case 'breviario': html = pf1.vistaBreviario(personaggio(p[1]), p[2]); break;
       case 'olografico': html = sf.vistaOlografico(personaggio(p[1]), p[2]); break;
+      case 'astronave': html = vistaNave(p[1]); break;
       case 'regolamenti': html = vistaRegolamenti(); break;
       case 'regolamento': html = vistaRegolamento(p[1]); break;
       case 'dadi': html = vistaDadi(); break;
@@ -1298,10 +1301,10 @@
       default: html = vistaCampagne();
     }
     // Tema grafico della campagna aperta: sci-fi tecnologico per Starfinder, rovine di Thassilon per Pathfinder 1, grimorio arcano per D&D 5e, fantasy per il resto
-    const cid = p[0] === 'campagna' || p[0] === 'schermo' ? p[1] : p[0] === 'sessione' ? sessione(p[1])?.campagnaId : p[0] === 'personaggio' ? personaggio(p[1])?.campagnaId : null;
+    const cid = p[0] === 'campagna' || p[0] === 'schermo' ? p[1] : p[0] === 'sessione' ? sessione(p[1])?.campagnaId : p[0] === 'personaggio' ? personaggio(p[1])?.campagnaId : p[0] === 'astronave' ? nave(p[1])?.campagnaId : null;
     const cTema = cid ? campagna(cid) : null;
     const schedaTema = cTema ? regolamento(cTema.regolamentoId)?.scheda : p[0] === 'regolamento' ? regolamento(p[1])?.scheda : '';
-    document.body.classList.toggle('tema-sf', schedaTema === 'sf');
+    document.body.classList.toggle('tema-sf', schedaTema === 'sf' || p[0] === 'astronave');
     document.body.classList.toggle('tema-pf1', schedaTema === 'pf1'); // Rovine di Thassilon
     document.body.classList.toggle('tema-dnd', schedaTema === 'dnd'); // Grimorio arcano
     if (GIOCATORE && p[0] === 'personaggio' && personaggio(p[1])) html = barraGiocatore(personaggio(p[1])) + html;
@@ -1408,6 +1411,44 @@
     }
     return c;
   }
+  // Elenco delle astronavi della campagna (Starfinder)
+  function schedaAstronavi(c) {
+    const navi = S.astronavi.filter((x) => x.campagnaId === c.id);
+    const pg = personaggiDi(c.id);
+    return `<div class="barra-azioni"><button class="primario" data-azione="nv-nuova" data-campagna="${c.id}">🚀 Nuova astronave</button></div>
+      ${navi.length ? `<div class="griglia">${navi.map((v) => { const k = nv.calcola(v, pg); return `<a class="scheda" href="#/astronave/${v.id}">
+          <div class="scheda-titolo">🚀 ${esc(v.nome)}</div>
+          <div class="scheda-sotto">${esc(v.struttura || 'struttura da scegliere')} · categoria ${esc(v.categoria)} · PS ${k.psMax - (v.combattimento?.danni || 0)}/${k.psMax} · CA ${k.ca} · AB ${k.ab}</div></a>`; }).join('')}</div>`
+        : '<p class="muto">Nessuna astronave. Creane una: struttura, sistemi e armi si scelgono dal wiki, con i Punti Costruzione e l\'energia controllati da soli.</p>'}
+      <p class="muto pf-aiuto">L'equipaggio si sceglie tra i personaggi della campagna: le prove di ogni ruolo vengono dalle loro schede. Per farla vedere ai giocatori, apri l'astronave e premi «💾 File per i giocatori»: lo importano nel kit con «📥 Importa scheda».</p>`;
+  }
+  function vistaNave(id) {
+    const v = nave(id);
+    if (!v) return nonTrovato();
+    const c = campagna(v.campagnaId);
+    return `<div class="briciole">${c ? `<a href="#/campagne">Campagne</a> › <a href="#/campagna/${c.id}/astronavi">${esc(c.nome)}</a>` : '<a href="#/">Le mie schede</a>'}</div>
+      <header class="intest"><h1>🚀 ${esc(v.nome)}</h1>
+        <div class="intest-sotto">Astronave · Starfinder${GIOCATORE ? ' · copia mandata dal master (si aggiorna importando un file nuovo)' : ''}</div>
+        <div class="barra-azioni">${GIOCATORE ? '' : `<button data-azione="nv-esporta" data-id="${v.id}" title="Salva il file dell'astronave da mandare ai giocatori">💾 File per i giocatori</button>
+          <button class="btn-cestino" data-azione="nv-elimina" data-id="${v.id}" title="Elimina l'astronave">🗑</button>`}</div></header>
+      ${nv.vista(v, { personaggi: equipaggioDi(v), sola: GIOCATORE })}`;
+  }
+  const FORMATO_NAVE = 'cronache-del-master/astronave';
+  function esportaNave(v) {
+    const copia = JSON.parse(JSON.stringify(v));
+    delete copia._personaggi;
+    // Con l'astronave viaggiano le schede dell'equipaggio, così il kit mostra le loro prove
+    const ids = new Set(Object.values(v.equipaggio || {}).flat().filter(Boolean));
+    const pers = personaggiDi(v.campagnaId).filter((p) => ids.has(p.id)).map((p) => { const x = JSON.parse(JSON.stringify(p)); delete x.campagnaId; return x; });
+    const contenuto = JSON.stringify({ formato: FORMATO_NAVE, versione: 1, esportato: new Date().toISOString(), nave: copia, personaggi: pers }, null, 1);
+    const nomeFile = `${(v.nome || 'astronave').replace(/[\\/:*?"<>|]+/g, ' ').trim()} - astronave.json`;
+    if (window.KIT_WEB && navigator.share && navigator.canShare) {
+      const file = new File([contenuto], nomeFile, { type: 'application/json' });
+      if (navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: nomeFile }).catch((e) => { if (e?.name !== 'AbortError') scaricaScheda(contenuto, nomeFile); }); return; }
+    }
+    scaricaScheda(contenuto, nomeFile);
+  }
+
   function vistaGiocatore() {
     const miei = S.personaggi.slice().sort((a, b) => a.nome.localeCompare(b.nome));
     const regs = S.regolamenti.filter((r) => r.scheda).concat(S.regolamenti.filter((r) => !r.scheda));
@@ -1433,6 +1474,7 @@
       ${miei.length ? `<h2>I miei personaggi</h2><div class="griglia">${miei.map((x) => `<a class="scheda" href="#/personaggio/${x.id}">
           <div class="scheda-titolo"><span class="ritratto ritratto-piccolo">${ritratto(x)}</span>${esc(x.nome)}</div>
           <div class="scheda-sotto">${esc(regDi(x)?.nome || '')}${x.giocatore ? ` · ${esc(x.giocatore)}` : ''}</div></a>`).join('')}</div>` : ''}
+      ${S.astronavi.length ? `<h2>Astronavi</h2><div class="griglia">${S.astronavi.map((v) => `<a class="scheda" href="#/astronave/${v.id}"><div class="scheda-titolo">🚀 ${esc(v.nome)}</div><div class="scheda-sotto">${esc(v.struttura || '')}</div></a>`).join('')}</div>` : ''}
       <section class="pannello giocatore-sez"><h3>Hai già un file della scheda?</h3>
         <p class="muto">Se il master ti ha rimandato la scheda, o vuoi continuarla da un altro computer, caricala qui.</p>
         <button data-azione="giocatore-carica">📥 Importa scheda</button></section>
@@ -1489,6 +1531,7 @@
         file.text().then((testo) => {
           let d;
           try { d = JSON.parse(testo); } catch { ko(new Error('Il file non è una scheda leggibile')); return; }
+          if (d?.formato === FORMATO_NAVE && d.nave?.id) { ok(d); return; }
           if (d?.formato !== FORMATO_SCHEDA || !d.personaggio?.nome) { ko(new Error('Il file non è una scheda di Cronache del Master (forse è un backup completo?)')); return; }
           ok(d);
         }, ko);
@@ -1591,6 +1634,20 @@
       return Promise.resolve(window.open(`${encodeURIComponent(pagina)}?schermo=1#/${tipo}/${pg}/${inc}`, `${tipo}-gdr`, 'width=1280,height=860'));
     },
     wiki: (pagina, sito) => (window.gdr?.wiki ? window.gdr.wiki(pagina, sito) : Promise.reject(new Error('disponibile solo nell\'app'))),
+  });
+
+  // Astronavi di Starfinder (src/sf-astronavi.js): della campagna, con l'equipaggio preso dai suoi personaggi.
+  // Nel kit dei giocatori l'astronave arriva da un file, con dentro le schede dell'equipaggio (_personaggi).
+  const nave = (id) => S.astronavi.find((x) => x.id === id);
+  const equipaggioDi = (v) => (v?._personaggi?.length ? v._personaggi : personaggiDi(v?.campagnaId));
+  const nv = window.creaAstronavi({
+    esc, uid,
+    salva: () => salva(),
+    render: () => render(),
+    toast: (h, t) => toast(h, t),
+    nave,
+    personaggiDi: (cid) => { const v = S.astronavi.find((x) => x.campagnaId === cid && x._personaggi?.length); return v ? v._personaggi : personaggiDi(cid); },
+    sfCalcola: (p) => sf.calcola(p),
   });
 
   // Modulo D&D 5e (src/dnd.js)
@@ -1900,6 +1957,27 @@
       salva();
       if (location.hash === '#/campagne' || location.hash === '') render(); else location.hash = '#/campagne';
     },
+    'nv-nuova'(el) {
+      const c = campagna(el.dataset.campagna);
+      if (!c) return;
+      const v = nv.nuova(c.id, `Astronave ${S.astronavi.filter((x) => x.campagnaId === c.id).length + 1}`);
+      S.astronavi.push(v);
+      salva();
+      location.hash = `#/astronave/${v.id}`;
+    },
+    'nv-elimina'(el) {
+      const v = nave(el.dataset.id);
+      if (!v || !confirm(`Eliminare l'astronave "${v.nome}"?`)) return;
+      S.astronavi = S.astronavi.filter((x) => x !== v);
+      salva();
+      location.hash = v.campagnaId && campagna(v.campagnaId) ? `#/campagna/${v.campagnaId}/astronavi` : '#/';
+    },
+    'nv-esporta'(el) {
+      const v = nave(el.dataset.id);
+      if (!v) return;
+      esportaNave(v);
+      toast(`💾 File dell'astronave <b>${esc(v.nome)}</b> salvato: mandalo ai giocatori, che lo importano nel kit con «📥 Importa scheda»`);
+    },
     'elimina-personaggio'(el) {
       const p = personaggio(el.dataset.id);
       if (!p || !confirm(`Eliminare definitivamente "${p.nome}"? Il testo dei diari non viene toccato.`)) return;
@@ -1985,6 +2063,15 @@
       try {
         const d = await leggiFileScheda();
         if (!d) return;
+        // File di un'astronave mandato dal master: si guarda (con le prove dell'equipaggio)
+        if (d.formato === FORMATO_NAVE) {
+          const v = { ...d.nave, _personaggi: d.personaggi || [] };
+          S.astronavi = S.astronavi.filter((x) => x.id !== v.id).concat(v);
+          salva();
+          location.hash = `#/astronave/${v.id}`;
+          toast(`🚀 Astronave <b>${esc(v.nome)}</b> importata`);
+          return;
+        }
         const r = S.regolamenti.find((x) => x.id === d.regolamento?.id) || S.regolamenti.find((x) => x.scheda && x.scheda === d.regolamento?.scheda);
         if (!r) { toast(`Questa scheda usa il regolamento «${esc(d.regolamento?.nome || '?')}», che qui non c'è`, 'errore'); return; }
         const c = campagnaGiocatore(r.id);
@@ -2003,6 +2090,7 @@
       try {
         const d = await leggiFileScheda();
         if (!d) return;
+        if (d.formato === FORMATO_NAVE) { toast('Questo è il file di un\'astronave: le astronavi si creano nella scheda «Astronavi» della campagna', 'errore'); return; }
         const rc = regolamento(c.regolamentoId);
         if (rc && d.regolamento?.id !== rc.id && (d.regolamento?.scheda || '') !== (rc.scheda || '')
           && !confirm(`La scheda è fatta con «${d.regolamento?.nome}», ma la campagna usa «${rc.nome}». Importarla comunque?`)) return;
@@ -2587,6 +2675,7 @@
   Object.assign(azioni, pf1.azioni);
   Object.assign(moduli, pf1.moduli);
   Object.assign(azioni, sf.azioni);
+  Object.assign(azioni, nv.azioni);
   Object.assign(azioni, dnd.azioni);
   Object.assign(azioni, pf2.azioni);
   Object.assign(moduli, sf.moduli);
@@ -2645,6 +2734,7 @@
       salva();
       return;
     }
+    if (nv.input(el)) return;
     if (pf1.input(el)) return;
     if (sf.input(el)) return;
     if (dnd.input(el)) return;
@@ -2662,6 +2752,7 @@
   });
   document.addEventListener('change', (e) => {
     const el = e.target;
+    if (nv.change(el)) return;
     if (pf1.change(el)) return;
     if (sf.change(el)) return;
     if (dnd.change(el)) return;

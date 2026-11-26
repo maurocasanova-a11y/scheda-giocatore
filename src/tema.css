@@ -526,7 +526,7 @@
   body.tema-sf .ritratto-box, body.tema-sf .comb-nome .ritratto, body.tema-sf .sch-img, body.tema-sf .sch-img-grande { filter: drop-shadow(0 0 1.5px var(--oro)) drop-shadow(0 0 10px rgba(69, 214, 255, .45)); }
   body.tema-sf .car { border-radius: 0; clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%, 0 10px); background: linear-gradient(180deg, #0f2236, #07111c); box-shadow: inset 0 0 0 1px rgba(69, 214, 255, .25); padding-bottom: 14px; }
   body.tema-sf .car-mod { border-radius: 0; color: #02121c; }
-  body.tema-sf .pf-box { border-radius: 0; border-left: 2px solid var(--oro); }
+  body.tema-sf .pf-box { border-radius: 0; border-left: 2px solid var(--oro); background: linear-gradient(180deg, #0e1c2c, #07111c); }
   body.tema-sf .pf-valore, body.tema-sf .pf-tot, body.tema-sf .pf-max { text-shadow: 0 0 10px rgba(69, 214, 255, .5); }
   body.tema-sf .pf-sez > summary { background: linear-gradient(90deg, rgba(69, 214, 255, .14), rgba(69, 214, 255, .02) 55%, transparent); }
   body.tema-sf .pf-sez > summary h3::before { content: '▸'; font-size: 12px; }
