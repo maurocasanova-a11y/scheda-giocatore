@@ -405,12 +405,22 @@ window.creaSF = function creaSF(ctx) {
     // Attacchi: arma specializzata dal 3° livello (+livello ai danni, +½ livello con le armi piccole)
     const colpire = cumula(per('colpire'));
     const danniB = cumula(per('danni'));
+    // Proprietà dell'arma (dal wiki, salvate con l'arma o nel campo critico/speciale):
+    // Operativo → in mischia si può usare DES invece di FOR per colpire (si prende la migliore) e la specializzazione
+    // vale ½ livello; Lancio → attacco a distanza con DES, ma ai danni si aggiunge la FOR.
     const armi = d.armi.map((a) => {
       const mischia = a.tipo === 'mischia';
-      const colpo = bab + (mischia ? m.FOR : m.DES) + n(a.bonus) + colpire;
-      const spec = a.specializzata !== false && liv >= 3 ? (a.categoria === 'piccola' ? Math.floor(liv / 2) : a.categoria === 'granata' ? 0 : liv) : 0;
-      const bonusDanni = (mischia ? m.FOR : 0) + spec + n(a.bonusDanni) + danniB;
-      return { id: a.id, colpo, danni: `${a.danni || '1d4'}${bonusDanni ? (bonusDanni > 0 ? '+' : '') + bonusDanni : ''}`, spec };
+      const props = `${a.proprieta || ''} ${a.critico || ''}`;
+      const operativa = /\boperativ[oa]\b/i.test(props);
+      const lancio = !mischia && /\blancio\b/i.test(props);
+      const carColpo = mischia ? (operativa && m.DES > m.FOR ? 'DES' : 'FOR') : 'DES';
+      const colpo = bab + m[carColpo] + n(a.bonus) + colpire;
+      const mezzo = a.categoria === 'piccola' || (mischia && operativa);
+      const spec = a.specializzata !== false && liv >= 3 ? (mezzo ? Math.floor(liv / 2) : a.categoria === 'granata' ? 0 : liv) : 0;
+      const forDanni = mischia || lancio;
+      const bonusDanni = (forDanni ? m.FOR : 0) + spec + n(a.bonusDanni) + danniB;
+      const nota = [operativa && mischia ? `${carColpo} per colpire (operativa)` : '', lancio ? 'DES per colpire, FOR ai danni (lancio)' : ''].filter(Boolean).join(' · ');
+      return { id: a.id, colpo, danni: `${a.danni || '1d4'}${bonusDanni ? (bonusDanni > 0 ? '+' : '') + bonusDanni : ''}`, spec, nota };
     });
     // Incantesimi al giorno (solo tabelle delle classi incantatrici): base dalla tabella + bonus della caratteristica
     const incantesimi = d.classi.filter((cl) => CLASSI_INC[nomeClasse(cl.nome)]).map((cl) => {
@@ -565,13 +575,13 @@ window.creaSF = function creaSF(ctx) {
         <label title="Volume: un numero, L (leggero) o vuoto se trascurabile">Volume ${campo(`armi#${a.id}|volume`, a.volume, 'class="pf-corto" placeholder="L" data-ridisegna-sf')}</label>
         ${togli('armi', a.id)}</div>
         <div class="pf-arma-tiri"><span>Colpire <b>${k(`arma:${a.id}:colpo`)}</b> ${dado('colpo:' + a.id, 'attacco')}</span><span>Danni <b>${k(`arma:${a.id}:danni`)}</b> ${dado('danni:' + a.id, 'danni')}</span>
-          <label>Munizioni ${num(`armi#${a.id}|munizioni`, a.munizioni, 'class="pf-corto"')}</label></div></div>`;
+          <label>Munizioni ${num(`armi#${a.id}|munizioni`, a.munizioni, 'class="pf-corto"')}</label>${ca?.nota ? `<small class="muto">${esc(ca.nota)}</small>` : ''}</div></div>`;
     }).join('');
     const gruppiArmi = new Map();
     for (const a of C.armi) { const g = `${a[12] || 'Altro'} · ${a[1] || '—'}`; if (!gruppiArmi.has(g)) gruppiArmi.set(g, []); gruppiArmi.get(g).push(a); }
     const sceltaArmi = C.armi.length ? `<span class="pf-dal-wiki">dal wiki: <select id="sf-scelta-arma-${id}"><option value="">— scegli —</option>${[...gruppiArmi].map(([g, l]) => `<optgroup label="${esc(g)}">${l.map((a) => `<option value="${esc(a[0])}">${esc(a[0])} (liv. ${esc(a[2])})</option>`).join('')}</optgroup>`).join('')}</select>
       <button class="btn-piccolo" data-azione="sf-arma-wiki" data-id="${id}">Aggiungi</button></span>` : '';
-    const corpoAttacchi = `${armi || '<p class="muto">Nessuna arma.</p>'}<div class="pf-piede">${aggiungi('armi', 'Arma')}${sceltaArmi}<span class="muto">Mischia: BAB + FOR (e FOR ai danni); distanza: BAB + DES. Dal 3° livello si aggiunge la specializzazione ai danni.</span></div>`;
+    const corpoAttacchi = `${armi || '<p class="muto">Nessuna arma.</p>'}<div class="pf-piede">${aggiungi('armi', 'Arma')}${sceltaArmi}<span class="muto">Mischia: BAB + FOR (e FOR ai danni; con le armi operative si usa la DES se è migliore); distanza: BAB + DES (le armi da lancio aggiungono la FOR ai danni). Dal 3° livello si aggiunge la specializzazione ai danni (½ livello con le armi piccole e le armi operative da mischia).</span></div>`;
 
     // Abilità
     const righeAbil = D.abilita.map(([nome, car, senza]) => {
@@ -1171,7 +1181,7 @@ window.creaSF = function creaSF(ctx) {
       if (!a) { ctx.toast('Scegli prima un\'arma', 'errore'); return; }
       const [nome, , livello, , danni, gittata, critico, capacita, , volume, speciale, , tip] = a;
       const [categoria, tipo] = TIPOLOGIA[tip] || ['speciale', 'distanza'];
-      dati(p).armi.push({ ...NUOVI.armi(), nome, categoria, tipo, danni: danni === '-' ? '' : danni, critico: [critico, gittata && gittata !== '-' ? `gittata ${gittata}` : '', speciale].filter((x) => x && x !== '-').join(' · '), munizioni: capacita && capacita !== '-' ? capacita : '', volume: volumeWiki(volume) });
+      dati(p).armi.push({ ...NUOVI.armi(), nome, categoria, tipo, danni: danni === '-' ? '' : danni, critico: [critico, gittata && gittata !== '-' ? `gittata ${gittata}` : '', speciale].filter((x) => x && x !== '-').join(' · '), munizioni: capacita && capacita !== '-' ? capacita : '', volume: volumeWiki(volume), proprieta: speciale && speciale !== '-' ? speciale : '' });
       ctx.salva(); ctx.render();
       ctx.toast(`⚔ <b>${esc(nome)}</b> (livello ${esc(livello)}) aggiunta agli attacchi${avvisoLivello(p, livello)}`);
     },
