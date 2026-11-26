@@ -132,11 +132,20 @@ window.creaDND = function creaDND(ctx) {
   const CATALOGO_DND = window.DND_EQUIP?.catalogo || [];
   const GRUPPI_DND = [...new Set(CATALOGO_DND.map((x) => x[0]))];
   const INCANTESIMI = C.incantesimi.map(([nome, livello, scuola, tempo, gittata, componenti, durata, conc, rituale, classi, wiki]) => ({ nome, livello, scuola, tempo, gittata, componenti, durata, conc, rituale, classi: classi.split(','), wiki: wiki === undefined ? nome : wiki }));
-  // Pulsante "i": pagina del wiki se c'è, altrimenti solo i dati dell'incantesimo (dal manuale)
+  // Incantesimi senza pagina sul wiki Fandom ma con la descrizione su Dungeon e Draghi (dungeonedraghi.it, regole libere SRD):
+  // indirizzo della pagina, con il nome SRD dove è diverso da quello del Manuale. Controllato sull'elenco completo del sito (307 incantesimi).
+  const DUNGEONEDRAGHI = 'https://dungeonedraghi.it/compendio/incantesimi/';
+  const PAGINE_DD = {
+    Allarme: 'allarme', Simbolo: 'simbolo',
+    'Aura Magica di Nystul': 'aura-magica-dellarcanista', 'Capanna di Leomund': 'capanna', 'Mano di Bigby': 'mano-arcana', 'Spada di Mordenkainen': 'spada-arcana',
+  };
+  // Pulsante "i": pagina del wiki se c'è, poi Dungeon e Draghi, altrimenti solo i dati dell'incantesimo (dal manuale)
   const infoInc = (v, nome) => {
     const dati = v ? [v.scuola, v.tempo && `tempo: ${v.tempo}`, v.gittata && `gittata: ${v.gittata}`, v.componenti && `componenti: ${v.componenti}`, v.durata && `durata: ${v.durata}`].filter(Boolean).join(' · ') : '';
+    const dd = v && !v.wiki && PAGINE_DD[v.nome];
     return v?.wiki ? `<a class="btn-mini" href="${esc(WIKI + v.wiki.replace(/ /g, '_'))}" target="_blank" rel="noopener" title="${esc(dati ? dati + ' — ' : '')}Descrizione sul wiki">i</a>`
-      : `<span class="btn-mini dnd-info-inc" title="${esc(dati || nome)} (descrizione sul Manuale del Giocatore)">i</span>`;
+      : dd ? `<a class="btn-mini" href="${esc(DUNGEONEDRAGHI + dd + '/')}" target="_blank" rel="noopener" title="${esc(dati ? dati + ' — ' : '')}Descrizione su Dungeon e Draghi">i</a>`
+        : `<span class="btn-mini dnd-info-inc" title="${esc(dati || nome)} (descrizione sul Manuale del Giocatore)">i</span>`;
   };
   const incantesimoDi = (nome) => INCANTESIMI.find((x) => norm(x.nome) === norm(nome || '')) || null;
   // Lista di incantesimi usata da una classe (Cavaliere Mistico e Mistificatore Arcano usano quella del mago)
