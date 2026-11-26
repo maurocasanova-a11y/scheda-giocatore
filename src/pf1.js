@@ -161,7 +161,7 @@ window.creaPF1 = function creaPF1(ctx) {
   const PF_MITICI = { Arcimago: 3, Campione: 5, Gerofante: 4, Maresciallo: 4, Mistificatore: 4, Protettore: 5 };
   const PERCORSI_VECCHI = { Guardiano: 'Protettore', Ierofante: 'Gerofante' };
   const PERCORSI = Object.keys(PF_MITICI);
-  const TIPI_CAPACITA = ['Talento', 'Tratto', 'Capacità di classe', 'Capacità razziale', 'Capacità mitica', 'Altro'];
+  const TIPI_CAPACITA = ['Talento', 'Scoperta arcana', 'Tratto', 'Capacità di classe', 'Capacità razziale', 'Capacità mitica', 'Altro'];
   const CONDIZIONI = ['Abbagliato', 'Accecato', 'Accovacciato', 'Affascinato', 'Affaticato', 'Assordato', 'Barcollante', 'Confuso', 'Esausto', 'Frastornato', 'Immobilizzato', 'Impreparato', 'In Lotta', 'In Preda al Panico', 'Inabile', 'Incorporeo', 'Indifeso', 'Infermo', 'Intralciato', 'Invisibile', 'Livelli Negativi', 'Morente', 'Nauseato', 'Paralizzato', 'Pietrificato', 'Privo di Sensi', 'Prono', 'Sanguinante', 'Scosso', 'Spaventato', 'Stabilizzato', 'Stordito'];
   // Effetti in breve delle condizioni (dalle pagine del wiki Golarion Insider, Condizioni); il testo completo si legge dal wiki
   const EFFETTI_CONDIZIONI = {
@@ -4123,6 +4123,51 @@ window.creaPF1 = function creaPF1(ctx) {
     ov.addEventListener('input', (e) => { const el = e.target.closest('[data-ia="nome"]'); if (el && incAgg) incAgg.scelte[Number(el.dataset.i)].nome = el.value; });
   }
 
+  // ---- Scoperte Arcane del Mago (src/pf1-scoperte-arcane.js): si prendono al posto di un talento (normale o bonus) ----
+  // [nome, tipo, livello minimo da mago, talenti richiesti, più volte]
+  const SCOPERTE_ARCANE = window.PF1_SCOPERTE_ARCANE || [];
+  const scopertaArcana = (nome) => SCOPERTE_ARCANE.find((x) => norm(x[0]) === norm(nome)) || null;
+  const scopertePrese = (d, nome) => d.capacita.filter((x) => norm(x.scoperta || '') === norm(nome)).length;
+  // Opzioni del sottomenu: disponibili (livello e talenti soddisfatti) e non ancora disponibili (disattivate, con il motivo)
+  function opzioniScoperteArcane(d) {
+    const mago = livelloClasse(d, 'Mago');
+    if (!mago || !SCOPERTE_ARCANE.length) return '';
+    const voci = SCOPERTE_ARCANE.filter(([nome, , , , piu]) => piu || !scopertePrese(d, nome)).map(([nome, tipo, liv, talenti]) => {
+      const manca = [mago < liv ? `mago di ${liv}° livello` : '', ...talenti.filter((t) => !haTalento(d, t))].filter(Boolean);
+      return `<option value="SA:${esc(nome)}"${manca.length ? ` disabled title="Serve: ${esc(manca.join(', '))}"` : ''}>${esc(nome)}${tipo ? ` (${tipo})` : ''} · mago ${liv}°${manca.length ? ` — serve ${esc(manca.join(', '))}` : ''}</option>`;
+    });
+    return voci.length ? `<optgroup label="Scoperte arcane del mago (al posto di un talento)">${voci.join('')}</optgroup>` : '';
+  }
+  function prendiScopertaArcana(p, nome) {
+    const s = scopertaArcana(nome);
+    if (!s) return;
+    const d = dati(p);
+    const [base, tipo, liv, talenti, piu] = s;
+    const mago = livelloClasse(d, 'Mago');
+    const manca = [mago < liv ? `mago di ${liv}° livello` : '', ...talenti.filter((t) => !haTalento(d, t))].filter(Boolean);
+    if (manca.length) { ctx.toast(`Non puoi prendere <b>${esc(base)}</b>: serve ${esc(manca.join(', '))}`, 'errore'); return; }
+    const gia = scopertePrese(d, base);
+    if (gia && !piu) { ctx.toast(`<b>${esc(base)}</b> c'è già`, 'errore'); return; }
+    d.capacita.push({ id: uid(), nome: `${base}${tipo ? ` (${tipo})` : ''}${gia ? ` ${gia + 1}` : ''}`, tipo: 'Scoperta arcana', scoperta: base, descrizione: '' });
+    ctx.salva();
+    ctx.render();
+    ctx.toast(`🔮 Scoperta arcana <b>${esc(base)}</b> aggiunta al posto di un talento${piu ? ' · si può prendere più volte, ogni volta su una scelta diversa (scrivila nella descrizione)' : ''}`);
+  }
+  // Descrizione dal wiki: la sezione della scoperta nella pagina Mago/Scoperte_Arcane
+  const estraiScoperta = (nome) => (doc) => {
+    const titoli = [...doc.querySelectorAll('#mw-content-text h3')];
+    const h = titoli.find((x) => norm(x.textContent).startsWith(norm(nome)));
+    if (!h) return '';
+    const parti = [];
+    for (let el = h.nextElementSibling; el && !/^H[23]$/.test(el.tagName); el = el.nextElementSibling) { const t = el.textContent.replace(/\s+/g, ' ').trim(); if (t) parti.push(t); }
+    return parti.join('\n\n');
+  };
+  function infoScopertaArcana(nome) {
+    const s = scopertaArcana(nome);
+    if (!s) return;
+    apriInfo(s[0], `<div class="info-fatti">${fatto('Tipo', 'Scoperta arcana del mago, al posto di un talento')}${fatto('Prerequisiti', [`mago di ${s[2]}° livello`, ...s[3]].join(', '))}${fatto('Più volte', s[4] ? 'sì, su scelte diverse' : '')}${fatto('Manuale', 'Guida del Giocatore Avanzata')}</div>`,
+      'Mago/Scoperte_Arcane', estraiScoperta(s[0]));
+  }
   function sceltaTalentoHtml(p, idSel, soloTipo = '') {
     const d = dati(p);
     const c = calcola(p, ctx.regDi(p));
@@ -4137,7 +4182,7 @@ window.creaPF1 = function creaPF1(ctx) {
     }
     const opzioni = (l) => l.map((t) => `<option value="${esc(t.nome)}">${esc(t.nome)}${t.tipi.length ? ` (${esc(t.tipi.join(', '))})` : ''}</option>`).join('');
     return `<span class="tal-scelta"><select id="${idSel}"><option value="">— scegli tra ${ok.length + forse.length} talenti acquisibili —</option>
-      ${ok.length ? `<optgroup label="Prerequisiti soddisfatti">${opzioni(ok)}</optgroup>` : ''}${forse.length ? `<optgroup label="Prerequisiti da verificare a mano">${opzioni(forse)}</optgroup>` : ''}</select>
+      ${ok.length ? `<optgroup label="Prerequisiti soddisfatti">${opzioni(ok)}</optgroup>` : ''}${forse.length ? `<optgroup label="Prerequisiti da verificare a mano">${opzioni(forse)}</optgroup>` : ''}${soloTipo ? '' : opzioniScoperteArcane(d)}</select>
       <button class="btn-mini" data-azione="pf1-talento-scelto" data-id="${p.id}" data-sel="${idSel}" title="Descrizione dal wiki" data-solo-info="1">i</button>
       <button class="btn-piccolo" data-azione="pf1-talento-scelto" data-id="${p.id}" data-sel="${idSel}">+ Prendi</button></span>`;
   }
@@ -4654,6 +4699,9 @@ window.creaPF1 = function creaPF1(ctx) {
           nota = `<button class="btn-mini" data-azione="pf1-info-talento" data-nome="${esc(t.nome)}" title="Descrizione dal wiki">i</button>
             ${s.stato === 'no' ? `<span class="oltre" title="Prerequisiti non soddisfatti: ${esc(manca)}">⚠ manca ${esc(manca)}</span>` : ''}`;
         }
+        // Scoperta arcana del mago: descrizione dal wiki
+        const sa = tipo === 'Scoperta arcana' && scopertaArcana(x.scoperta || x.nome.replace(/\s*\((Str|Sop|Mag)\).*$|\s+\d+$/, ''));
+        if (sa) nota = `<button class="btn-mini" data-azione="pf1-info-scoperta-arcana" data-nome="${esc(sa[0])}" title="Descrizione dal wiki">i</button>`;
         return `<div class="pf-cap">
           <div class="pf-riga">
             <input class="pf-largo" data-pf1="capacita#${x.id}|nome" data-id="${id}" value="${esc(x.nome)}">
@@ -6395,9 +6443,15 @@ window.creaPF1 = function creaPF1(ctx) {
       if (prendiTalentoConScelta(p, t, abil)) document.getElementById('st-overlay')?.remove();
     },
     'pf1-scelta-talento-annulla'() { document.getElementById('st-overlay')?.remove(); },
+    'pf1-info-scoperta-arcana'(el) { infoScopertaArcana(el.dataset.nome); },
     'pf1-talento-scelto'(el) {
       const nome = document.getElementById(el.dataset.sel)?.value;
       if (!nome) { ctx.toast('Scegli prima un talento dal menu', 'errore'); return; }
+      // Scoperta arcana del mago (sottomenu dei talenti)
+      if (nome.startsWith('SA:')) {
+        if (el.dataset.soloInfo) infoScopertaArcana(nome.slice(3)); else prendiScopertaArcana(ctx.personaggio(el.dataset.id), nome.slice(3));
+        return;
+      }
       if (el.dataset.soloInfo) azioni['pf1-info-talento']({ dataset: { nome } });
       else azioni['pf1-prendi-talento']({ dataset: { id: el.dataset.id, nome } });
     },
