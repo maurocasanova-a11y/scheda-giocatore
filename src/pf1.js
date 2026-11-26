@@ -2821,8 +2821,9 @@ window.creaPF1 = function creaPF1(ctx) {
       // Sette incantesimi di Divinazione diversi, uno almeno di 3° livello
       'Incantesimi': (p, d) => {
         const div = new Map();
+        // Contano gli incantesimi preparati/conosciuti e quelli scritti nel libro (mago), nel formulario o nel famiglio
         for (const inc of d.incantatori) {
-          for (const s of inc.incantesimi || []) {
+          for (const s of [...(inc.incantesimi || []), ...(inc.libro || [])]) {
             const v = incantesimoDi(s.nome);
             if (v && norm(v.base) === 'divinazione') div.set(norm(v.nome), Math.max(div.get(norm(v.nome)) ?? 0, n(s.livello)));
           }
@@ -8187,6 +8188,7 @@ window.creaPF1 = function creaPF1(ctx) {
     iniziativa: (p) => calcola(p, ctx.regDi(p)).init,
     // Calcoli completi della scheda (usati dalle prove in prove/)
     calcola: (p) => calcola(p, ctx.regDi(p)),
+    requisitiPrestigio: (nome, p) => requisitiPrestigio(nome, p, dati(p), calcola(p, ctx.regDi(p))),
     vistaScheda,
     vistaTavolo,
     vistaIncontro,
