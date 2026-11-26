@@ -1428,7 +1428,7 @@
     const c = campagna(v.campagnaId);
     return `<div class="briciole">${c ? `<a href="#/campagne">Campagne</a> › <a href="#/campagna/${c.id}/astronavi">${esc(c.nome)}</a>` : '<a href="#/">Le mie schede</a>'}</div>
       <header class="intest"><h1>🚀 ${esc(v.nome)}</h1>
-        <div class="intest-sotto">Astronave · Starfinder${GIOCATORE ? ' · copia mandata dal master (si aggiorna importando un file nuovo)' : ''}</div>
+        <div class="intest-sotto">Astronave · Starfinder${GIOCATORE ? (v.dalVivo ? ' · 📡 dal vivo: si aggiorna da sola durante la sessione' : ' · copia mandata dal master (si aggiorna con un file nuovo o collegandosi alla sessione dal vivo)') : ''}</div>
         <div class="barra-azioni">${GIOCATORE ? '' : `<button data-azione="nv-esporta" data-id="${v.id}" title="Salva il file dell'astronave da mandare ai giocatori">💾 File per i giocatori</button>
           <button class="btn-cestino" data-azione="nv-elimina" data-id="${v.id}" title="Elimina l'astronave">🗑</button>`}</div></header>
       ${nv.vista(v, { personaggi: equipaggioDi(v), sola: GIOCATORE })}`;
@@ -1437,6 +1437,7 @@
   function esportaNave(v) {
     const copia = JSON.parse(JSON.stringify(v));
     delete copia._personaggi;
+    delete copia.dalVivo;
     // Con l'astronave viaggiano le schede dell'equipaggio, così il kit mostra le loro prove
     const ids = new Set(Object.values(v.equipaggio || {}).flat().filter(Boolean));
     const pers = personaggiDi(v.campagnaId).filter((p) => ids.has(p.id)).map((p) => { const x = JSON.parse(JSON.stringify(p)); delete x.campagnaId; return x; });
@@ -2369,12 +2370,37 @@
   try { Object.assign(dvG, JSON.parse(localStorage.getItem(CHIAVE_DV_GIOCATORE) || '{}')); } catch { /* niente */ }
   const dvGRicorda = () => { try { localStorage.setItem(CHIAVE_DV_GIOCATORE, JSON.stringify({ codice: dvG.codice, pgId: dvG.pgId, ultimoComando: dvG.ultimoComando })); } catch { /* niente */ } };
   // Ascolta le correzioni del master (danni, cure, condizioni, modifiche alla scheda) e lo stato dello scontro (turno, condizioni)
+  // Astronavi mandate dal master nella sessione: si aggiungono o si aggiornano (segnate «dalVivo»)
+  function dvGRiceviNavi(copia) {
+    const arrivate = Object.values(copia || {}).map((x) => { try { return JSON.parse(x.testo); } catch { return null; } }).filter((x) => x?.nave?.id);
+    let cambiate = false;
+    for (const { nave: v, personaggi } of arrivate) {
+      const prima = S.astronavi.find((x) => x.id === v.id);
+      const nuova = { ...v, _personaggi: personaggi || [], dalVivo: true };
+      if (prima && JSON.stringify(prima) === JSON.stringify(nuova)) continue;
+      cambiate = true;
+      if (prima?.dalVivo && Number(prima.combattimento?.danni || 0) !== Number(v.combattimento?.danni || 0)) {
+        const k = nv.calcola(nuova, nuova._personaggi);
+        toast(`🚀 <b>${esc(v.nome)}</b>: Punti Scafo ${k.psMax - Number(prima.combattimento?.danni || 0)} → <b>${k.psMax - Number(v.combattimento?.danni || 0)}</b>`);
+      }
+      if (prima) { for (const k of Object.keys(prima)) delete prima[k]; Object.assign(prima, nuova); } else S.astronavi.push(nuova);
+    }
+    // Quelle tolte dal master spariscono (solo quelle arrivate dal vivo). Se manca tutto il ramo (sessione chiusa)
+    // il giocatore tiene l'ultima versione ricevuta.
+    const ids = new Set(arrivate.map((x) => x.nave.id));
+    const prima = S.astronavi.length;
+    if (copia) S.astronavi = S.astronavi.filter((x) => !x.dalVivo || ids.has(x.id));
+    if (cambiate || S.astronavi.length !== prima) { salva(); dvRidisegna(); }
+  }
   async function dvGAscolta() {
     dvG.stop?.();
     dvG.stop = null;
+    dvG.stopNavi?.();
+    dvG.stopNavi = null;
     if (!dvG.codice || !dvAttivo()) return;
     const io = await DV.mioUid();
     const codice = dvG.codice;
+    dvG.stopNavi = DV.ascolta(`sessioni/${codice}/astronavi`, (copia) => { if (dvG.codice === codice) dvGRiceviNavi(copia); }, () => {});
     dvG.stop = DV.ascolta(`sessioni/${codice}/perGiocatore/${io}`, (copia) => {
       if (dvG.codice !== codice) return;
       const comandi = Object.entries(copia?.comandi || {}).sort(([a], [b]) => (a < b ? -1 : 1));
@@ -2412,6 +2438,10 @@
   };
   function dvGScollega(messaggio) {
     dvG.stop?.();
+    dvG.stopNavi?.();
+    dvG.stopNavi = null;
+    // Le astronavi ricevute restano com'erano, ma non si aggiornano più
+    for (const v of S.astronavi) if (v.dalVivo) v.dalVivo = false;
     dvG.codice = ''; dvG.pgId = ''; dvG.ultimo = ''; dvG.stato = ''; dvG.ultimoComando = null; dvG.statoMaster = null; dvG.stop = null;
     clearTimeout(dvG.timer);
     dvGRicorda();
@@ -2485,7 +2515,7 @@
   // ---------- Master: sessione aperta dal tracker ----------
   // base[pgId]: la scheda come la conosce il giocatore; inAttesa[pgId]: correzioni mandate e non ancora confermate;
   // statoInviato[uid]: l'ultimo stato dello scontro mandato a quel giocatore
-  const dvM = { codice: '', campagnaId: '', stop: null, giocatori: {}, visti: {}, eventiVisti: new Set(), errore: '', base: {}, inAttesa: {}, statoInviato: {}, timer: null };
+  const dvM = { codice: '', campagnaId: '', stop: null, giocatori: {}, visti: {}, eventiVisti: new Set(), errore: '', base: {}, inAttesa: {}, statoInviato: {}, naviInviate: {}, timer: null };
   // Campi della scheda che restano del master (non viaggiano verso il giocatore)
   const CAMPI_DEL_MASTER = ['id', 'campagnaId', 'tipo', 'importato', 'documenti', 'idGiocatore'];
   const schedaPerGiocatore = (p) => { const x = JSON.parse(JSON.stringify(p)); for (const k of CAMPI_DEL_MASTER) delete x[k]; return x; };
@@ -2495,10 +2525,31 @@
     clearTimeout(dvM.timer);
     dvM.timer = setTimeout(dvMInvia, 500);
   }
+  // Astronavi della campagna nella sessione dal vivo: sessioni/<codice>/astronavi/<id> = { testo: JSON di nave + equipaggio }
+  function dvMInviaNavi(c, codice) {
+    const navi = S.astronavi.filter((x) => x.campagnaId === c.id);
+    for (const v of navi) {
+      const copia = JSON.parse(JSON.stringify(v));
+      delete copia._personaggi;
+      const ids = new Set(Object.values(v.equipaggio || {}).flat().filter(Boolean));
+      const pers = personaggiDi(c.id).filter((p) => ids.has(p.id)).map((p) => { const x = JSON.parse(JSON.stringify(p)); delete x.campagnaId; return x; });
+      const testo = JSON.stringify({ nave: copia, personaggi: pers });
+      if (dvM.naviInviate[v.id] === testo) continue;
+      dvM.naviInviate[v.id] = testo;
+      DV.scrivi(`sessioni/${codice}/astronavi/${v.id}`, { testo, t: DV.ORA }).catch((e) => { delete dvM.naviInviate[v.id]; dvM.errore = `astronave non inviata: ${e.message}`; });
+    }
+    // Astronavi eliminate: spariscono anche dai giocatori
+    for (const id of Object.keys(dvM.naviInviate)) {
+      if (navi.some((v) => v.id === id)) continue;
+      delete dvM.naviInviate[id];
+      DV.cancella(`sessioni/${codice}/astronavi/${id}`).catch(() => {});
+    }
+  }
   function dvMInvia() {
     const c = campagna(dvM.campagnaId);
     if (!c || !dvM.codice) return;
     const codice = dvM.codice;
+    dvMInviaNavi(c, codice);
     const inc = c.incontro;
     const attivo = inc?.fase ? inc.combattenti.find((x) => x.id === inc.attivo) : null;
     for (const [u, g] of Object.entries(dvM.giocatori)) {
@@ -2547,6 +2598,7 @@
       c.dalVivo = { codice, aperta: Date.now() };
       salva();
       dvMAscolta(c);
+      dvMProgramma(); // le astronavi della campagna partono subito verso i giocatori
       toast(`📡 Sessione dal vivo aperta: codice <b>${esc(codice)}</b>`);
     } catch (e) { toast(`Sessione non aperta: ${esc(e.message)}`, 'errore'); }
     render();
@@ -2566,7 +2618,7 @@
     const codice = dvM.codice;
     dvM.stop?.();
     clearTimeout(dvM.timer);
-    Object.assign(dvM, { codice: '', campagnaId: '', stop: null, giocatori: {}, base: {}, inAttesa: {}, statoInviato: {} });
+    Object.assign(dvM, { codice: '', campagnaId: '', stop: null, giocatori: {}, base: {}, inAttesa: {}, statoInviato: {}, naviInviate: {} });
     if (c) { delete c.dalVivo; salva(); }
     try { if (codice) await DV.cancella(`sessioni/${codice}`); } catch { /* già chiusa */ }
     if (avvisa) toast(`📡 Sessione dal vivo <b>${esc(codice)}</b> chiusa: i giocatori non sono più collegati`);
