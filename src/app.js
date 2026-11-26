@@ -1748,6 +1748,10 @@
     nave,
     navi: (cid) => S.astronavi.filter((x) => x.campagnaId === cid),
     calcolaNave: (v) => nv.calcola(v, equipaggioDi(v)),
+    prova: (v, ruolo) => nv.prova(v, ruolo),
+    colpisci: (v, danno, q, venti) => nv.colpisci(v, danno, q, venti),
+    tiraDanni: (e) => nv.tiraDanni(e),
+    numCategoria: (c) => nv.numCategoria(c),
   });
 
   // Modulo D&D 5e (src/dnd.js)

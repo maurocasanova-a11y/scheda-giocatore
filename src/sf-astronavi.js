@@ -26,6 +26,7 @@ window.creaAstronavi = function creaAstronavi(ctx) {
     quartieri: '', sensori: '', scudi: '', paratie: '', scafo: '', comparti: [], sicurezza: [], altri: [], supporti: [], scudiQuad: {},
     equipaggio: { capitano: '', pilota: '', ingegneri: [], artiglieri: [], scientifici: [], magici: [], primi: [] },
     combattimento: { danni: 0, temp: null, scudi: null, critici: {} }, note: '',
+    png: { attivo: false, superiore: 'pilota' }, // equipaggio PNG standard (navi del master)
   });
   const normalizza = (v) => {
     const base = nuova(v.campagnaId, v.nome);
@@ -109,7 +110,8 @@ window.creaAstronavi = function creaAstronavi(ctx) {
     const virataArm = pen(arm?.[3], /\+(\d+)\s*distanza di virata/);
     const deflettore = String(sel.scudi?.[4] || '');
     const pilota = membro(v.equipaggio.pilota, personaggi);
-    const gradiPilota = pilota ? pilota.gradi('Pilotare') : 0;
+    const pngAttivo = !!v.png?.attivo;
+    const gradiPilota = pilota ? pilota.gradi('Pilotare') : pngAttivo ? Math.max(1, Math.floor(numCategoria(v.categoria))) : 0;
     const mt = t?.[3] || 0;
     const ca = 10 + (arm?.[1] || 0) + mt + gradiPilota + pen(deflettore, /\+(\d+)\s*CA/);
     const ab = 10 + (sel.difese?.[1] || 0) + mt + gradiPilota + penAB + pen(deflettore, /\+(\d+)\s*AB/);
@@ -175,6 +177,17 @@ window.creaAstronavi = function creaAstronavi(ctx) {
     for (const id of v.equipaggio.scientifici) aggiungi('scientifici', id, (m) => [['Computer', conPen(m.tot('Computer') + (c.sensori?.[2] || 0), mods('sensori'))]]);
     for (const id of v.equipaggio.magici) aggiungi('magici', id, (m) => [['Misticismo', conPen(m.tot('Misticismo'), penNucleo)]]);
     for (const id of v.equipaggio.primi) aggiungi('primi', id, (m) => ['Acrobazia', 'Atletica'].map((a) => [a, conPen(m.tot(a), penNucleo)]));
+    // Equipaggio PNG standard (Costruire le Astronavi): artiglieria, abilità buona e una abilità superiore dalla categoria
+    if (v.png?.attivo) {
+      const t = (A.equipaggioPng || []).find((r) => r[0] === v.categoria) || (A.equipaggioPng || []).find((r) => r[0] === '1') || ['1', 5, 5, 10];
+      const abil = (ruolo) => (v.png.superiore === ruolo ? t[3] : t[2]);
+      const png = (ruolo, prove) => { if (!out.some((x) => x.ruolo === ruolo)) out.push({ ruolo, id: 'png-' + ruolo, nome: 'Equipaggio PNG', png: true, prove }); };
+      png('capitano', ['Diplomazia', 'Intimidire', 'Raggirare'].map((a) => [a, conPen(abil('capitano'), mods('supporto'))]));
+      png('pilota', [['Pilotare', conPen(abil('pilota') + c.pilotareNave, mods('motori'))]]);
+      png('ingegneri', [['Ingegneria', conPen(abil('ingegneri'), mods('nucleo', true))]]);
+      png('artiglieri', [['Artiglieria', conPen(t[1], mods('armi'))]]);
+      png('scientifici', [['Computer', conPen(abil('scientifici') + (c.sensori?.[2] || 0), mods('sensori'))]]);
+    }
     return out;
   }
 
@@ -223,7 +236,7 @@ window.creaAstronavi = function creaAstronavi(ctx) {
       const scelti = molti ? v.equipaggio[k] : v.equipaggio[k] ? [v.equipaggio[k]] : [];
       const prove = c.equipaggio.filter((x) => x.ruolo === k);
       return `<div class="nv-ruolo"><b>${esc(et)}</b>
-        ${prove.map((x) => `<span class="chip">${esc(x.nome)}: ${x.prove.map(([a, b]) => `${esc(a)} <b>${b === null ? 'fallisce' : segno(b)}</b>`).join(', ')}${sola ? '' : ` <button class="chip-x" data-azione="nv-togli-ruolo" data-id="${id}" data-ruolo="${k}" data-pg="${x.id}" title="Togli dal ruolo">×</button>`}</span>`).join(' ')}
+        ${prove.map((x) => `<span class="chip">${esc(x.nome)}: ${x.prove.map(([a, b]) => `${esc(a)} <b>${b === null ? 'fallisce' : segno(b)}</b>`).join(', ')}${sola || x.png ? '' : ` <button class="chip-x" data-azione="nv-togli-ruolo" data-id="${id}" data-ruolo="${k}" data-pg="${x.id}" title="Togli dal ruolo">×</button>`}</span>`).join(' ')}
         ${scelti.filter((pid) => !prove.some((x) => x.id === pid)).map((pid) => `<span class="chip muto">${esc(nome(pid))}</span>`).join(' ')}
         ${sola || (!molti && scelti.length) ? '' : `<select data-nv-ruolo="${k}" data-id="${id}"><option value="">+ assegna…</option>${opz(pgs.filter((p) => !scelti.includes(p.id)).map((p) => [p.id, p.nome]), '')}</select>`}</div>`;
     }).join('');
@@ -280,7 +293,7 @@ window.creaAstronavi = function creaAstronavi(ctx) {
       </div>
       ${c.s ? `<p class="muto pf-aiuto">${esc(c.s.taglia)}${c.t ? ` (${esc(c.t[4])}, CA e AB ${segno(c.t[3])})` : ''} · equipaggio ${c.s.eqMin}–${c.s.eqMax} · comparti adattabili ${c.s.comparti} · fonte: ${esc(c.s.fonte)}</p>` : ''}
       <details class="pannello pf-sez" open><summary><h3>Combattimento</h3></summary>${combattimento}</details>
-      <details class="pannello pf-sez" open><summary><h3>Equipaggio</h3></summary><div class="nv-ruoli">${ruoli}</div>
+      <details class="pannello pf-sez" open><summary><h3>Equipaggio</h3></summary>${sola ? '' : `<div class="pf-riga"><label class="pf-chk"><input type="checkbox" data-nv="png|attivo" data-id="${id}" data-bool data-ridisegna ${v.png?.attivo ? 'checked' : ''}> Equipaggio PNG standard</label>${v.png?.attivo ? `<label>abilità superiore del <select data-nv="png|superiore" data-id="${id}" data-ridisegna>${opz([['pilota', 'pilota'], ['capitano', 'capitano'], ['ingegneri', 'ingegnere'], ['scientifici', 'ufficiale scientifico']], v.png.superiore)}</select></label>` : ''}<small class="muto">per le navi del master: i ruoli senza personaggio hanno i bonus del Manuale per la categoria (gradi = categoria)</small></div>`}<div class="nv-ruoli">${ruoli}</div>
         <p class="muto pf-aiuto">Prove dalla scheda di ogni personaggio. Artiglieria: BAB o gradi in Pilotare (il più alto) + DES. Pilota: Pilotare + manovrabilità e propulsori. Scientifico: Computer + sensori.${c.computer?.[1] ? ` Il computer (${esc(c.computer[0])}) dà +${c.computer[1]} a ${c.computer[2]} prov${c.computer[2] === 1 ? 'a' : 'e'} per round, da aggiungere quando si usa.` : ''}</p></details>
       <details class="pannello pf-sez" open><summary><h3>Armi</h3></summary>${armiArco || '<p class="muto">Scegli la struttura per vedere i supporti.</p>'}</details>
       <details class="pannello pf-sez"${sola ? '' : ' open'}><summary><h3>Sistemi</h3></summary><div class="nv-sistemi-scelta">${sola ? CAMPI.filter(([k]) => v[k]).map(([k, , et]) => `<div><span class="muto">${esc(et)}</span> ${esc(v[k])}</div>`).join('') : sistemi}</div>${multi}${distribuzione}</details>
@@ -316,7 +329,7 @@ window.creaAstronavi = function creaAstronavi(ctx) {
   function applica(el) {
     const v = naveDa(el);
     if (!v) return false;
-    const val = el.dataset.numero !== undefined ? n(el.value) : el.value;
+    const val = el.dataset.bool !== undefined ? el.checked : el.dataset.numero !== undefined ? n(el.value) : el.value;
     scrivi(v, el.dataset.nv, val);
     if (el.dataset.nv === 'struttura') v.supporti = supportiDaStruttura(v);
     if (el.dataset.nv === 'scudi') { v.scudiQuad = {}; v.combattimento.scudi = null; }
@@ -360,6 +373,12 @@ window.creaAstronavi = function creaAstronavi(ctx) {
       const q = document.getElementById(`nv-quad-${v.id}`)?.value || 'prua';
       const venti = document.getElementById(`nv-venti-${v.id}`)?.checked;
       if (danno <= 0) { ctx.toast('Scrivi i danni del colpo', 'errore'); return; }
+      ctx.toast(colpisci(v, danno, q, venti));
+    },
+  };
+  // Applica un colpo alla nave e restituisce il resoconto (testo per l'avviso)
+  function colpisci(v, danno, q, venti) {
+    {
       const c = calcola(v, ctx.personaggiDi(v.campagnaId));
       const sc = statoScudi(v, c);
       let resto = danno;
@@ -374,8 +393,10 @@ window.creaAstronavi = function creaAstronavi(ctx) {
       v.combattimento.danni = prima + resto;
       const critici = resto > 0 ? (c.sc ? Math.floor(v.combattimento.danni / c.sc) - Math.floor(prima / c.sc) : 0) + (venti ? 1 : 0) : 0;
       ctx.salva(); ctx.render();
-      ctx.toast(`💥 ${danno} danni a ${q}: ${suScudi} sugli scudi${suTemp ? `, ${suTemp} sull'armatura ablativa` : ''}, ${resto} allo scafo${critici ? ` — <b>${critici} danno critico${critici > 1 ? '' : ''}</b>: premi «🎲 Danno critico»` : ''}`);
-    },
+      return `💥 ${esc(v.nome)}: ${danno} danni a ${q} — ${suScudi} sugli scudi${suTemp ? `, ${suTemp} sull'armatura ablativa` : ''}, ${resto} allo scafo${critici ? ` — <b>${critici} danno critico</b>: premi «🎲 Danno critico» nella sua scheda` : ''}`;
+    }
+  }
+  const azioni2 = {
     'nv-critico'(el) {
       const v = naveDa(el);
       const crit = v.combattimento.critici = v.combattimento.critici || {};
@@ -393,8 +414,20 @@ window.creaAstronavi = function creaAstronavi(ctx) {
     },
   };
 
+  Object.assign(azioni, azioni2);
+  const migliore = (c, ruolo) => { const x = c.equipaggio.filter((e) => e.ruolo === ruolo).map((e) => e.prove[0][1]).filter((b) => b !== null); return x.length ? Math.max(...x) : null; };
+  function prova(v, ruolo) { const c = calcola(v, ctx.personaggiDi(v.campagnaId)); return migliore(c, ruolo); }
+  // Danni di un'arma: «2d6», «4d4 × 10», «1d10 × 10 + 5»…
+  function tiraDanni(espr) {
+    const t = String(espr || '').replace(/\s+/g, '').replace(/[×x]/g, '*');
+    const m = t.match(/^(\d+d\d+)(?:\*(\d+))?(?:\+(\d+))?/i);
+    if (!m) return null;
+    const r = window.Dadi.tira(m[1]);
+    const tot = r.totale * (m[2] ? Number(m[2]) : 1) + (m[3] ? Number(m[3]) : 0);
+    return { totale: tot, testo: `${m[1]}${m[2] ? ` × ${m[2]}` : ''}${m[3] ? ` + ${m[3]}` : ''} = ${tot}` };
+  }
   return {
-    nuova, normalizza, calcola, vista, azioni, supportiDaStruttura,
+    nuova, normalizza, calcola, vista, azioni, supportiDaStruttura, colpisci, prova, tiraDanni, numCategoria,
     input(el) {
       if (el.dataset.nv && el.tagName !== 'SELECT') { applica(el); return true; }
       return false;
