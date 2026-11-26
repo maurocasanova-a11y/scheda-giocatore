@@ -1512,3 +1512,4 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
 /* App per tablet Android: niente cartella dati da aprire */
 .app-tablet [data-azione="apri-cartella"] { display: none; }
 #st-overlay { position: fixed; inset: 0; z-index: 91; background: rgba(0, 0, 0, .6); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.pf-cd-foc { color: var(--oro-chiaro, #e8cf8e); font-weight: 600; white-space: nowrap; }

@@ -3980,7 +3980,18 @@ window.creaPF1 = function creaPF1(ctx) {
     'arma specializzata superiore': { tipo: 'arma', testo: 'un altro +2 ai danni con l\'arma scelta', richiede: ['Arma Focalizzata', 'Arma Focalizzata Superiore', 'Arma Specializzata'] },
     'critico migliorato': { tipo: 'arma', testo: 'raddoppia l\'intervallo di minaccia dell\'arma scelta (es. 19-20 diventa 17-20)' },
     'competenza nelle armi esotiche': { tipo: 'arma', testo: 'nessuna penalità di −4 con l\'arma esotica scelta', soloEsotiche: true },
+    'incantesimi focalizzati': { tipo: 'scuola', testo: '+1 alla CD dei tiri salvezza contro gli incantesimi della scuola scelta' },
+    'incantesimi focalizzati superiore': { tipo: 'scuola', testo: 'un altro +1 alla CD degli incantesimi della scuola scelta', richiede: ['Incantesimi Focalizzati'] },
   };
+  // Testi della finestra per tipo di scelta
+  const PAROLE_SCELTA = {
+    abilita: { domanda: 'Su quale abilità?', voce: 'l\'abilità', una: 'un\'abilità', richiesti: 'Abilità con i talenti richiesti' },
+    arma: { domanda: 'Con quale arma?', voce: 'l\'arma', una: 'un\'arma', richiesti: 'Armi con i talenti richiesti' },
+    scuola: { domanda: 'Su quale scuola di magia?', voce: 'la scuola', una: 'una scuola', richiesti: 'Scuole con i talenti richiesti' },
+  };
+  // Incantesimi Focalizzati (e Superiore) sulla scuola di un incantesimo: +1 alla CD per ciascuno
+  const focusScuola = (d, scuola) => ['Incantesimi Focalizzati', 'Incantesimi Focalizzati Superiore']
+    .filter((t) => scuola && sceltePer(d, t).some((x) => norm(String(scuola)).startsWith(norm(x)))).length;
   const talentoConScelta = (nome) => TALENTI_CON_SCELTA[norm(nome)] || null;
   // Scelte già fatte per un talento (es. le armi di «Arma Focalizzata (…)»)
   const sceltePer = (d, nomeTalento) => d.capacita.filter((x) => baseTalento(x.nome || '') === norm(nomeTalento)).map((x) => sceltaTalento(x.nome)).filter(Boolean);
@@ -3997,12 +4008,13 @@ window.creaPF1 = function creaPF1(ctx) {
     const spec = talentoConScelta(t.nome);
     const gia = new Set(sceltePer(d, t.nome).map(norm));
     const libera = (x) => !gia.has(norm(x));
-    if (spec.tipo === 'abilita') return [['Abilità', abilitaPerTalento(p).filter(libera)]].filter(([, l]) => l.length);
-    // Gradini superiori: solo le armi su cui ci sono già tutti i talenti richiesti
+    // Gradini superiori: solo le scelte (armi, scuole) su cui ci sono già tutti i talenti richiesti
     if (spec.richiede) {
       const ok = sceltePer(d, spec.richiede[0]).filter((x) => spec.richiede.every((r) => sceltePer(d, r).some((y) => norm(y) === norm(x))));
-      return [['Armi con i talenti richiesti', [...new Set(ok)].filter(libera)]].filter(([, l]) => l.length);
+      return [[PAROLE_SCELTA[spec.tipo].richiesti, [...new Set(ok)].filter(libera)]].filter(([, l]) => l.length);
     }
+    if (spec.tipo === 'abilita') return [['Abilità', abilitaPerTalento(p).filter(libera)]].filter(([, l]) => l.length);
+    if (spec.tipo === 'scuola') return [['Scuole', SCUOLE_INC.filter((x) => x !== 'Universale').filter(libera)]].filter(([, l]) => l.length);
     const esotica = (x) => EQUIP.armi.some((v) => v[1] === 'Armi Esotiche' && norm(v[0]) === norm(x));
     const mie = [...new Set(d.armi.map((a) => armaBase(a.nome)).filter(Boolean))].filter((x) => !spec.soloEsotiche || esotica(x));
     const gruppi = [['Le armi del personaggio', mie.filter(libera)]];
@@ -4017,20 +4029,20 @@ window.creaPF1 = function creaPF1(ctx) {
     const spec = talentoConScelta(t.nome);
     const gruppi = scelteTalento(p, t);
     const gia = sceltePer(d, t.nome);
-    const suArma = spec.tipo === 'arma';
+    const P = PAROLE_SCELTA[spec.tipo];
     if (!gruppi.length) {
-      ctx.toast(spec.richiede ? `Per <b>${esc(t.nome)}</b> serve prima ${esc(spec.richiede.join(', '))} sulla stessa arma` : `<b>${esc(t.nome)}</b> è già preso su tutte le scelte possibili`, 'errore');
+      ctx.toast(spec.richiede ? `Per <b>${esc(t.nome)}</b> serve prima ${esc(spec.richiede.join(', '))} sulla stessa ${spec.tipo === 'scuola' ? 'scuola' : 'arma'}` : `<b>${esc(t.nome)}</b> è già preso su tutte le scelte possibili`, 'errore');
       return;
     }
     const gradi = (a) => n(d.abil[a]?.gradi);
-    const opzione = (x) => `<option value="${esc(x)}">${esc(x)}${!suArma && gradi(x) ? ` (${gradi(x)} gradi)` : ''}</option>`;
+    const opzione = (x) => `<option value="${esc(x)}">${esc(x)}${spec.tipo === 'abilita' && gradi(x) ? ` (${gradi(x)} gradi)` : ''}</option>`;
     const ov = document.createElement('div');
     ov.id = 'st-overlay';
     ov.innerHTML = `<div class="info-box ia-box" role="dialog" aria-label="${esc(t.nome)}">
       <div class="info-testa"><h2>${esc(t.nome)}</h2><button class="btn-x" data-azione="pf1-scelta-talento-annulla" title="Annulla">×</button></div>
       <div class="info-corpo">
-        <p class="muto">${esc(spec.testo[0].toUpperCase() + spec.testo.slice(1))}. Puoi prenderlo più volte, ogni volta su ${suArma ? 'un\'arma' : 'un\'abilità'} diversa${gia.length ? ` (già preso su: ${esc(gia.join(', '))})` : ''}.</p>
-        <div class="pf-riga"><label class="pf-largo">${suArma ? 'Con quale arma?' : 'Su quale abilità?'} <select id="st-abilita"><option value="">— scegli ${suArma ? 'l\'arma' : 'l\'abilità'} —</option>
+        <p class="muto">${esc(spec.testo[0].toUpperCase() + spec.testo.slice(1))}. Puoi prenderlo più volte, ogni volta su ${P.una} diversa${gia.length ? ` (già preso su: ${esc(gia.join(', '))})` : ''}.</p>
+        <div class="pf-riga"><label class="pf-largo">${P.domanda} <select id="st-abilita"><option value="">— scegli ${P.voce} —</option>
           ${gruppi.length === 1 ? gruppi[0][1].map(opzione).join('') : gruppi.map(([g, l]) => `<optgroup label="${esc(g)}">${l.map(opzione).join('')}</optgroup>`).join('')}</select></label></div>
         <div class="pf-piede"><button class="primario" data-azione="pf1-scelta-talento-ok" data-id="${p.id}" data-nome="${esc(t.nome)}">Prendi il talento</button><button data-azione="pf1-scelta-talento-annulla">Annulla</button></div>
       </div></div>`;
@@ -4697,6 +4709,7 @@ window.creaPF1 = function creaPF1(ctx) {
           ${s.nome && incMitici(d).has(norm(s.nome)) ? SEGNO_MITICO : ''}
           ${libroDi(inc) && s.nome && !nelLibro(inc, s.nome) ? `<small class="oltre" title="Non è scritto nel ${esc(libroDi(inc)[0].toLowerCase())}: non si può preparare">non nel ${libroDi(inc)[0] === 'Famiglio' ? 'famiglio' : libroDi(inc)[0] === 'Formulario' ? 'formulario' : 'libro'}</small>` : ''}
           ${v ? `<small class="pf-scuola" title="${esc(v.scuola)}">${esc(v.base)}</small><button class="btn-mini" data-azione="pf1-info-inc" data-nome="${esc(v.nome)}" title="Descrizione dal wiki">i</button>` : ''}
+          ${(() => { const f = v ? focusScuola(d, v.scuola) : 0; const cdL = ci.livelli.find((l) => l.L === n(s.livello))?.cd; return f && cdL ? `<small class="pf-cd-foc" title="CD dei tiri salvezza con Incantesimi Focalizzati${f > 1 ? ' e Superiore' : ''} (+${f})">CD ${cdL + f}</small>` : ''; })()}
           ${spontaneo ? '' : `<label title="Copie preparate">prep ${num(`incantatori#${inc.id}|incantesimi#${s.id}|preparati`, s.preparati, 'min="0"')}</label><span class="muto">lanciati ${n(s.lanciati)}</span>`}
           ${!spontaneo && nomeClasse(inc.classe) === 'Mago' && d.mago.scuola && d.mago.scuola !== 'Universale' ? `<label class="pf-chk" title="Incantesimo di una scuola opposta: ogni copia preparata occupa 2 slot">${chk(`incantatori#${inc.id}|incantesimi#${s.id}|opposta`, s.opposta, 'data-ridisegna-pf1')} opp.</label>` : ''}
           ${campo(`incantatori#${inc.id}|incantesimi#${s.id}|note`, s.note, 'placeholder="note (scuola, effetto…)" class="pf-largo"')}
