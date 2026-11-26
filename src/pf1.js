@@ -489,6 +489,19 @@ window.creaPF1 = function creaPF1(ctx) {
     return null;
   };
   const oggettoDi = (nome) => OGGETTI.find((o) => norm(o[0]) === norm(nome)) || null;
+  // Equipaggiamento comune dal wiki (src/pf1-merci.js): [gruppo, nome, costo, peso in kg, dettagli, valore in mo, fonte, pagina]
+  const MERCI = window.PF1_MERCI?.catalogo || [];
+  const merceDi = (nome) => MERCI.find((x) => norm(x[1]) === norm(nome || '')) || null;
+  // Descrizione di un oggetto comune: la riga della tabella della pagina del gruppo (per le varianti, la riga dell'oggetto base)
+  const estraiMerce = (nome) => (doc) => {
+    const base = nome.replace(/\s*\([^)]*\)\s*$/, '');
+    const righe = [...doc.querySelectorAll('#mw-content-text tr')];
+    const riga = righe.find((r) => norm(r.cells[0]?.textContent.trim() || '') === norm(nome)) || righe.find((r) => norm(r.cells[0]?.textContent.trim() || '') === norm(base));
+    if (!riga) return '';
+    const testi = [...riga.cells].map((c) => c.textContent.replace(/\s+/g, ' ').trim());
+    const lungo = testi.reduce((a, b) => (b.length > a.length ? b : a), '');
+    return lungo.length > 40 ? lungo : '';
+  };
 
   // ---- Slot del corpo per gli oggetti magici indossati ----
   // [chiave, nome, punto sul corpo (x, y) nello schema]
@@ -4770,6 +4783,10 @@ window.creaPF1 = function creaPF1(ctx) {
         <span class="pf-dal-wiki">oggetto magico dal wiki: <input id="scelta-oggetto-${id}" list="pf1-oggetti-magici" placeholder="scrivi per cercare (${OGGETTI.length})" class="pf-largo">
           <button class="btn-piccolo" data-azione="pf1-oggetto-wiki" data-id="${id}">Aggiungi</button>
           <button class="btn-mini" data-azione="pf1-info-oggetto" data-campo="scelta-oggetto-${id}" title="Descrizione dal wiki dell'oggetto scritto">i</button></span>
+        ${MERCI.length ? `<span class="pf-dal-wiki">equipaggiamento comune: <input id="scelta-merce-${id}" list="pf1-merci" placeholder="corda, tenda, razioni, cavallo… (${MERCI.length})" class="pf-largo">
+          <button class="btn-piccolo" data-azione="pf1-merce" data-id="${id}">Aggiungi</button>
+          <button class="btn-mini" data-azione="pf1-info-merce" data-campo="scelta-merce-${id}" title="Costo, peso e descrizione dal wiki">i</button></span>
+        ${datalistFisso('pf1-merci', () => MERCI.map((x) => `<option value="${esc(x[1])}">${esc([x[0], x[2], x[3] !== '' ? `${String(x[3]).replace('.', ',')} kg` : ''].filter(Boolean).join(' · '))}</option>`).join(''))}` : ''}
         ${datalistFisso('pf1-oggetti-magici', () => OGGETTI.map((o) => `<option value="${esc(o[0])}">${esc(`${o[2]} · ${o[3]}`)}</option>`).join(''))}</div>
       <h4>Monete</h4>
       <div class="pf-riga"><label>mp ${num('monete|mp', d.monete.mp, 'min="0"')}</label><label>mo ${num('monete|mo', d.monete.mo, 'min="0"')}</label><label>ma ${num('monete|ma', d.monete.ma, 'min="0"')}</label><label>mr ${num('monete|mr', d.monete.mr, 'min="0"')}</label><span class="muto">valore ${k('monete')}</span></div>
@@ -6100,6 +6117,25 @@ window.creaPF1 = function creaPF1(ctx) {
       ctx.salva();
       ctx.render();
       ctx.toast(`✨ <b>${esc(nome)}</b> aggiunto${eff ? ` · bonus attivo: ${esc(riassuntoBonus({ effetti: eff.effetti }))}${eff.nota ? ` (${esc(eff.nota)})` : ''}` : ''}`);
+    },
+    'pf1-merce'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      const x = merceDi(document.getElementById(`scelta-merce-${el.dataset.id}`)?.value);
+      if (!p || !x) { ctx.toast("Scrivi o scegli un oggetto dall'elenco dell'equipaggiamento", 'errore'); return; }
+      const [gruppo, nome, costo, peso, dettagli, valore] = x;
+      // Animali, trasporti e alloggi non si portano addosso: «A casa», così il loro peso non conta
+      const fuori = /^(Animali|Trasporti|Alloggi)/.test(gruppo);
+      dati(p).oggetti.push({ ...NUOVI.oggetti(), nome, peso: peso === '' ? '' : peso, valore, dove: fuori ? 'casa' : 'zaino',
+        note: [valore === '' && costo ? `costo ${costo}` : '', dettagli].filter(Boolean).join(' · ') });
+      ctx.salva();
+      ctx.render();
+      ctx.toast(`🎒 <b>${esc(nome)}</b> aggiunto agli oggetti${costo ? ` (${esc(costo)})` : ''}`);
+    },
+    'pf1-info-merce'(el) {
+      const x = merceDi(document.getElementById(el.dataset.campo)?.value);
+      if (!x) { ctx.toast("Scrivi o scegli un oggetto dall'elenco dell'equipaggiamento", 'errore'); return; }
+      apriInfo(x[1], `<div class="info-fatti">${fatto('Gruppo', x[0])}${fatto('Costo', x[2])}${fatto('Peso', x[3] !== '' ? `${String(x[3]).replace('.', ',')} kg` : '')}${fatto('Regole', x[4])}${fatto('Manuale', x[6] || 'Manuale di Gioco')}</div>`,
+        x[7], estraiMerce(x[1]));
     },
     'pf1-info-oggetto'(el) {
       const nome = el.dataset.nome || document.getElementById(el.dataset.campo)?.value || '';
