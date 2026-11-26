@@ -1,0 +1,125 @@
+/* ---------- Starfinder: archivio olografico degli incantesimi (vista #/olografico/<pg>/<classe>, src/sf.js) ---------- */
+.olo-apri { margin-left: 10px; border-color: rgba(80, 230, 255, .5); color: #8eefff; text-transform: none; letter-spacing: .04em; }
+body.modo-olo { background: #02070d; }
+body.modo-olo #contenuto { padding: 0; max-width: none; height: 100vh; overflow-y: auto; }
+body.modo-olo #contenuto > * { max-width: none; }
+body.modo-olo .grim-torna { position: static; display: inline-block; margin: 12px 0 -18px 28px; padding: 5px 12px; border: 1px solid rgba(90, 235, 255, .45); border-radius: 3px; background: rgba(0, 120, 180, .12); color: #8eefff; font-family: 'Orbitron', sans-serif; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; box-shadow: none; position: relative; z-index: 2; }
+@media (max-width: 820px) { body.modo-olo .grim-torna { margin: 10px 0 -4px 10px; } }
+
+.olo {
+  position: relative; min-height: 100vh; padding: 34px 28px 40px; overflow: hidden; perspective: 1600px;
+  color: #c8f6ff; font-family: 'Exo 2', 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(ellipse 70% 40% at 50% 105%, rgba(0, 200, 255, .28), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(40, 90, 160, .25), transparent 70%),
+    #02070d;
+}
+/* Pavimento a griglia luminosa sotto lo schermo */
+.olo::before {
+  content: ''; position: absolute; left: -20%; right: -20%; bottom: -10%; height: 55%; pointer-events: none;
+  transform: perspective(500px) rotateX(62deg); transform-origin: 50% 100%;
+  background-image: linear-gradient(rgba(0, 220, 255, .14) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 220, 255, .14) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to top, #000 10%, transparent 90%);
+  -webkit-mask-image: linear-gradient(to top, #000 10%, transparent 90%);
+}
+.olo-schermo {
+  position: relative; max-width: 1220px; margin: 0 auto; padding: 22px 26px 26px;
+  border: 1px solid rgba(90, 235, 255, .5); border-radius: 8px;
+  background: linear-gradient(180deg, rgba(14, 70, 105, .38), rgba(4, 28, 48, .32));
+  backdrop-filter: blur(3px);
+  box-shadow: 0 0 34px rgba(0, 200, 255, .28), inset 0 0 70px rgba(0, 170, 255, .14);
+  transform: rotateX(3deg); transform-origin: 50% 100%;
+  animation: olo-accensione .9s ease-out both;
+}
+/* Righe di scansione e tremolio dell'ologramma */
+.olo-schermo::after {
+  content: ''; position: absolute; inset: 0; border-radius: 8px; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(130, 240, 255, .055) 0 1px, transparent 1px 3px);
+  animation: olo-tremolio 5s infinite steps(1);
+}
+/* Banda luminosa che scorre dall'alto in basso */
+.olo-schermo::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 90px; pointer-events: none; border-radius: 8px;
+  background: linear-gradient(180deg, transparent, rgba(120, 240, 255, .09), transparent);
+  animation: olo-scansione 6s linear infinite;
+}
+.olo-angolo { position: absolute; width: 22px; height: 22px; border: 2px solid #5de8ff; filter: drop-shadow(0 0 6px #22d3ff); }
+.olo-angolo.a1 { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
+.olo-angolo.a2 { top: -2px; right: -2px; border-left: 0; border-bottom: 0; }
+.olo-angolo.a3 { bottom: -2px; left: -2px; border-right: 0; border-top: 0; }
+.olo-angolo.a4 { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+
+.olo-testa { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px 20px; padding-bottom: 14px; border-bottom: 1px dashed rgba(90, 235, 255, .35); }
+.olo-sigla { font-family: 'Orbitron', sans-serif; font-size: 11.5px; letter-spacing: .32em; color: #5de8ff; }
+.olo h1 { margin: 4px 0 0; font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 28px; letter-spacing: .1em; text-transform: uppercase; color: #e6fcff; text-shadow: 0 0 14px rgba(0, 220, 255, .75), 0 0 2px #fff; }
+.olo-stato { display: flex; flex-wrap: wrap; gap: 8px; }
+.olo-stato span { padding: 3px 10px; border: 1px solid rgba(90, 235, 255, .4); border-radius: 3px; font-family: 'Orbitron', sans-serif; font-size: 11px; letter-spacing: .12em; color: #9ef2ff; background: rgba(0, 160, 220, .08); }
+.olo-stato .olo-online { color: #6dffbf; border-color: rgba(109, 255, 191, .45); animation: olo-lampeggio 2.4s infinite; }
+
+/* Schede dei livelli, con le tacche degli slot rimasti */
+.olo-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.olo-tab { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 104px; padding: 8px 12px; border: 1px solid rgba(90, 235, 255, .35); border-radius: 4px; background: rgba(0, 120, 180, .08); color: #9ef2ff; cursor: pointer; font-family: inherit; text-align: left; transition: background .15s, box-shadow .15s; }
+.olo-tab b { font-family: 'Orbitron', sans-serif; font-size: 13px; letter-spacing: .14em; }
+.olo-tab small { font-size: 11px; color: rgba(158, 242, 255, .65); }
+.olo-tab:hover { background: rgba(0, 190, 255, .14); }
+.olo-tab.attiva { background: rgba(0, 200, 255, .22); border-color: #5de8ff; box-shadow: 0 0 16px rgba(0, 210, 255, .45), inset 0 0 12px rgba(0, 210, 255, .2); color: #eafdff; }
+.olo-tacche { display: flex; gap: 5px; min-height: 10px; align-items: center; }
+.olo-tacche i { width: 8px; height: 8px; transform: rotate(45deg); border: 1px solid rgba(93, 232, 255, .55); }
+.olo-tacche i.on { background: #5de8ff; box-shadow: 0 0 8px #22d3ff; }
+.olo-inf { font-size: 14px; line-height: 1; color: #5de8ff; }
+
+/* Elenco e dettaglio */
+.olo-corpo { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); gap: 18px; }
+.olo-elenco { display: flex; flex-direction: column; gap: 4px; max-height: 62vh; overflow-y: auto; padding-right: 4px; }
+.olo-voce { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border: 0; border-left: 2px solid rgba(93, 232, 255, .3); background: rgba(0, 120, 180, .06); color: #bdf3ff; text-align: left; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s; }
+.olo-voce:hover { background: rgba(0, 190, 255, .13); border-left-color: #5de8ff; }
+.olo-voce.scelta { background: linear-gradient(90deg, rgba(0, 210, 255, .28), rgba(0, 210, 255, .04)); border-left-color: #e6fcff; color: #fff; text-shadow: 0 0 8px rgba(0, 220, 255, .8); }
+.olo-voce-nome { font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+.olo-voce small { font-size: 11.5px; color: rgba(158, 242, 255, .65); }
+.olo-dettaglio { position: relative; padding: 16px 20px; border: 1px solid rgba(90, 235, 255, .3); border-radius: 6px; background: rgba(0, 40, 70, .35); box-shadow: inset 0 0 40px rgba(0, 170, 255, .1); }
+.olo-titolo { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.olo-titolo h2 { margin: 0; font-family: 'Orbitron', sans-serif; font-size: 22px; letter-spacing: .08em; text-transform: uppercase; color: #eafdff; text-shadow: 0 0 12px rgba(0, 220, 255, .7); }
+.olo-liv { font-family: 'Orbitron', sans-serif; font-size: 12px; letter-spacing: .2em; color: #5de8ff; border: 1px solid rgba(93, 232, 255, .5); padding: 2px 8px; border-radius: 3px; }
+.olo-dati { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 14px 0; }
+.olo-dato { padding: 6px 10px; border-top: 1px solid rgba(93, 232, 255, .35); background: rgba(0, 150, 210, .07); }
+.olo-dato span { display: block; font-family: 'Orbitron', sans-serif; font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: rgba(93, 232, 255, .8); }
+.olo-dato b { font-weight: 600; font-size: 14px; color: #e6fcff; }
+.olo-testo { max-height: 42vh; overflow-y: auto; padding-right: 6px; font-size: 15px; line-height: 1.6; color: #c8f6ff; text-shadow: 0 0 6px rgba(0, 200, 255, .25); }
+.olo-testo p { margin: 0 0 10px; }
+.olo-muto { color: rgba(158, 242, 255, .6); font-style: italic; }
+.olo-carica span { animation: olo-lampeggio 1s infinite; }
+.olo-comandi { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed rgba(90, 235, 255, .3); }
+.olo-lancia {
+  padding: 10px 24px; border: 1px solid #5de8ff; border-radius: 4px; cursor: pointer;
+  font-family: 'Orbitron', sans-serif; font-size: 14px; letter-spacing: .18em; text-transform: uppercase; color: #02121c;
+  background: linear-gradient(180deg, #8ff3ff, #22c7f0); box-shadow: 0 0 18px rgba(0, 220, 255, .6);
+}
+.olo-lancia:hover { box-shadow: 0 0 28px rgba(0, 230, 255, .9); }
+.olo-lancia:disabled { cursor: default; color: rgba(158, 242, 255, .6); background: rgba(0, 80, 120, .25); border-color: rgba(93, 232, 255, .3); box-shadow: none; }
+.olo-link { color: #8eefff; font-size: 13px; letter-spacing: .06em; }
+.olo ::-webkit-scrollbar { width: 6px; }
+.olo ::-webkit-scrollbar-thumb { background: rgba(93, 232, 255, .4); border-radius: 3px; }
+
+@keyframes olo-accensione {
+  0% { opacity: 0; filter: brightness(3) blur(4px); transform: rotateX(3deg) scaleY(.02); }
+  60% { opacity: 1; transform: rotateX(3deg) scaleY(1.02); }
+  100% { filter: none; transform: rotateX(3deg) scaleY(1); }
+}
+@keyframes olo-scansione { 0% { transform: translateY(-90px); } 100% { transform: translateY(100vh); } }
+@keyframes olo-tremolio { 0%, 100% { opacity: 1; } 47% { opacity: .75; } 48% { opacity: 1; } 82% { opacity: .85; } 83% { opacity: 1; } }
+@keyframes olo-lampeggio { 50% { opacity: .35; } }
+
+/* Telefoni e tablet stretti: una colonna, schermo dritto */
+@media (max-width: 820px) {
+  .olo { padding: 14px 10px 30px; }
+  .olo-schermo { padding: 14px 12px 18px; transform: none; animation: none; }
+  .olo h1 { font-size: 20px; }
+  .olo-corpo { grid-template-columns: minmax(0, 1fr); }
+  .olo-elenco { max-height: none; }
+  .olo-tab { min-width: 86px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .olo-schermo, .olo-schermo::before, .olo-schermo::after, .olo-online, .olo-carica span { animation: none !important; }
+}
+@media print { .olo-apri { display: none !important; } }

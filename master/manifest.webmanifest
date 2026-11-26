@@ -1,0 +1,30 @@
+{
+  "name": "Cronache del Master",
+  "short_name": "Cronache",
+  "description": "Gestore di campagne di gioco di ruolo per il master",
+  "lang": "it",
+  "start_url": "./index.html#/campagne",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#18151e",
+  "theme_color": "#18151e",
+  "icons": [
+    {
+      "src": "icone/icona-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icone/icona-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icone/icona-mascherabile-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

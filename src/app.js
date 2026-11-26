@@ -1430,7 +1430,7 @@
         <p class="imp-cartella"><b>${esc(s.cartella)}</b></p>
         <p class="muto">I dati restano nell'app di questo tablet (si perdono solo disinstallandola). Per lavorare anche sul PC usa la <b>copia di sicurezza online</b> qui sotto:
           sul PC premi «Salva adesso», qui «Ripristina» con lo stesso codice (e viceversa quando torni al PC). Un dispositivo alla volta.</p>
-        <p class="muto">«Esporta backup» salva un file nella cartella <b>Documenti/Cronache del Master</b> del tablet; «Importa backup» apre un file scelto da te.</p>
+        <p class="muto">${s.notaBackup ? esc(s.notaBackup) : '«Esporta backup» salva un file nella cartella <b>Documenti/Cronache del Master</b> del tablet; «Importa backup» apre un file scelto da te.'}</p>
       </section>
       ${sezioneCopiaOnline()}`;
     }
@@ -1454,7 +1454,8 @@
           <button data-azione="kit-crea-web">📱 Prepara il kit per tablet e telefoni…</button></div>
         <p class="muto pf-aiuto"><b>Per PC:</b> comparirà la cartella «Cronache del Master - scheda giocatore». Comprimila (tasto destro › Invia a › Cartella compressa) e mandala ai giocatori, o mettila su Google Drive.<br>
           <b>Per tablet e telefoni (Android, iPhone, iPad):</b> se la cartella «… (tablet e telefoni)» è già collegata a GitHub, il pulsante la rigenera e carica subito la nuova versione sul sito (il link viene copiato); altrimenti la crea da pubblicare a mano (istruzioni nel LEGGIMI). I giocatori aprono il link e installano la scheda con «Aggiungi alla schermata Home»; poi funziona anche senza connessione e si aggiorna da sola.<br>
-          In entrambi i kit i mostri del tuo Manuale dei Mostri non vengono inclusi, e il file della scheda è lo stesso.</p>
+          In entrambi i kit i mostri del tuo Manuale dei Mostri non vengono inclusi, e il file della scheda è lo stesso.<br>
+          <b>La tua app per iPad e tablet:</b> lo stesso pulsante pubblica anche l'app del master all'indirizzo del sito seguito da <b>master/</b> (solo il programma, i dati restano nel dispositivo): su iPad aprila in Safari › Condividi › «Aggiungi alla schermata Home».</p>
       </section>
       ${sezioneCopiaOnline()}
       <section class="pannello imp-dati">
