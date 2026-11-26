@@ -685,7 +685,8 @@ window.creaPF1 = function creaPF1(ctx) {
       case 'mitico': return n(d.mitico.grado) >= a.v;
       case 'li': return c.incantatori.some((x) => x.cl >= a.v);
       case 'classe': { const k = nomeClasse(a.nome); return k ? livelloClasse(d, k) >= a.v : null; }
-      case 'razza': return d.razza.nome ? d.razza.nome === a.nome : null;
+      // La razza del personaggio, oppure una a cui corrisponde (es. gli Umani Azlanti contano come Umani)
+      case 'razza': return d.razza.nome ? d.razza.nome === a.nome || (razzaDi(d)?.contaCome || []).includes(a.nome) : null;
       case 'gradi': {
         const nomi = Object.keys(d.abil);
         const k = nomi.find((x) => norm(x) === norm(a.abil)) || nomi.find((x) => norm(a.abil).startsWith(norm(x.replace(/\s*\(.*$/, '')) + ' ('));
