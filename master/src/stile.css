@@ -1513,3 +1513,39 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
 .app-tablet [data-azione="apri-cartella"] { display: none; }
 #st-overlay { position: fixed; inset: 0; z-index: 91; background: rgba(0, 0, 0, .6); display: flex; align-items: center; justify-content: center; padding: 24px; }
 .pf-cd-foc { color: var(--oro-chiaro, #e8cf8e); font-weight: 600; white-space: nowrap; }
+
+/* ---- Schermo dei giocatori: grandezza del testo, messaggi, scena, tiri, annuncio del turno ---- */
+.schermo { zoom: var(--sch-scala, 1); }
+.sch-scala { display: flex; gap: 4px; opacity: .35; transition: opacity .2s; }
+.sch-scala:hover { opacity: 1; }
+.sch-messaggio { font-size: 28px; font-weight: 700; text-align: center; padding: 14px 18px; border-radius: 12px; border: 2px solid var(--oro); background: rgba(212, 175, 55, .14); color: var(--oro-chiaro, #f3dfa2); animation: sch-pulsa 2s ease-in-out infinite; }
+@keyframes sch-pulsa { 50% { box-shadow: 0 0 22px rgba(212, 175, 55, .45); } }
+.sch-scena.grande img { max-height: 78vh; width: 100%; }
+.sch-corpo-lista { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .sch-corpo-lista { grid-template-columns: minmax(0, 1fr); } .sch-tiri { width: auto; order: -1; } }
+.sch-tiri { width: 240px; display: flex; flex-direction: column; gap: 6px; background: var(--pannello); border: 2px solid var(--bordo); border-radius: 12px; padding: 10px 12px; }
+.sch-tiri h3 { margin: 0 0 4px; font-size: 18px; }
+.sch-tiro { display: flex; justify-content: space-between; gap: 10px; font-size: 16px; border-bottom: 1px solid var(--bordo); padding-bottom: 4px; }
+.sch-tiro b { font-size: 22px; color: var(--oro); }
+.sch-tiro:first-of-type b { font-size: 28px; }
+.sch-carta.mio { border-style: dashed; }
+#sch-annuncio { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; pointer-events: none;
+  font-size: clamp(36px, 8vw, 110px); font-weight: 800; color: var(--oro, #d4af37); text-shadow: 0 0 30px rgba(0, 0, 0, .9), 0 0 60px rgba(212, 175, 55, .5);
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, .75), rgba(0, 0, 0, .35)); animation: sch-annuncio 3.2s ease forwards; }
+@keyframes sch-annuncio { 0% { opacity: 0; transform: scale(.85); } 12% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+.comb-schermo { display: inline-flex; gap: 4px; margin-left: 6px; }
+.btn-mini.acceso, .btn-piccolo.acceso { border-color: var(--oro); color: var(--oro); background: rgba(212, 175, 55, .12); }
+.inc-schermo-extra { margin-top: 6px; }
+@media (max-width: 700px) {
+  .sch-corpo-lista { grid-template-columns: minmax(0, 1fr); }
+  .schermo, .sch-lista, .sch-carta { min-width: 0; }
+  .sch-carta { gap: 10px; padding: 8px 10px; }
+  .sch-iniz { width: 34px; font-size: 20px; }
+  .sch-tiri { width: auto; }
+  .sch-round { font-size: 24px; }
+  .sch-turno-nome { font-size: 22px; }
+  .sch-messaggio { font-size: 20px; }
+  .sch-img { width: 48px; height: 48px; }
+  .sch-nome { font-size: 17px; }
+  .sch-vita { width: 100%; }
+}

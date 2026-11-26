@@ -262,6 +262,7 @@
     }
     S.tiri.unshift(tiro);
     S.tiri.length = Math.min(S.tiri.length, 100);
+    if (!GIOCATORE && !SCHERMO) pf1.tiroSulloSchermo(S.campagne, tiro); // «tiri sullo schermo» del tracker
     salva();
     toast(htmlTiro(tiro, true));
     return tiro;
@@ -1279,7 +1280,7 @@
     const q = new URLSearchParams(qs);
     const p = percorso.split('/').filter(Boolean);
     let html;
-    if (GIOCATORE && !['personaggio', 'dadi', 'grimorio', 'breviario', 'olografico', 'astronave', 'mappa'].includes(p[0])) html = vistaGiocatore();
+    if (GIOCATORE && !['personaggio', 'dadi', 'grimorio', 'breviario', 'olografico', 'astronave', 'mappa', 'schermo-vivo'].includes(p[0])) html = vistaGiocatore();
     else switch (p[0]) {
       case 'campagna': html = vistaCampagna(p[1], p[2], p[3]); break;
       case 'sessione': html = vistaSessione(p[1], p[2] === 'modifica', q.get('evidenzia')); break;
@@ -1295,6 +1296,7 @@
       case 'olografico': html = sf.vistaOlografico(personaggio(p[1]), p[2]); break;
       case 'astronave': html = vistaNave(p[1]); break;
       case 'mappa': html = vistaMappaGiocatore(); break;
+      case 'schermo-vivo': html = vistaSchermoGiocatore(); break;
       case 'regolamenti': html = vistaRegolamenti(); break;
       case 'regolamento': html = vistaRegolamento(p[1]); break;
       case 'dadi': html = vistaDadi(); break;
@@ -1524,6 +1526,13 @@
   }
   // Kit: mappa del combattimento ricevuta dalla sessione dal vivo (in sola lettura; toccando una nave si vedono archi e bersagli)
   const mappaDalVivo = { battaglia: null };
+  // Schermo dei giocatori ricevuto dalla sessione dal vivo (iniziativa, turno, messaggi, tiri, scena)
+  const schermoDalVivo = { dati: null, scena: '' };
+  const linkSchermo = () => (GIOCATORE && schermoDalVivo.dati ? '<a class="btn-piccolo primario" href="#/schermo-vivo">📺 Schermo del tavolo</a>' : '');
+  function vistaSchermoGiocatore() {
+    return `<div class="barra-azioni"><a class="bottone" href="#/giocatore">← I miei personaggi</a>${dvG.pgId ? `<a class="bottone" href="#/personaggio/${dvG.pgId}">La mia scheda</a>` : ''}</div>
+      ${pf1.renderSchermo(schermoDalVivo.dati, { fidato: false, scena: schermoDalVivo.scena, mioPg: dvG.pgId })}`;
+  }
   const linkMappa = () => (GIOCATORE && mappaDalVivo.battaglia ? '<a class="btn-piccolo primario" href="#/mappa">🗺 Mappa del combattimento</a>' : '');
   function vistaMappaGiocatore() {
     const b = mappaDalVivo.battaglia;
@@ -1574,7 +1583,7 @@
       ${miei.length ? `<h2>I miei personaggi</h2><div class="griglia">${miei.map((x) => `<a class="scheda" href="#/personaggio/${x.id}">
           <div class="scheda-titolo"><span class="ritratto ritratto-piccolo">${ritratto(x)}</span>${esc(x.nome)}</div>
           <div class="scheda-sotto">${esc(regDi(x)?.nome || '')}${x.giocatore ? ` · ${esc(x.giocatore)}` : ''}</div></a>`).join('')}</div>` : ''}
-      ${linkMappa() ? `<div class="barra-azioni">${linkMappa()}</div>` : ''}
+      ${linkMappa() || linkSchermo() ? `<div class="barra-azioni">${linkSchermo()}${linkMappa()}</div>` : ''}
       ${S.astronavi.length ? `<h2>Astronavi</h2><div class="griglia">${S.astronavi.map((v) => `<a class="scheda" href="#/astronave/${v.id}"><div class="scheda-titolo">🚀 ${esc(v.nome)}</div><div class="scheda-sotto">${esc(v.struttura || '')}</div></a>`).join('')}</div>` : ''}
       <section class="pannello giocatore-sez"><h3>Hai già un file della scheda?</h3>
         <p class="muto">Se il master ti ha rimandato la scheda, o vuoi continuarla da un altro computer, caricala qui.</p>
@@ -1590,7 +1599,7 @@
     return `<div class="barra-azioni barra-giocatore"><a class="bottone" href="#/giocatore">← I miei personaggi</a>
       <button class="primario" data-azione="pg-esporta" data-id="${p.id}">💾 Salva il file per il master</button>
       <button data-azione="giocatore-carica" title="Carica il file di una scheda (tua o rimandata dal master)">📥 Importa scheda</button>
-      <span class="muto">La scheda resta salvata in questo browser; il file serve per mandarla al master.</span></div>
+      ${linkSchermo()}<span class="muto">La scheda resta salvata in questo browser; il file serve per mandarla al master.</span></div>
       ${barraDalVivoGiocatore(p)}`;
   }
   // File della scheda: il personaggio con il regolamento a cui appartiene (senza la campagna)
@@ -2582,6 +2591,21 @@
       if (b && prima && b.round !== prima.round) toast(`🗺 Combattimento tra astronavi: round <b>${b.round}</b>`);
       if (JSON.stringify(prima) !== JSON.stringify(b) && (location.hash.startsWith('#/mappa') || !b !== !prima)) dvRidisegna();
     }, () => {});
+    dvG.stopSchermo?.();
+    dvG.stopScena?.();
+    dvG.stopSchermo = DV.ascolta(`sessioni/${codice}/schermo`, (copia) => {
+      if (dvG.codice !== codice) return;
+      let d = null;
+      try { d = copia?.testo ? JSON.parse(copia.testo) : null; } catch { d = null; }
+      const prima = schermoDalVivo.dati;
+      schermoDalVivo.dati = d;
+      if (location.hash.startsWith('#/schermo-vivo') || !d !== !prima) dvRidisegna();
+    }, () => {});
+    dvG.stopScena = DV.ascolta(`sessioni/${codice}/scena`, (copia) => {
+      if (dvG.codice !== codice) return;
+      schermoDalVivo.scena = typeof copia?.img === 'string' ? copia.img : '';
+      if (location.hash.startsWith('#/schermo-vivo')) dvRidisegna();
+    }, () => {});
     dvG.stop = DV.ascolta(`sessioni/${codice}/perGiocatore/${io}`, (copia) => {
       if (dvG.codice !== codice) return;
       const comandi = Object.entries(copia?.comandi || {}).sort(([a], [b]) => (a < b ? -1 : 1));
@@ -2624,6 +2648,12 @@
     dvG.stopMappa?.();
     dvG.stopMappa = null;
     mappaDalVivo.battaglia = null;
+    dvG.stopSchermo?.();
+    dvG.stopScena?.();
+    dvG.stopSchermo = null;
+    dvG.stopScena = null;
+    schermoDalVivo.dati = null;
+    schermoDalVivo.scena = '';
     // Le astronavi ricevute restano com'erano, ma non si aggiornano più
     for (const v of S.astronavi) if (v.dalVivo) v.dalVivo = false;
     dvG.codice = ''; dvG.pgId = ''; dvG.ultimo = ''; dvG.stato = ''; dvG.ultimoComando = null; dvG.statoMaster = null; dvG.stop = null;
@@ -2737,11 +2767,25 @@
       DV.cancella(`sessioni/${codice}/astronavi/${id}`).catch(() => {});
     }
   }
+  function dvMInviaSchermo(c, codice) {
+    const testo = JSON.stringify(pf1.datiSchermo(c, { immagini: false }));
+    if (dvM.schermoInviato !== testo) {
+      dvM.schermoInviato = testo;
+      DV.scrivi(`sessioni/${codice}/schermo`, { testo, t: DV.ORA }).catch(() => { dvM.schermoInviato = null; });
+    }
+    // Immagine di scena: solo se non è troppo grande per i telefoni
+    const sc = c.incontro?.scena && /^data:image\//.test(c.incontro.scena) && c.incontro.scena.length < 900000 ? c.incontro.scena : '';
+    if (dvM.scenaInviata !== sc) {
+      dvM.scenaInviata = sc;
+      (sc ? DV.scrivi(`sessioni/${codice}/scena`, { img: sc, t: DV.ORA }) : DV.cancella(`sessioni/${codice}/scena`)).catch(() => { dvM.scenaInviata = null; });
+    }
+  }
   function dvMInvia() {
     const c = campagna(dvM.campagnaId);
     if (!c || !dvM.codice) return;
     const codice = dvM.codice;
     dvMInviaNavi(c, codice);
+    dvMInviaSchermo(c, codice);
     const inc = c.incontro;
     const attivo = inc?.fase ? inc.combattenti.find((x) => x.id === inc.attivo) : null;
     for (const [u, g] of Object.entries(dvM.giocatori)) {

@@ -6771,50 +6771,134 @@ window.creaPF1 = function creaPF1(ctx) {
       <button class="btn-piccolo" data-azione="inc-atterra" ${attr} data-cb="${cb.id}" title="Torna a terra">Atterra</button></div>`;
   }
 
+  // ---- Schermo dei giocatori: dati già filtrati (nascosti, sconosciuti, niente numeri dei PF) e disegno ----
+  // datiSchermo serve sia alla finestra locale (con immagini) sia ai telefoni dei giocatori (sessione dal vivo, senza immagini).
+  function datiSchermo(c, { immagini = true } = {}) {
+    const inc = incontroDi(c);
+    const visibile = (cb) => cb && !cb.nascosto;
+    const nomeVisto = (cb, i) => (cb.ignoto ? 'Creatura misteriosa' : i.nome);
+    const ordine = ordineTurno(inc).filter(visibile);
+    const attivoTutto = inc.combattenti.find((x) => x.id === inc.attivo);
+    const attivo = visibile(attivoTutto) ? attivoTutto : null;
+    const iA = attivo ? ordine.indexOf(attivo) : -1;
+    const prossimo = attivo ? ordine[iA + 1] || ordine[0] : null;
+    const carte = inc.combattenti.filter(visibile).map((cb) => {
+      const i = info(cb);
+      const r = i.pfMax > 0 ? i.pf / i.pfMax : null;
+      const vita = i.pfMax > 0 ? {
+        perc: i.pf <= 0 ? 100 : Math.max(3, Math.min(100, Math.round(r * 100))), colore: i.pf <= 0 ? 'nera' : r > 0.5 ? 'verde' : r > 0.25 ? 'gialla' : 'rossa',
+        titolo: salute(i), ps: i.psMax > 0 ? Math.max(0, Math.min(100, Math.round((i.ps / i.psMax) * 100))) : null,
+      } : null;
+      const ignoto = !!cb.ignoto;
+      return {
+        id: cb.id, pgId: cb.pgId || '', iniz: cb.iniz === '' || cb.iniz == null ? '' : String(cb.iniz), nome: nomeVisto(cb, i),
+        badge: i.pg ? i.tipo : ignoto ? '?' : cb.mostro ? 'Mostro' : 'PNG', badgePg: i.pg && i.tipo === 'PG',
+        img: immagini && !ignoto ? immagineCb(cb, i) : '', iniziali: ignoto ? '❓' : cb.mostro ? '👹' : String(i.nome || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0].toUpperCase()).join(''),
+        attivo: cb.id === inc.attivo, aTerra: !!statoPf(i, cb), sorpreso: inc.fase === 'sorpresa' && cb.consapevole === false, impreparato: impreparato(inc, cb),
+        condizioni: (cb.condizioni || []).map((x) => ({ nome: String(x.nome), durata: x.durata === '' || x.durata == null ? '' : String(x.durata),
+          titolo: inc.sistema === 'pf1' ? EFFETTI_CONDIZIONI[norm(String(x.nome).replace(/\s+\d+$/, ''))] || '' : '' })),
+        effetti: (inc.effetti || []).filter((ef) => ef.bersagli.includes(cb.id)).map((ef) => ({ nome: String(ef.nome), rimanenti: ef.rimanenti === '' || ef.rimanenti == null ? '' : String(ef.rimanenti) })),
+        voloHtml: immagini && cb.volo ? chipVolo(cb, inc, true) : '', vita,
+      };
+    });
+    const azioni = attivo ? azioniDi(inc).filter(([k]) => inc.fase !== 'sorpresa' || k !== 'movimento')
+      .map(([k, nome]) => [inc.fase === 'sorpresa' && k === 'standard' ? 'Standard o movimento' : nome, !!(attivo.azioni || {})[k]]) : [];
+    return {
+      campagna: String(c.nome || ''), fase: inc.fase || '', round: Number(inc.round) || 0,
+      attivo: attivo ? { id: attivo.id, pgId: attivo.pgId || '', nome: nomeVisto(attivo, info(attivo)), img: immagini && !attivo.ignoto ? immagineCb(attivo, info(attivo)) : '',
+        iniziali: carte.find((x) => x.id === attivo.id)?.iniziali || '?', azioni } : null,
+      prossimo: prossimo && prossimo !== attivo ? nomeVisto(prossimo, info(prossimo)) : '',
+      scena: immagini && inc.scena && /^data:image\//.test(inc.scena) ? inc.scena : '',
+      messaggio: String(inc.messaggio || ''),
+      tiri: inc.tiriPubblici ? (inc.tiriSchermo || []).slice(0, 5) : [],
+      carte,
+    };
+  }
+  // Disegno dello schermo. fidato = dati prodotti da questa finestra (immagini e HTML del volo ammessi);
+  // dai telefoni dei giocatori arrivano dalla sessione dal vivo e si usano solo come testo.
+  let turnoAnnunciato = null;
+  function renderSchermo(s, { fidato = true, scena = '', mioPg = '' } = {}) {
+    if (!s) return '<div class="schermo"><p class="vuoto">In attesa del master…</p></div>';
+    const imgScena = fidato ? s.scena : scena && /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(scena) ? scena : '';
+    const ritratto = (x) => (fidato && x.img ? x.img : `<span class="ritratto-iniziali">${esc(x.iniziali || '?')}</span>`);
+    const carte = (s.carte || []).map((x) => `<div class="sch-carta${x.attivo ? ' attivo' : ''}${x.aTerra ? ' a-terra' : ''}${x.sorpreso ? ' sorpreso' : ''}${mioPg && x.pgId === mioPg ? ' mio' : ''}">
+        <div class="sch-iniz">${x.iniz === '' ? '—' : esc(x.iniz)}</div>
+        <span class="ritratto sch-img">${ritratto(x)}</span>
+        <div class="sch-corpo">
+          <div class="sch-nome">${esc(x.nome)} <span class="badge ${x.pgId ? (x.badgePg ? 'badge-pg' : '') : 'badge-mostro'}">${esc(x.badge)}</span>
+            ${x.sorpreso ? '<span class="badge badge-sorpreso">sorpreso</span>' : ''}${x.impreparato ? '<span class="badge badge-impreparato">impreparato</span>' : ''}</div>
+          ${fidato && x.voloHtml ? `<div class="sch-chips sch-volo">${x.voloHtml}</div>` : ''}
+          ${x.condizioni?.length ? `<div class="sch-chips sch-condizioni">${x.condizioni.map((k) => `<span class="chip sch-cond" title="${esc(k.titolo)}">${esc(k.nome)}${k.durata ? ` <b>${esc(k.durata)} r</b>` : ''}</span>`).join('')}</div>` : ''}
+          ${x.vita ? `${x.vita.ps != null ? `<div class="sch-vita sch-vita-ps" title="Stamina"><span style="width:${Number(x.vita.ps) || 0}%"></span></div>` : ''}<div class="sch-vita sch-vita-${['verde', 'gialla', 'rossa', 'nera'].includes(x.vita.colore) ? x.vita.colore : 'verde'}" title="${esc(x.vita.titolo)}"><span style="width:${Number(x.vita.perc) || 0}%"></span></div>` : ''}
+          ${x.effetti?.length ? `<div class="sch-chips">${x.effetti.map((ef) => `<span class="chip chip-effetto">✨ ${esc(ef.nome)}${ef.rimanenti ? ` <b>${esc(ef.rimanenti)} r</b>` : ''}</span>`).join('')}</div>` : ''}
+        </div>
+      </div>`).join('');
+    const a = s.attivo;
+    const tiri = (s.tiri || []).length ? `<aside class="sch-tiri"><h3>🎲 Tiri</h3>${s.tiri.map((t) => `<div class="sch-tiro"><span>${esc(t.etichetta || t.espr)}</span><b>${esc(t.totale)}</b></div>`).join('')}</aside>` : '';
+    // Fuori dallo scontro: modalità scena (immagine a tutto schermo) o attesa
+    const inScontro = !!s.fase;
+    const scenaGrande = !inScontro && imgScena;
+    // Annuncio del turno: solo quando cambia (e non alla prima apertura)
+    const chiave = inScontro && a ? `${s.round}:${a.id}` : null;
+    if (chiave && turnoAnnunciato !== null && chiave !== turnoAnnunciato) {
+      const mio = mioPg && a.pgId === mioPg;
+      setTimeout(() => annunciaTurno(mio ? 'È il tuo turno!' : `Tocca a ${a.nome}`, mio || !mioPg), 0);
+    }
+    turnoAnnunciato = chiave ?? turnoAnnunciato ?? '';
+    setTimeout(() => document.querySelector('.sch-carta.attivo')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
+    return `<div class="schermo${scenaGrande ? ' modo-scena' : ''}" style="--sch-scala:${scalaSchermo()}">
+      <header class="sch-testa">
+        <div class="sch-round">${s.fase === 'sorpresa' ? 'Round di sorpresa' : inScontro ? `Round ${s.round}` : scenaGrande ? esc(s.campagna) : 'In attesa dello scontro'}</div>
+        ${inScontro && a ? `<div class="sch-turno"><span class="ritratto sch-img-grande">${ritratto(a)}</span>
+          <div><div class="muto">Tocca a</div><div class="sch-turno-nome">${esc(a.nome)}</div>
+          ${s.prossimo ? `<div class="muto">poi ${esc(s.prossimo)}</div>` : ''}
+          <div class="sch-azioni">${(a.azioni || []).map(([nome, usata]) => `<span class="sch-azione${usata ? ' usata' : ''}">${esc(nome)}</span>`).join('')}</div></div></div>` : ''}
+        ${scenaGrande ? '' : `<div class="muto sch-camp">${esc(s.campagna)}</div>`}
+        <div class="sch-scala"><button class="btn-mini" data-azione="sch-scala" data-d="-1" title="Testo più piccolo">A−</button><button class="btn-mini" data-azione="sch-scala" data-d="1" title="Testo più grande">A+</button></div>
+      </header>
+      ${s.messaggio ? `<div class="sch-messaggio">📢 ${esc(s.messaggio)}</div>` : ''}
+      ${imgScena ? `<div class="sch-scena${scenaGrande ? ' grande' : ''}"><img src="${imgScena}" alt="Scena"></div>` : ''}
+      ${scenaGrande ? '' : `<div class="sch-corpo-lista"><div class="sch-lista">${carte || '<p class="vuoto">Nessuno in combattimento.</p>'}</div>${tiri}</div>`}
+    </div>`;
+  }
+  // Grandezza del testo dello schermo (per la TV): resta in questo dispositivo
+  function scalaSchermo() { try { return Math.min(2, Math.max(0.7, Number(localStorage.getItem('schermo-scala')) || 1)); } catch { return 1; } }
+  // «Tocca a…» a tutto schermo per qualche secondo, con un breve suono
+  function annunciaTurno(testo, suona) {
+    document.getElementById('sch-annuncio')?.remove();
+    const el = document.createElement('div');
+    el.id = 'sch-annuncio';
+    el.textContent = testo;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3200);
+    if (!suona) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ac = new Ctx();
+      [[660, 0], [880, 0.16]].forEach(([f, t]) => {
+        const o = ac.createOscillator();
+        const g = ac.createGain();
+        o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, ac.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(0.25, ac.currentTime + t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + t + 0.35);
+        o.connect(g).connect(ac.destination);
+        o.start(ac.currentTime + t);
+        o.stop(ac.currentTime + t + 0.4);
+      });
+      setTimeout(() => ac.close(), 1000);
+    } catch { /* audio non disponibile */ }
+  }
   function vistaSchermo(c) {
     if (!c) return '<p class="vuoto">Campagna non trovata.</p>';
-    const inc = incontroDi(c);
-    const attivo = inc.combattenti.find((x) => x.id === inc.attivo);
-    const lista = ordineTurno(inc);
-    const iA = lista.indexOf(attivo);
-    const prossimo = attivo ? (lista[iA + 1] || inc.combattenti[0]) : null;
-    const carte = inc.combattenti.map((cb) => {
-      const i = info(cb);
-      const effetti = (inc.effetti || []).filter((ef) => ef.bersagli.includes(cb.id))
-        .map((ef) => `<span class="chip chip-effetto">✨ ${esc(ef.nome)}${ef.rimanenti === '' || ef.rimanenti == null ? '' : ` <b>${ef.rimanenti} r</b>`}</span>`).join('');
-      const cond = (cb.condizioni || []).map((x) => `<span class="chip sch-cond" title="${esc(inc.sistema === 'pf1' ? EFFETTI_CONDIZIONI[norm(String(x.nome).replace(/\s+\d+$/, ''))] || '' : '')}">${esc(x.nome)}${x.durata ? ` <b>${x.durata} r</b>` : ''}</span>`).join('');
-      const perc = i.pfMax > 0 ? Math.max(0, Math.min(100, (i.pf / i.pfMax) * 100)) : 0;
-      const stato = statoPf(i, cb);
-      const sorpreso = inc.fase === 'sorpresa' && cb.consapevole === false;
-      return `<div class="sch-carta${cb.id === inc.attivo ? ' attivo' : ''}${stato ? ' a-terra' : ''}${sorpreso ? ' sorpreso' : ''}">
-        <div class="sch-iniz">${cb.iniz === '' || cb.iniz == null ? '—' : esc(cb.iniz)}</div>
-        <span class="ritratto sch-img">${immagineCb(cb, i)}</span>
-        <div class="sch-corpo">
-          <div class="sch-nome">${esc(i.nome)} ${i.pg ? `<span class="badge ${i.tipo === 'PG' ? 'badge-pg' : ''}">${i.tipo}</span>` : `<span class="badge badge-mostro">${cb.mostro ? 'Mostro' : 'PNG'}</span>`}
-            ${sorpreso ? '<span class="badge badge-sorpreso">sorpreso</span>' : ''}${impreparato(inc, cb) ? '<span class="badge badge-impreparato">impreparato</span>' : ''}</div>
-          ${cb.volo ? `<div class="sch-chips sch-volo">${chipVolo(cb, inc, true)}</div>` : ''}
-          ${cond ? `<div class="sch-chips sch-condizioni">${cond}</div>` : ''}
-          ${barraVita(i, perc)}
-          ${effetti ? `<div class="sch-chips">${effetti}</div>` : ''}
-        </div>
-      </div>`;
-    }).join('');
-    return `<div class="schermo">
-      <header class="sch-testa">
-        <div class="sch-round">${inc.fase === 'sorpresa' ? 'Round di sorpresa' : inc.fase ? `Round ${inc.round}` : 'In attesa dello scontro'}</div>
-        ${attivo ? `<div class="sch-turno"><span class="ritratto sch-img-grande">${immagineCb(attivo, info(attivo))}</span>
-          <div><div class="muto">Tocca a</div><div class="sch-turno-nome">${esc(nomeCb(attivo))}</div>
-          ${prossimo && prossimo !== attivo ? `<div class="muto">poi ${esc(nomeCb(prossimo))}</div>` : ''}
-          <div class="sch-azioni">${azioniDi(inc).filter(([k]) => inc.fase !== 'sorpresa' || k !== 'movimento').map(([k, nome]) => {
-            const a = attivo.azioni || {};
-            const nomeV = inc.fase === 'sorpresa' && k === 'standard' ? 'Standard o movimento' : nome;
-            return `<span class="sch-azione${a[k] ? ' usata' : ''}">${esc(nomeV)}</span>`;
-          }).join('')}</div></div></div>` : ''}
-        <div class="muto sch-camp">${esc(c.nome)}</div>
-      </header>
-      ${inc.scena && /^data:image\//.test(inc.scena) ? `<div class="sch-scena"><img src="${inc.scena}" alt="Scena"></div>` : ''}
-      <div class="sch-lista">${carte || '<p class="vuoto">Nessuno in combattimento.</p>'}</div>
-    </div>`;
+    return renderSchermo(datiSchermo(c));
+  }
+  // Tiri pubblici: se nello scontro di una campagna è attivo «tiri sullo schermo», il tiro appena fatto va sullo schermo
+  function tiroSulloSchermo(campagne, tiro) {
+    const c = campagne.find((x) => x.incontro?.tiriPubblici && x.incontro.fase);
+    if (!c || !tiro) return;
+    const inc = c.incontro;
+    inc.tiriSchermo = [{ etichetta: String(tiro.etichetta || '').slice(0, 80), espr: String(tiro.espr || ''), totale: String(tiro.totale) }, ...(inc.tiriSchermo || [])].slice(0, 5);
   }
   // ---- Mostri del bestiario (dati in src/pf1-mostri.js) ----
   const MOSTRI = window.PF1_MOSTRI || [];
@@ -7084,7 +7168,11 @@ window.creaPF1 = function creaPF1(ctx) {
             : `<div class="comb-nome-riga">${cb.mostro ? `<span class="ritratto ritratto-mostro" data-img-mostro="${esc(cb.mostro)}">${cb.immagine && /^data:image\//.test(cb.immagine) ? `<img src="${cb.immagine}" alt="">` : '<span class="ritratto-iniziali">👹</span>'}</span>` : ''}<input value="${esc(cb.nome)}" data-inc="combattenti#${cb.id}|nome" ${attr} class="comb-nome-in"> <span class="badge badge-mostro">${cb.mostro ? 'Mostro' : 'PNG'}</span></div>`}
           <div class="comb-sotto">Iniz ${modificabile ? `<input type="number" class="mini" value="${esc(cb.modIniz ?? '')}" data-inc="combattenti#${cb.id}|modIniz" ${attr} data-tipo="numero">` : segno(i.modIniz)}
             · CA ${modificabile ? `<input type="number" class="mini" value="${esc(cb.ca ?? '')}" data-inc="combattenti#${cb.id}|ca" ${attr} data-tipo="numero">` : i.scheda === 'sf' ? `<b>${i.ca}</b>/<b>${i.cac}</b> <small class="muto">CAE/CAC</small>` : `<b>${i.ca}</b>`}
-            ${modificabile ? `· PF max <input type="number" class="mini" value="${esc(cb.pfMax ?? '')}" data-inc="combattenti#${cb.id}|pfMax" ${attr} data-tipo="numero">` : ''} ${stati}</div>
+            ${modificabile ? `· PF max <input type="number" class="mini" value="${esc(cb.pfMax ?? '')}" data-inc="combattenti#${cb.id}|pfMax" ${attr} data-tipo="numero">` : ''} ${stati}
+            <span class="comb-schermo">
+              <button class="btn-mini${cb.nascosto ? ' acceso' : ''}" data-azione="inc-nascondi" ${attr} data-cb="${cb.id}" title="${cb.nascosto ? 'Nascosto: non compare sullo schermo dei giocatori. Clicca per rivelarlo' : 'Nascondilo dallo schermo dei giocatori (imboscata, invisibile)'}">${cb.nascosto ? '🙈 nascosto' : '👁'}</button>
+              ${i.pg ? '' : `<button class="btn-mini${cb.ignoto ? ' acceso' : ''}" data-azione="inc-ignoto" ${attr} data-cb="${cb.id}" title="${cb.ignoto ? 'Sullo schermo compare come «Creatura misteriosa». Clicca quando i personaggi lo identificano' : 'Mostralo come «Creatura misteriosa» finché non viene identificato'}">${cb.ignoto ? '❓ sconosciuto' : '❓'}</button>`}
+            </span></div>
         </div>
         <div class="comb-pf">
           <div class="barra-pf"><span style="width:${perc}%"></span></div>
@@ -7117,6 +7205,13 @@ window.creaPF1 = function creaPF1(ctx) {
         <button data-azione="inc-schermo" ${attr} title="Apre il tracker in una seconda finestra da spostare su un altro monitor per i giocatori">🖥 Schermo giocatori</button>
         <button data-azione="inc-scena" ${attr} title="Immagine o mappa mostrata sullo schermo dei giocatori sopra l'ordine di iniziativa">🖼 ${inc.scena ? 'Cambia scena' : 'Immagine di scena'}</button>
         ${inc.scena ? `<button class="btn-piccolo" data-azione="inc-scena-x" ${attr} title="Togli l'immagine di scena">× scena</button>` : ''}
+      </div>
+      <div class="inc-barra inc-schermo-extra">
+        <span class="muto">Schermo giocatori:</span>
+        <input id="inc-msg-${c.id}" class="pf-largo" value="${esc(inc.messaggio || '')}" placeholder="Messaggio da mostrare (es. «Il ponte crolla tra 2 round!»)">
+        <button class="btn-piccolo" data-azione="inc-messaggio" ${attr}>📢 Mostra</button>
+        ${inc.messaggio ? `<button class="btn-piccolo" data-azione="inc-messaggio-x" ${attr}>× messaggio</button>` : ''}
+        <button class="btn-piccolo${inc.tiriPubblici ? ' acceso' : ''}" data-azione="inc-tiri-pubblici" ${attr} title="Durante lo scontro i tiri che fai (anche dei mostri) compaiono sullo schermo dei giocatori">🎲 Tiri sullo schermo: <b>${inc.tiriPubblici ? 'sì' : 'no'}</b></button>
       </div>
       ${ctx.pannelloDalVivo ? ctx.pannelloDalVivo(c) : ''}
       ${sezioneMusica(c, attr)}
@@ -7542,6 +7637,46 @@ window.creaPF1 = function creaPF1(ctx) {
       delete inc.scena;
       ctx.salva();
       ctx.render();
+    },
+    // ---- Schermo dei giocatori: nascosti, sconosciuti, messaggio, tiri pubblici, grandezza del testo ----
+    'inc-nascondi'(el) {
+      const cb = incontroDi(ctx.campagna(el.dataset.camp)).combattenti.find((x) => x.id === el.dataset.cb);
+      if (!cb) return;
+      cb.nascosto = !cb.nascosto;
+      ctx.salva();
+      ctx.render();
+    },
+    'inc-ignoto'(el) {
+      const cb = incontroDi(ctx.campagna(el.dataset.camp)).combattenti.find((x) => x.id === el.dataset.cb);
+      if (!cb) return;
+      cb.ignoto = !cb.ignoto;
+      ctx.salva();
+      ctx.render();
+    },
+    'inc-messaggio'(el) {
+      const inc = incontroDi(ctx.campagna(el.dataset.camp));
+      inc.messaggio = String(document.getElementById(`inc-msg-${el.dataset.camp}`)?.value || '').trim().slice(0, 200);
+      ctx.salva();
+      ctx.render();
+      ctx.toast(inc.messaggio ? '📢 Messaggio sullo schermo dei giocatori' : 'Messaggio tolto');
+    },
+    'inc-messaggio-x'(el) {
+      const inc = incontroDi(ctx.campagna(el.dataset.camp));
+      delete inc.messaggio;
+      ctx.salva();
+      ctx.render();
+    },
+    'inc-tiri-pubblici'(el) {
+      const inc = incontroDi(ctx.campagna(el.dataset.camp));
+      inc.tiriPubblici = !inc.tiriPubblici;
+      if (!inc.tiriPubblici) delete inc.tiriSchermo;
+      ctx.salva();
+      ctx.render();
+    },
+    'sch-scala'(el) {
+      const v = Math.round(Math.min(2, Math.max(0.7, scalaSchermo() + 0.1 * Number(el.dataset.d))) * 10) / 10;
+      try { localStorage.setItem('schermo-scala', String(v)); } catch { /* niente */ }
+      document.querySelector('.schermo')?.style.setProperty('--sch-scala', v);
     },
     // ---- Editor dei mostri personalizzati ----
     'mc-crea'(el) {
@@ -8193,6 +8328,8 @@ window.creaPF1 = function creaPF1(ctx) {
     vistaTavolo,
     vistaIncontro,
     vistaSchermo,
+    // Schermo dei giocatori: dati (anche per la sessione dal vivo), disegno, tiri pubblici
+    datiSchermo, renderSchermo, tiroSulloSchermo,
     // Sessione dal vivo (app.js): PF del personaggio come li vede il tracker, e una riga nel registro dello scontro in corso
     pfDalVivo: (pgId) => { try { const i = info({ pgId }); return { pf: i.pf, pfMax: i.pfMax, ps: i.ps, psMax: i.psMax }; } catch { return null; } },
     annotaDalVivo: (c, testo) => { const inc = c.incontro; if (inc?.fase) annota(inc, testo); },
