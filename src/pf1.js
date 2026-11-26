@@ -677,7 +677,8 @@ window.creaPF1 = function creaPF1(ctx) {
   const CLASSI_ARCANE = new Set(['Mago', 'Stregone', 'Arcanista', 'Bardo', 'Scaldo', 'Magus', 'Fattucchiere', 'Convocatore', 'Iracondo di Stirpe']);
   const CLASSI_DIVINE = new Set(['Chierico', 'Oracolo', 'Druido', 'Ranger', 'Paladino', 'Antipaladino', 'Inquisitore', 'Sacerdote Guerriero', 'Cacciatore', 'Sciamano']);
   // Nome del talento senza la scelta tra parentesi: "Arma Focalizzata (spada lunga)" -> "arma focalizzata"
-  const baseTalento = (s) => norm(String(s).replace(/\s*\((?!mitico\))[^)]*\)\s*$/i, ''));
+  // (anche con una parentesi dentro la scelta: "Abilità Focalizzata (Conoscenze (arcane))" -> "abilita focalizzata")
+  const baseTalento = (s) => norm(String(s).replace(/\s*\((?!mitico\))[^()]*(?:\([^()]*\))?[^()]*\)\s*$/i, ''));
   // Allineamento del personaggio dal campo di testo (anche sigle come LB, CN, N)
   function allineamentoDi(p) {
     const a = norm(p.campi?.Allineamento || '');
@@ -1772,7 +1773,7 @@ window.creaPF1 = function creaPF1(ctx) {
     const presi = st.talenti.filter((t) => d.capacita.some((x) => norm(x.nome) === norm(t) || baseTalento(x.nome) === baseTalento(t) && !/\(/.test(t)));
     const talenti = st.talenti.map((t) => {
       const preso = presi.includes(t);
-      return `<span class="stirpe-tal${preso ? ' preso' : ''}">${preso ? '✓ ' : ''}${esc(t)}${!preso && TALENTI.talento(t.replace(/\s*\(.*$/, '')) ? ` <button class="btn-mini" data-azione="pf1-prendi-talento" data-id="${id}" data-nome="${esc(t.replace(/\s*\(.*$/, ''))}" title="Prendi questo talento">+</button>` : ''}</span>`;
+      return `<span class="stirpe-tal${preso ? ' preso' : ''}">${preso ? '✓ ' : ''}${esc(t)}${!preso && TALENTI.talento(t.replace(/\s*\(.*$/, '')) ? ` <button class="btn-mini" data-azione="pf1-prendi-talento" data-id="${id}" data-nome="${esc(t.replace(/\s*\(.*$/, ''))}" data-scelta="${esc(sceltaTalento(t))}" title="Prendi questo talento">+</button>` : ''}</span>`;
     }).join('');
     const poteri = st.poteri.map((pt) => {
       const ok = pt.liv <= liv;
@@ -3960,6 +3961,45 @@ window.creaPF1 = function creaPF1(ctx) {
   let incAgg = null; // { pg, inc, modo: 'uno'|'due', scelte: [{ livello, nome }] }
   // Livello più alto che l'incantatore sa lanciare (con almeno un incantesimo al giorno)
   const livMaxLancio = (ci) => Math.max(-1, ...(ci?.livelli || []).filter((l) => l.base !== '' && !l.troppoAlto && (l.tot > 0 || l.L === 0)).map((l) => l.L));
+  // Talenti con la scelta di un'abilità (Abilità Focalizzata): il nome diventa «Abilità Focalizzata (Furtività)»,
+  // ed è da quel nome che la scheda calcola il bonus. Si può prendere più volte, ogni volta su un'abilità diversa.
+  const TALENTI_SU_ABILITA = { 'abilita focalizzata': '+3 all\'abilità scelta, +6 con almeno 10 gradi' };
+  const talentoSuAbilita = (nome) => TALENTI_SU_ABILITA[norm(nome)] || '';
+  // Abilità selezionabili: quelle del regolamento, con tutti i tipi di Artigianato, Professione e Intrattenere
+  function abilitaPerTalento(p) {
+    const r = ctx.regDi(p);
+    return (r?.abilita || []).flatMap((a) => (ABIL_SPECIALIZZATE[a.nome] ? ABIL_SPECIALIZZATE[a.nome].map((t) => `${a.nome} (${t})`) : [a.nome]));
+  }
+  function apriSceltaTalento(p, t) {
+    document.getElementById('st-overlay')?.remove();
+    const d = dati(p);
+    const gia = new Set(d.capacita.filter((x) => baseTalento(x.nome || '') === norm(t.nome)).map((x) => norm(sceltaTalento(x.nome))));
+    const elenco = abilitaPerTalento(p).filter((a) => !gia.has(norm(a)));
+    const gradi = (a) => n(d.abil[a]?.gradi);
+    const ov = document.createElement('div');
+    ov.id = 'st-overlay';
+    ov.innerHTML = `<div class="info-box ia-box" role="dialog" aria-label="${esc(t.nome)}">
+      <div class="info-testa"><h2>${esc(t.nome)}</h2><button class="btn-x" data-azione="pf1-scelta-talento-annulla" title="Annulla">×</button></div>
+      <div class="info-corpo">
+        <p class="muto">${esc(talentoSuAbilita(t.nome))}. Puoi prenderlo più volte, ogni volta su un'abilità diversa${gia.size ? ` (già preso su: ${esc([...d.capacita.filter((x) => baseTalento(x.nome || '') === norm(t.nome)).map((x) => sceltaTalento(x.nome))].join(', '))})` : ''}.</p>
+        <div class="pf-riga"><label class="pf-largo">Su quale abilità? <select id="st-abilita"><option value="">— scegli l'abilità —</option>
+          ${elenco.map((a) => `<option value="${esc(a)}">${esc(a)}${gradi(a) ? ` (${gradi(a)} gradi)` : ''}</option>`).join('')}</select></label></div>
+        <div class="pf-piede"><button class="primario" data-azione="pf1-scelta-talento-ok" data-id="${p.id}" data-nome="${esc(t.nome)}">Prendi il talento</button><button data-azione="pf1-scelta-talento-annulla">Annulla</button></div>
+      </div></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+  }
+  function prendiTalentoSuAbilita(p, t, abil) {
+    const d = dati(p);
+    const nome = `${t.nome} (${abil})`;
+    if (d.capacita.some((x) => norm(x.nome) === norm(nome))) { ctx.toast(`<b>${esc(nome)}</b> c'è già`, 'errore'); return false; }
+    d.capacita.push({ id: uid(), nome, tipo: 'Talento', descrizione: '' });
+    ctx.salva();
+    ctx.render();
+    const bonus = n(d.abil[abil]?.gradi) >= 10 ? 6 : 3;
+    ctx.toast(`🎖 <b>${esc(nome)}</b> aggiunto ai talenti · ${esc(abil)} +${bonus}${bonus === 3 ? ' (+6 con 10 gradi)' : ''}`);
+    return true;
+  }
   function apriIncAggiuntivi(p) {
     const d = dati(p);
     const spontanei = d.incantatori.filter((x) => x.tipo === 'spontanei');
@@ -6272,12 +6312,27 @@ window.creaPF1 = function creaPF1(ctx) {
       if (s.stato === 'no') { ctx.toast(`Non puoi prendere <b>${esc(t.nome)}</b>: manca ${esc(s.req.filter((r) => r.esito === false).map((r) => r.testo).join(', '))}`, 'errore'); return; }
       // Incantesimi Aggiuntivi: prima si sceglie cosa si aggiunge (classe, livello, incantesimi)
       if (norm(t.nome) === norm(NOME_INC_AGGIUNTIVI)) { apriIncAggiuntivi(p); return; }
+      // Abilità Focalizzata: si chiede l'abilità (se non arriva già scelta, es. dai talenti della stirpe)
+      if (talentoSuAbilita(t.nome)) {
+        const gia = el.dataset.scelta && abilitaPerTalento(p).find((a) => norm(a) === norm(el.dataset.scelta));
+        if (gia) prendiTalentoSuAbilita(p, t, gia); else apriSceltaTalento(p, t);
+        return;
+      }
       d.capacita.push({ id: uid(), nome: t.nome, tipo: 'Talento', descrizione: '' });
       ctx.salva();
       ctx.render();
       const scelta = /\((?:arma|abilit|scuola|scelt)/i.test(t.prerequisiti) || /Focalizzat|Specializzazione|Critico Migliorato|Competenza/i.test(t.nome);
       ctx.toast(`🎖 <b>${esc(t.nome)}</b> aggiunto ai talenti${s.stato === 'forse' ? ' · controlla i prerequisiti in giallo' : ''}${scelta ? ' · scrivi la scelta tra parentesi, es. (spada lunga)' : ''}${/^doppio percorso/.test(norm(t.nome)) ? ' · scegli il secondo percorso nella sezione Mitico' : ''}`);
     },
+    'pf1-scelta-talento-ok'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      const t = TALENTI.talento(el.dataset.nome);
+      const abil = document.getElementById('st-abilita')?.value;
+      if (!p || !t) return;
+      if (!abil) { ctx.toast('Scegli prima l\'abilità', 'errore'); return; }
+      if (prendiTalentoSuAbilita(p, t, abil)) document.getElementById('st-overlay')?.remove();
+    },
+    'pf1-scelta-talento-annulla'() { document.getElementById('st-overlay')?.remove(); },
     'pf1-talento-scelto'(el) {
       const nome = document.getElementById(el.dataset.sel)?.value;
       if (!nome) { ctx.toast('Scegli prima un talento dal menu', 'errore'); return; }
