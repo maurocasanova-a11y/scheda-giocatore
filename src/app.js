@@ -1422,6 +1422,18 @@
     if (!window.gdr?.statoDati) return '<header class="intest"><h1>Impostazioni</h1></header><p class="vuoto">Le impostazioni dei dati sono disponibili solo nell\'app.</p>';
     if (!s) { window.gdr.statoDati().then((x) => { statoDati = x; render(); }); return '<p class="muto">Carico…</p>'; }
     const l = s.lucchetto;
+    // App per tablet Android: i dati stanno nella memoria dell'app; tra PC e tablet passano con la copia online
+    if (s.tablet) {
+      return `<header class="intest"><h1>Impostazioni</h1></header>
+      <section class="pannello imp-dati">
+        <h3>Dove sono salvati i dati</h3>
+        <p class="imp-cartella"><b>${esc(s.cartella)}</b></p>
+        <p class="muto">I dati restano nell'app di questo tablet (si perdono solo disinstallandola). Per lavorare anche sul PC usa la <b>copia di sicurezza online</b> qui sotto:
+          sul PC premi «Salva adesso», qui «Ripristina» con lo stesso codice (e viceversa quando torni al PC). Un dispositivo alla volta.</p>
+        <p class="muto">«Esporta backup» salva un file nella cartella <b>Documenti/Cronache del Master</b> del tablet; «Importa backup» apre un file scelto da te.</p>
+      </section>
+      ${sezioneCopiaOnline()}`;
+    }
     return `<header class="intest"><h1>Impostazioni</h1></header>
       <section class="pannello imp-dati">
         <h3>Dove sono salvati i dati</h3>

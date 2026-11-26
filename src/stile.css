@@ -1508,3 +1508,6 @@ input.mini { width: 54px; padding: 2px 5px; font-size: 13px; }
 .mp-tabella { width: 100%; }
 .mp-aggiungi { flex-wrap: wrap; gap: 8px 14px; }
 .mp-aggiungi .riga-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+/* App per tablet Android: niente cartella dati da aprire */
+.app-tablet [data-azione="apri-cartella"] { display: none; }
