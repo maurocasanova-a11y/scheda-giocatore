@@ -254,7 +254,14 @@ window.creaPF1 = function creaPF1(ctx) {
   }
 
   // ---- Equipaggiamento dal wiki (dati in src/pf1-equip.js) ----
-  const EQUIP = window.PF1_EQUIP || { armi: [], armature: [] };
+  // Gli attacchi naturali (src/pf1-attacchi-naturali.js) si aggiungono alle armi come gruppo a parte:
+  // [nome, 'Attacchi Naturali', Primario/Secondario, costo, danni P, danni M, critico, gittata, peso, tipo, speciale, danni per taglia]
+  const TAGLIE_NATURALI = ['Piccolissima', 'Minuta', 'Minuscola', 'Piccola', 'Media', 'Grande', 'Enorme', 'Mastodontica', 'Colossale'];
+  const EQUIP = (() => {
+    const base = window.PF1_EQUIP || { armi: [], armature: [] };
+    const naturali = (window.PF1_ATTACCHI_NATURALI || []).map(([nome, attacco, tipo, t]) => [nome, 'Attacchi Naturali', attacco, '—', t[3], t[4], 'x2', '—', '—', tipo, `attacco naturale ${attacco.toLowerCase()}`, t]);
+    return { ...base, armi: [...base.armi, ...naturali] };
+  })();
   const numeroDa = (s) => { const m = String(s || '').replace(/\./g, '').replace(',', '.').match(/-?\d+(?:\.\d+)?/); return m ? Number(m[0]) : ''; };
   // Tendina raggruppata + pulsanti per aggiungere un'arma o un'armatura con i valori del wiki
   function sceltaEquip(p, lista) {
@@ -274,6 +281,15 @@ window.creaPF1 = function creaPF1(ctx) {
   // Valori della scheda presi da una riga della tabella del wiki
   function daTabellaArma(v, taglia) {
     const [nome, categoria, gruppo, , dP, dM, critico, gittata, peso] = v;
+    // Attacco naturale: danni dalla taglia del personaggio; i secondari a −5 per colpire e con metà FOR ai danni
+    if (categoria === 'Attacchi Naturali') {
+      const i = TAGLIE_NATURALI.indexOf(taglia || 'Media');
+      const secondario = gruppo === 'Secondario';
+      return {
+        nome, tipo: 'mischia', danni: v[11]?.[i < 0 ? 4 : i] || dM || '', critico: '20/×2', carDanni: secondario ? 'FOR05' : 'FOR',
+        bonus: secondario ? -5 : '', peso: '', gittata: '',
+      };
+    }
     const distanza = /Distanza/.test(gruppo) || categoria === 'Armi da Fuoco';
     const piccola = ['Piccola', 'Minuscola', 'Minuta', 'Piccolissima'].includes(taglia);
     const crit = String(critico || '').replace(/x/g, '×');
@@ -6307,7 +6323,7 @@ window.creaPF1 = function creaPF1(ctx) {
       d[lista].push({ ...NUOVI[lista](), ...valori });
       ctx.salva();
       ctx.render();
-      ctx.toast(`${lista === 'armi' ? '⚔' : '🛡'} <b>${esc(nome)}</b> aggiunt${lista === 'armi' ? 'a agli attacchi' : 'a all\'equipaggiamento'}${gittata ? ` · gittata ${esc(gittata)}` : ''}`);
+      ctx.toast(`${lista === 'armi' ? '⚔' : '🛡'} <b>${esc(nome)}</b> aggiunt${lista === 'armi' ? 'a agli attacchi' : 'a all\'equipaggiamento'}${gittata ? ` · gittata ${esc(gittata)}` : ''}${v[1] === 'Attacchi Naturali' ? (v[2] === 'Secondario' ? ' · attacco naturale secondario: −5 per colpire e ½ FOR ai danni' : ' · attacco naturale primario') + ' (con un solo attacco naturale: FOR × 1,5, da scegliere a mano)' : ''}`);
     },
     'pf1-info-equip'(el) {
       const lista = el.dataset.lista;
@@ -6317,6 +6333,13 @@ window.creaPF1 = function creaPF1(ctx) {
       const fatti = lista === 'armi'
         ? [['Categoria', `${v[1]} · ${v[2]}`], ['Costo', v[3]], ['Danni (P / M)', `${v[4]} / ${v[5]}`], ['Critico', v[6]], ['Gittata', v[7]], ['Peso', v[8]], ['Tipo', v[9]], ['Speciale', v[10]]]
         : [['Gruppo', v[1]], ['Costo', v[2]], ['Bonus', v[3]], ['Bonus DES max', v[4]], ['Penalità alla prova', v[5]], ['Fallimento incantesimi', v[6]], ['Velocità (9 m / 6 m)', `${v[7]} / ${v[8]}`], ['Peso', v[9]]];
+      // Attacchi naturali: danni per tutte le taglie e la pagina delle regole
+      if (v[1] === 'Attacchi Naturali') {
+        const perTaglia = TAGLIE_NATURALI.map((t, i) => (v[11][i] ? `${t} ${v[11][i]}` : '')).filter(Boolean).join(' · ');
+        apriInfo(nome, `<div class="info-fatti">${fatto('Tipo di attacco', v[2] === 'Secondario' ? 'Secondario: BAB −5, metà FOR ai danni' : 'Primario: BAB pieno, FOR piena ai danni')}${fatto('Danni per taglia', perTaglia)}${fatto('Tipo di danno', v[9])}${fatto('Un solo attacco naturale', 'BAB pieno e FOR × 1,5 ai danni')}</div>`,
+          'Attacchi_Naturali', estraiIncantesimo);
+        return;
+      }
       apriInfo(nome, `<div class="info-fatti">${fatti.map(([k, x]) => fatto(k, x && x !== '—' ? x : '')).join('')}</div>`,
         paginaWiki(`${lista === 'armi' ? 'Armi' : 'Armature'}/${nome}`), estraiIncantesimo);
     },
