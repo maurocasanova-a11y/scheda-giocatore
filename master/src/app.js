@@ -107,6 +107,9 @@
     }, 400);
   }
   let statoDati = null; // cartella dati, sola lettura, PC (solo nell'app)
+  // App Android in costruzione (Impostazioni): lo stato arriva dal processo principale mentre GitHub lavora
+  const apk = { inCorso: false, stato: '' };
+  window.gdr?.suStatoApk?.((testo) => { apk.stato = testo; const el = document.getElementById('apk-stato'); if (el) el.textContent = testo; });
   // Brani: i file della cartella dati si salvano per nome; i vecchi indirizzi file:// della cartella musica si convertono
   function urlMusica(b) {
     if (!b.file && /^file:/i.test(b.url || '') && /\/musica\//i.test(b.url)) b.file = decodeURIComponent(b.url.split('/').pop());
@@ -1459,6 +1462,13 @@
           In entrambi i kit i mostri del tuo Manuale dei Mostri non vengono inclusi, e il file della scheda è lo stesso.<br>
           <b>La tua app per iPad e tablet:</b> lo stesso pulsante pubblica anche l'app del master all'indirizzo del sito seguito da <b>master/</b> (solo il programma, i dati restano nel dispositivo): su iPad aprila in Safari › Condividi › «Aggiungi alla schermata Home».</p>
       </section>
+      ${window.gdr?.creaApk ? `<section class="pannello imp-dati">
+        <h3>App Android per il tuo tablet</h3>
+        <p class="muto">Salva il programma su GitHub, fa costruire a GitHub l'app aggiornata (5-8 minuti) e la scarica nella cartella <b>Documenti › Cronache del Master - app Android</b>, che si apre da sola alla fine. Puoi continuare a usare il programma mentre aspetti.</p>
+        <div class="barra-azioni"><button class="primario" data-azione="apk-crea" ${apk.inCorso ? 'disabled' : ''}>🤖 ${apk.inCorso ? 'Costruzione in corso…' : 'Crea l\'app Android aggiornata'}</button>
+          <span class="muto" id="apk-stato">${esc(apk.stato)}</span></div>
+        <p class="muto pf-aiuto">Sul tablet: copia il file (Drive, cavo USB…), aprilo e premi <b>Installa</b>: va sopra la versione vecchia e i dati restano. Non disinstallare l'app prima di aggiornarla.</p>
+      </section>` : ''}
       ${sezioneCopiaOnline()}
       <section class="pannello imp-dati">
         <h3>Uso su più PC</h3>
@@ -2312,6 +2322,25 @@
     'dv-chiudi'(el) {
       if (!confirm('Chiudere la sessione dal vivo? I giocatori verranno scollegati e il codice non varrà più.')) return;
       dvMChiudi();
+    },
+    async 'apk-crea'() {
+      if (!window.gdr?.creaApk || apk.inCorso) return;
+      apk.inCorso = true;
+      apk.stato = 'Avvio…';
+      render();
+      toast('🤖 Costruzione dell\'app Android avviata: ci vogliono 5-8 minuti, puoi continuare a lavorare');
+      try {
+        const r = await window.gdr.creaApk();
+        apk.stato = `✅ Versione ${r.versione} pronta: ${r.file.split(/[\\/]/).pop()}`;
+        toast(`🤖 App Android <b>${esc(r.versione)}</b> pronta in <b>${esc(r.cartella)}</b> (cartella aperta): copiala sul tablet e installala sopra quella vecchia`);
+      } catch (e) {
+        const motivo = String(e.message || e).replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/i, '');
+        apk.stato = `⚠ Non riuscita: ${motivo}`;
+        toast(`App Android non creata: ${esc(motivo)}`, 'errore');
+      } finally {
+        apk.inCorso = false;
+        render();
+      }
     },
     async 'kit-crea-web'(el) {
       if (!window.gdr?.creaKitWeb) return;
