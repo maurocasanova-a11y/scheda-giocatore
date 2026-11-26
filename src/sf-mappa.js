@@ -83,7 +83,9 @@ window.creaMappaSpaziale = function creaMappaSpaziale(ctx) {
     const b = battaglia(c);
     const cid = c.id;
     const lato = 20;
-    const sel = b.pedine.find((p) => p.id === b.sel) || null;
+    // In sola lettura (giocatori) la scelta della nave resta solo su quello schermo
+    const idSel = sola ? selLocale : b.sel;
+    const sel = b.pedine.find((p) => p.id === idSel) || null;
     // Area: tutte le pedine con un margine (almeno 21 × 15 esagoni)
     const qs = b.pedine.map((p) => p.q + Math.floor(p.r / 2)), rs = b.pedine.map((p) => p.r);
     const r0 = Math.min(0, ...rs) - 3, r1 = Math.max(14, ...rs) + 3;
@@ -107,7 +109,7 @@ window.creaMappaSpaziale = function creaMappaSpaziale(ctx) {
       const st = statPedina(p);
       const [x, y] = pixel(p.q, p.r, lato);
       const ang = ANGOLI[p.dir];
-      return `<g class="mp-pedina ${p.lato === 'nemico' ? 'nemico' : 'alleato'}${p.id === b.sel ? ' sel' : ''}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})"${sola ? '' : ` data-azione="mp-seleziona" data-camp="${cid}" data-p="${p.id}"`}>
+      return `<g class="mp-pedina ${p.lato === 'nemico' ? 'nemico' : 'alleato'}${p.id === idSel ? ' sel' : ''}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})"${sola ? ` data-azione="mp-guarda" data-p="${p.id}"` : ` data-azione="mp-seleziona" data-camp="${cid}" data-p="${p.id}"`}>
         <circle r="${lato * 0.78}"/><polygon class="mp-prua" points="${lato * 0.72},0 ${-lato * 0.42},${-lato * 0.42} ${-lato * 0.2},0 ${-lato * 0.42},${lato * 0.42}" transform="rotate(${ang})"/>
         <text y="${lato * 1.45}">${esc(st.nome.length > 12 ? st.nome.slice(0, 11) + '…' : st.nome)}</text></g>`;
     }).join('');
@@ -168,9 +170,11 @@ window.creaMappaSpaziale = function creaMappaSpaziale(ctx) {
   }
 
   // ---- Azioni ----
+  let selLocale = '';
   const camp = (el) => ctx.campagna(el.dataset.camp);
   const fatto = () => { ctx.salva(); ctx.render(); };
   const azioni = {
+    'mp-guarda'(el) { selLocale = selLocale === el.dataset.p ? '' : el.dataset.p; ctx.render(); },
     'mp-seleziona'(el) { const b = battaglia(camp(el)); b.sel = b.sel === el.dataset.p ? '' : el.dataset.p; b.sposta = false; fatto(); },
     'mp-esagono'(el) {
       const b = battaglia(camp(el));

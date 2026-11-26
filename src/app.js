@@ -1279,7 +1279,7 @@
     const q = new URLSearchParams(qs);
     const p = percorso.split('/').filter(Boolean);
     let html;
-    if (GIOCATORE && !['personaggio', 'dadi', 'grimorio', 'breviario', 'olografico', 'astronave'].includes(p[0])) html = vistaGiocatore();
+    if (GIOCATORE && !['personaggio', 'dadi', 'grimorio', 'breviario', 'olografico', 'astronave', 'mappa'].includes(p[0])) html = vistaGiocatore();
     else switch (p[0]) {
       case 'campagna': html = vistaCampagna(p[1], p[2], p[3]); break;
       case 'sessione': html = vistaSessione(p[1], p[2] === 'modifica', q.get('evidenzia')); break;
@@ -1294,6 +1294,7 @@
       case 'breviario': html = pf1.vistaBreviario(personaggio(p[1]), p[2]); break;
       case 'olografico': html = sf.vistaOlografico(personaggio(p[1]), p[2]); break;
       case 'astronave': html = vistaNave(p[1]); break;
+      case 'mappa': html = vistaMappaGiocatore(); break;
       case 'regolamenti': html = vistaRegolamenti(); break;
       case 'regolamento': html = vistaRegolamento(p[1]); break;
       case 'dadi': html = vistaDadi(); break;
@@ -1305,7 +1306,7 @@
     const cid = p[0] === 'campagna' || p[0] === 'schermo' ? p[1] : p[0] === 'sessione' ? sessione(p[1])?.campagnaId : p[0] === 'personaggio' ? personaggio(p[1])?.campagnaId : p[0] === 'astronave' ? nave(p[1])?.campagnaId : null;
     const cTema = cid ? campagna(cid) : null;
     const schedaTema = cTema ? regolamento(cTema.regolamentoId)?.scheda : p[0] === 'regolamento' ? regolamento(p[1])?.scheda : '';
-    document.body.classList.toggle('tema-sf', schedaTema === 'sf' || p[0] === 'astronave');
+    document.body.classList.toggle('tema-sf', schedaTema === 'sf' || p[0] === 'astronave' || p[0] === 'mappa');
     document.body.classList.toggle('tema-pf1', schedaTema === 'pf1'); // Rovine di Thassilon
     document.body.classList.toggle('tema-dnd', schedaTema === 'dnd'); // Grimorio arcano
     if (GIOCATORE && p[0] === 'personaggio' && personaggio(p[1])) html = barraGiocatore(personaggio(p[1])) + html;
@@ -1504,9 +1505,19 @@
     return `<div class="briciole">${c ? `<a href="#/campagne">Campagne</a> › <a href="#/campagna/${c.id}/astronavi">${esc(c.nome)}</a>` : '<a href="#/">Le mie schede</a>'}</div>
       <header class="intest"><h1>🚀 ${esc(v.nome)}</h1>
         <div class="intest-sotto">Astronave · Starfinder${GIOCATORE ? (v.dalVivo ? ' · 📡 dal vivo: si aggiorna da sola durante la sessione' : ' · copia mandata dal master (si aggiorna con un file nuovo o collegandosi alla sessione dal vivo)') : ''}</div>
-        <div class="barra-azioni">${GIOCATORE ? '' : `<button data-azione="nv-esporta" data-id="${v.id}" title="Salva il file dell'astronave da mandare ai giocatori">💾 File per i giocatori</button>
+        <div class="barra-azioni">${GIOCATORE ? linkMappa() : `<button data-azione="nv-esporta" data-id="${v.id}" title="Salva il file dell'astronave da mandare ai giocatori">💾 File per i giocatori</button>
           <button class="btn-cestino" data-azione="nv-elimina" data-id="${v.id}" title="Elimina l'astronave">🗑</button>`}</div></header>
       ${nv.vista(v, { personaggi: equipaggioDi(v), sola: GIOCATORE })}`;
+  }
+  // Kit: mappa del combattimento ricevuta dalla sessione dal vivo (in sola lettura; toccando una nave si vedono archi e bersagli)
+  const mappaDalVivo = { battaglia: null };
+  const linkMappa = () => (GIOCATORE && mappaDalVivo.battaglia ? '<a class="btn-piccolo primario" href="#/mappa">🗺 Mappa del combattimento</a>' : '');
+  function vistaMappaGiocatore() {
+    const b = mappaDalVivo.battaglia;
+    if (!b) return '<header class="intest"><h1>🗺 Mappa del combattimento</h1></header><p class="muto">Nessuna mappa in questo momento: compare qui quando il master mette le astronavi sulla mappa durante la sessione dal vivo.</p>';
+    return `<div class="briciole"><a href="#/">Le mie schede</a></div>
+      <header class="intest"><h1>🗺 Mappa del combattimento</h1><div class="intest-sotto">📡 dal vivo: la muove il master. Tocca una nave per vedere i suoi archi di fuoco e chi può colpire.</div></header>
+      ${mp.vista({ id: 'dalvivo', battaglia: b }, { sola: true })}`;
   }
   const FORMATO_NAVE = 'cronache-del-master/astronave';
   function esportaNave(v) {
@@ -1550,6 +1561,7 @@
       ${miei.length ? `<h2>I miei personaggi</h2><div class="griglia">${miei.map((x) => `<a class="scheda" href="#/personaggio/${x.id}">
           <div class="scheda-titolo"><span class="ritratto ritratto-piccolo">${ritratto(x)}</span>${esc(x.nome)}</div>
           <div class="scheda-sotto">${esc(regDi(x)?.nome || '')}${x.giocatore ? ` · ${esc(x.giocatore)}` : ''}</div></a>`).join('')}</div>` : ''}
+      ${linkMappa() ? `<div class="barra-azioni">${linkMappa()}</div>` : ''}
       ${S.astronavi.length ? `<h2>Astronavi</h2><div class="griglia">${S.astronavi.map((v) => `<a class="scheda" href="#/astronave/${v.id}"><div class="scheda-titolo">🚀 ${esc(v.nome)}</div><div class="scheda-sotto">${esc(v.struttura || '')}</div></a>`).join('')}</div>` : ''}
       <section class="pannello giocatore-sez"><h3>Hai già un file della scheda?</h3>
         <p class="muto">Se il master ti ha rimandato la scheda, o vuoi continuarla da un altro computer, caricala qui.</p>
@@ -2543,6 +2555,16 @@
     const io = await DV.mioUid();
     const codice = dvG.codice;
     dvG.stopNavi = DV.ascolta(`sessioni/${codice}/astronavi`, (copia) => { if (dvG.codice === codice) dvGRiceviNavi(copia); }, () => {});
+    dvG.stopMappa?.();
+    dvG.stopMappa = DV.ascolta(`sessioni/${codice}/battaglia`, (copia) => {
+      if (dvG.codice !== codice) return;
+      let b = null;
+      try { b = copia?.testo ? JSON.parse(copia.testo) : null; } catch { b = null; }
+      const prima = mappaDalVivo.battaglia;
+      mappaDalVivo.battaglia = b;
+      if (b && prima && b.round !== prima.round) toast(`🗺 Combattimento tra astronavi: round <b>${b.round}</b>`);
+      if (JSON.stringify(prima) !== JSON.stringify(b) && (location.hash.startsWith('#/mappa') || !b !== !prima)) dvRidisegna();
+    }, () => {});
     dvG.stop = DV.ascolta(`sessioni/${codice}/perGiocatore/${io}`, (copia) => {
       if (dvG.codice !== codice) return;
       const comandi = Object.entries(copia?.comandi || {}).sort(([a], [b]) => (a < b ? -1 : 1));
@@ -2582,6 +2604,9 @@
     dvG.stop?.();
     dvG.stopNavi?.();
     dvG.stopNavi = null;
+    dvG.stopMappa?.();
+    dvG.stopMappa = null;
+    mappaDalVivo.battaglia = null;
     // Le astronavi ricevute restano com'erano, ma non si aggiornano più
     for (const v of S.astronavi) if (v.dalVivo) v.dalVivo = false;
     dvG.codice = ''; dvG.pgId = ''; dvG.ultimo = ''; dvG.stato = ''; dvG.ultimoComando = null; dvG.statoMaster = null; dvG.stop = null;
@@ -2669,6 +2694,14 @@
   }
   // Astronavi della campagna nella sessione dal vivo: sessioni/<codice>/astronavi/<id> = { testo: JSON di nave + equipaggio }
   function dvMInviaNavi(c, codice) {
+    // Mappa del combattimento tra astronavi (solo se c'è almeno una nave sopra)
+    const b = c.battaglia?.pedine?.length ? { round: c.battaglia.round, pedine: c.battaglia.pedine.map(({ storia, ...x }) => x) } : null;
+    const testoMappa = JSON.stringify(b);
+    if (dvM.battagliaInviata !== testoMappa) {
+      dvM.battagliaInviata = testoMappa;
+      (b ? DV.scrivi(`sessioni/${codice}/battaglia`, { testo: testoMappa, t: DV.ORA }) : DV.cancella(`sessioni/${codice}/battaglia`))
+        .catch(() => { dvM.battagliaInviata = null; });
+    }
     const navi = S.astronavi.filter((x) => x.campagnaId === c.id);
     for (const v of navi) {
       const copia = JSON.parse(JSON.stringify(v));
@@ -2760,7 +2793,7 @@
     const codice = dvM.codice;
     dvM.stop?.();
     clearTimeout(dvM.timer);
-    Object.assign(dvM, { codice: '', campagnaId: '', stop: null, giocatori: {}, base: {}, inAttesa: {}, statoInviato: {}, naviInviate: {} });
+    Object.assign(dvM, { codice: '', campagnaId: '', stop: null, giocatori: {}, base: {}, inAttesa: {}, statoInviato: {}, naviInviate: {}, battagliaInviata: null });
     if (c) { delete c.dalVivo; salva(); }
     try { if (codice) await DV.cancella(`sessioni/${codice}`); } catch { /* già chiusa */ }
     if (avvisa) toast(`📡 Sessione dal vivo <b>${esc(codice)}</b> chiusa: i giocatori non sono più collegati`);
