@@ -596,7 +596,12 @@ window.creaPF1 = function creaPF1(ctx) {
   }
 
   // ---- Archetipi (dati in src/pf1-archetipi.js) ----
-  const ARCHETIPI = window.PF1_ARCHETIPI || {};
+  // Più gli archetipi «di Golarion» (src/pf1-archetipi-golarion.js), che hanno la loro pagina del wiki in fondo
+  const ARCHETIPI = (() => {
+    const out = { ...(window.PF1_ARCHETIPI || {}) };
+    for (const [cl, l] of Object.entries(window.PF1_ARCHETIPI_GOLARION || {})) out[cl] = [...(out[cl] || []), ...l].sort((a, b) => a[0].localeCompare(b[0], 'it'));
+    return out;
+  })();
   const archetipiClasse = (cl) => ARCHETIPI[nomeClasse(cl.nome)] || [];
   const archetipoDi = (cl, nome) => archetipiClasse(cl).find((a) => a[0] === nome) || null;
   const sceltiClasse = (cl) => (cl.archetipi || []).map((x) => archetipoDi(cl, x)).filter(Boolean);
@@ -618,16 +623,17 @@ window.creaPF1 = function creaPF1(ctx) {
     const v = toccatiDa(a).find((x) => tb.some((y) => sovrapposte(x, y)));
     return v ? v.base : '';
   }
-  const paginaArchetipi = (classe, nome) => `${/\(Monaco Rivisitato\)$/.test(nome) ? 'Monaco_Rivisitato' : classe.replace(/ /g, '_')}/Archetipi`;
+  const paginaArchetipi = (classe, nome, pagina) => pagina || `${/\(Monaco Rivisitato\)$/.test(nome) ? 'Monaco_Rivisitato' : classe.replace(/ /g, '_')}/Archetipi`;
   // Testo di un archetipo: la sezione col suo titolo nella pagina degli archetipi della classe
-  const estraiArchetipo = (nome) => (doc) => {
+  // (negli archetipi «di Golarion» il titolo dell'archetipo è un h3 dentro la sezione Archetipi)
+  const estraiArchetipo = (nome, livello = 'H2') => (doc) => {
     const chiave = norm(nome.replace(/\s*\(Monaco Rivisitato\)$/, ''));
     const c = doc.querySelector('#mw-content-text .mw-parser-output') || doc.querySelector('#mw-content-text');
     const titolo = (el) => norm((el.querySelector('.mw-headline')?.textContent || el.textContent).replace(/\[modifica.*$/i, ''));
     const out = [];
     let dentro = false;
     for (const el of [...(c?.children || [])]) {
-      if (el.tagName === 'H2') { if (dentro) break; dentro = titolo(el) === chiave; continue; }
+      if (el.tagName === livello || (livello === 'H3' && el.tagName === 'H2')) { if (dentro) break; dentro = el.tagName === livello && titolo(el) === chiave; continue; }
       if (!dentro || el.tagName === 'TABLE' || el.classList.contains('golarion-box')) continue;
       el.querySelectorAll('br').forEach((b) => b.replaceWith('\n\n'));
       const t = el.textContent.replace(/\[modifica[^\]]*\]/gi, '').replace(/[ \t\r]+/g, ' ').trim();
@@ -6363,7 +6369,7 @@ window.creaPF1 = function creaPF1(ctx) {
       const a = (ARCHETIPI[el.dataset.classe] || []).find((x) => x[0] === el.dataset.nome);
       if (!a) return;
       apriInfo(`${a[0]} (${el.dataset.classe})`, `<div class="info-fatti">${a[1].map(([nome, L, sost, tipo]) => fatto(`${L ? L + '° ' : ''}${nome}`, sost ? `${tipo === 'm' ? 'modifica' : 'sostituisce'} ${sost}` : '—')).join('')}</div>`,
-        paginaArchetipi(el.dataset.classe, a[0]), estraiArchetipo(a[0]));
+        paginaArchetipi(el.dataset.classe, a[0], a[2]), estraiArchetipo(a[0], a[2] ? 'H3' : 'H2'));
     },
     // Maestro del Sapere: prende o toglie un segreto (togliendolo si toglie anche ciò che aveva dato)
     'ms-segreto'(el) {
