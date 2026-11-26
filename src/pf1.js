@@ -1323,7 +1323,7 @@ window.creaPF1 = function creaPF1(ctx) {
 
   // Valori calcolati da mostrare, indicizzati per chiave (aggiornati a ogni modifica senza ridisegnare)
   function mappa(c) {
-    const o = {};
+    const o = { ...valoriSoffio(c) };
     for (const s of CARS) {
       o['mod:' + s] = segno(c.m[s]);
       o['prova:' + s] = n(c.proveCar) ? `prova ${segno(c.m[s] + n(c.proveCar))}` : '';
@@ -1883,13 +1883,17 @@ window.creaPF1 = function creaPF1(ctx) {
   const NOMI_CAR = { FOR: 'Forza', DES: 'Destrezza', COS: 'Costituzione', INT: 'Intelligenza', SAG: 'Saggezza', CAR: 'Carisma' };
   // Soffio di Ashardalon: Nube Sacra (9 m, 1d8 sacri ogni 2 livelli) e Soffio Elettrico (linea 36 m, 1d6 per livello);
   // Riflessi CD 10 + ½ livello + COS. Il livello è quello del personaggio (la razza non ha livelli propri)
-  function soffioAshardalon(d, c) {
-    const L = livelloPersonaggio(d);
-    const cos = c ? c.m.COS : 0;
-    const cd = 10 + Math.floor(L / 2) + cos;
+  // I valori stanno anche in mappa(): così si aggiornano subito quando cambiano livello o Costituzione
+  function valoriSoffio(c) {
+    const L = c?.liv || 0;
     const nube = Math.floor(L / 2);
-    return `<div><span class="muto">Soffio di Ashardalon</span> Nube Sacra (emanazione 9 m) <b>${nube ? `${nube}d8` : '—'}</b> sacri${nube ? '' : ' <small class="muto">(dal 2° livello)</small>'}
-      · Soffio Elettrico (linea 36 m) <b>${L ? `${L}d6` : '—'}</b> elettricità · Riflessi <b>CD ${cd}</b> <small class="muto">(10 + ½ livello + COS)</small></div>`;
+    return { 'soffio:nube': nube ? `${nube}d8` : '— (dal 2° livello)', 'soffio:elettrico': L ? `${L}d6` : '—', 'soffio:cd': `CD ${10 + Math.floor(L / 2) + (c ? c.m.COS : 0)}` };
+  }
+  function soffioAshardalon(d, c) {
+    const v = valoriSoffio(c);
+    const k = (chiave) => `<b data-calc="${chiave}">${esc(v[chiave])}</b>`;
+    return `<div><span class="muto">Soffio di Ashardalon</span> Nube Sacra (emanazione 9 m) ${k('soffio:nube')} sacri
+      · Soffio Elettrico (linea 36 m) ${k('soffio:elettrico')} elettricità · Riflessi ${k('soffio:cd')} <small class="muto">(10 + ½ livello + COS)</small></div>`;
   }
   function rigaArte(p, d) {
     const voluti = ['Canto', 'Oratoria', d.razza.strumento].filter(Boolean);
