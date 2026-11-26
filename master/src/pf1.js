@@ -352,14 +352,23 @@ window.creaPF1 = function creaPF1(ctx) {
     ${MATERIALI[x.materiale]?.nota ? `<small class="muto" title="${esc(MATERIALI[x.materiale].nota)}">ⓘ ${esc(MATERIALI[x.materiale].nota.slice(0, 60))}${MATERIALI[x.materiale].nota.length > 60 ? '…' : ''}</small>` : ''}`;
 
   // ---- Compagni: compagno animale, famiglio, eidolon (dati in src/pf1-compagni.js) ----
-  const COMP = window.PF1_COMPAGNI || { compagno: [], specie: {}, famiglio: [], famigli: [], eidolon: [], forme: {} };
+  // Famigli ufficiali che non sono sul wiki italiano (Archives of Nethys, elenco dei famigli): si aggiungono a quelli di src/pf1-compagni.js
+  const FAMIGLI_EXTRA = [
+    ['Petrifern', 'Il padrone guadagna bonus +1 di Armatura Naturale alla CA (Ultimate Wilderness; vegetale, anche come famiglio tumorale)'],
+  ];
+  const COMP = (() => {
+    const base = window.PF1_COMPAGNI || { compagno: [], specie: {}, famiglio: [], famigli: [], eidolon: [], forme: {} };
+    const nuovi = FAMIGLI_EXTRA.filter(([n]) => !base.famigli.some((f) => f[0] === n));
+    return { ...base, famigli: [...base.famigli, ...nuovi].sort((a, b) => a[0].localeCompare(b[0], 'it')) };
+  })();
   const TIPI_COMPAGNO = [['compagno', 'Compagno animale'], ['famiglio', 'Famiglio'], ['eidolon', 'Eidolon']];
   // Livello che fa avanzare il compagno: dalle classi del padrone, salvo valore scritto a mano
   function livelloPadrone(d, x) {
     if (x.livello !== '' && x.livello != null) return Math.max(0, Math.min(20, n(x.livello)));
     const L = (k) => livelloClasse(d, k);
     if (x.tipo === 'compagno') return Math.min(20, Math.max(L('Druido'), L('Cacciatore'), L('Cavaliere'), L('Ranger') - 3, 0));
-    if (x.tipo === 'famiglio') return Math.min(20, L('Mago') + L('Stregone') + L('Fattucchiere') + L('Arcanista'));
+    // Alchimista con la scoperta Famiglio Tumorale: il suo livello vale come livello da mago per il famiglio
+    if (x.tipo === 'famiglio') return Math.min(20, L('Mago') + L('Stregone') + L('Fattucchiere') + L('Arcanista') + (haScoperta(d, 'Famiglio Tumorale') ? L('Alchimista') : 0));
     return Math.min(20, L('Convocatore'));
   }
   const speciali = (righe, i) => [...new Set(righe.slice(0, i).flatMap((r) => String(r).split(/,\s*/)).filter((s) => s && !/^[—-]$/.test(s.trim())))];
@@ -427,6 +436,8 @@ window.creaPF1 = function creaPF1(ctx) {
     let m;
     if ((m = testo.match(/\+(\d+) ai Tiri Salvezza su (Tempra|Riflessi|Volontà)/i))) return [E({ tempra: 'tempra', riflessi: 'riflessi', 'volontà': 'volonta' }[m[2].toLowerCase()], +m[1])];
     if ((m = testo.match(/\+(\d+) (?:alle prove di|all'|alla)\s*Iniziativa/i))) return [E('iniz', +m[1])];
+    // «bonus +1 di Armatura Naturale alla CA», «bonus di armatura naturale +1 alla CA» (Tartaruga, Trilobita, Petrifern…)
+    if ((m = testo.match(/\+(\d+) di armatura naturale|armatura naturale \+(\d+)/i))) return [E('ca', +(m[1] || m[2]), 'armatura naturale')];
     if ((m = testo.match(/\+(\d+) alle prove di ([^.,(]+)/i))) {
       const nome = abilita.find((a) => norm(a.nome) === norm(m[2].trim()));
       return nome ? [E('abil:' + nome.nome, +m[1])] : [];
