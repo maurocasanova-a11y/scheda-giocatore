@@ -6930,7 +6930,8 @@ window.creaPF1 = function creaPF1(ctx) {
     inc.tiriSchermo = [{ etichetta: String(tiro.etichetta || '').slice(0, 80), espr: String(tiro.espr || ''), totale: String(tiro.totale) }, ...(inc.tiriSchermo || [])].slice(0, 5);
   }
   // ---- Mostri del bestiario (dati in src/pf1-mostri.js) ----
-  const MOSTRI = window.PF1_MOSTRI || [];
+  // Più i mostri ufficiali non ancora tradotti su Golarion Insider (src/pf1-mostri-extra.js, da d20pfsrd)
+  const MOSTRI = [...(window.PF1_MOSTRI || []), ...(window.PF1_MOSTRI_EXTRA || [])];
   // Bestiario per regolamento: mostri PF1 o alieni di Starfinder (src/sf-alieni.js, stesso schema)
   const bestiario = (sistema) => (sistema === 'sf' ? window.SF_ALIENI || [] : sistema === 'dnd' ? window.DND_MOSTRI || [] : sistema === 'pf2' ? window.PF2_MOSTRI || [] : MOSTRI);
   const mostroDi = (nome, sistema) => bestiario(sistema).find((m) => norm(m[0]) === norm(nome || ''))
