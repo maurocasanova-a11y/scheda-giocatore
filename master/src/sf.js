@@ -61,6 +61,26 @@ window.creaSF = function creaSF(ctx) {
   // Catalogo dell'equipaggiamento (src/sf-equip.js): [gruppo, nome, livello, prezzo, volume, dettagli, pagina]
   const CATALOGO = window.SF_EQUIP?.catalogo || [];
   const GRUPPI_CATALOGO = [...new Set(CATALOGO.map((x) => x[0]))];
+  const voceCatalogo = (nome) => CATALOGO.find((x) => norm(x[1]) === norm(String(nome || '').trim())) || null;
+  // Elenco per la ricerca nel catalogo (oltre 1300 voci): si crea una volta sola, fuori dalla scheda (come in PF1)
+  function elencoCatalogo() {
+    if (!CATALOGO.length || document.getElementById('sf-catalogo-tutto')) return '';
+    let box = document.getElementById('liste-fisse');
+    if (!box) { box = document.createElement('div'); box.id = 'liste-fisse'; box.hidden = true; document.body.appendChild(box); }
+    const dl = document.createElement('datalist');
+    dl.id = 'sf-catalogo-tutto';
+    dl.innerHTML = CATALOGO.map((x) => `<option value="${esc(x[1])}">${esc([x[0], x[2] && `liv. ${x[2]}`, x[3] && `${x[3]} cr`].filter(Boolean).join(' · '))}</option>`).join('');
+    box.appendChild(dl);
+    return '';
+  }
+  // Oggetto del catalogo nello zaino: volume, valore in crediti e note (livello, prezzo non numerico, dettagli)
+  function catalogoNelloZaino(p, d, x) {
+    const [, nome, livello, prezzo, volume, dettagli] = x;
+    const v = prezzoNumero(prezzo);
+    d.oggetti.push({ ...NUOVI.oggetti(), nome, ingombro: /^(L|\d+)$/.test(volume) ? volume : '', valore: v,
+      note: [livello && `liv. ${livello}`, v === '' && prezzo ? `prezzo ${prezzo}` : '', /^(L|\d+)$/.test(volume) || !volume ? '' : `volume ${volume}`, dettagli].filter(Boolean).join(' · ') });
+    ctx.toast(`🎒 <b>${esc(nome)}</b> aggiunto agli oggetti${avvisoLivello(p, livello)}`);
+  }
   // Dove si può installare: migliorie nelle armature, fusioni/accessori/cristalli sulle armi
   const DEST_CATALOGO = { "Migliorie d'armatura": 'armature', "Fusioni d'arma": 'armi', 'Accessori per armi': 'armi', 'Cristalli arma solarian': 'armi' };
   const prezzoNumero = (p) => (/^\d{1,3}(\.\d{3})*$|^\d+$/.test(String(p).trim()) ? Number(String(p).replace(/\./g, '')) : '');
@@ -684,7 +704,10 @@ window.creaSF = function creaSF(ctx) {
     : c.carico === 'sovraccarico' ? '<span class="sf-cond">⛔ Sovraccarico: velocità 1,5 m, DES max alla CA +0, −5 alle prove basate su FOR e DES (già applicati a CA e abilità)</span>' : '<span class="muto">nessuna penalità</span>'}
         <small class="muto">Contano armi, armature e ciò che è nello zaino; casa e astronave no. Con l'armatura vale la penalità peggiore, non si sommano.</small></div>`;
     const corpoEquip = `${statoCarico}<h4>Armature e scudi</h4>${armature || '<p class="muto">Nessuna.</p>'}<div class="pf-piede">${aggiungi('armature', 'Armatura')}${sceltaArm}</div>
-      <h4>Oggetti</h4>${oggetti || '<p class="muto">Nessun oggetto.</p>'}<div class="pf-piede">${aggiungi('oggetti', 'Oggetto')}<label>Crediti ${num('crediti', d.crediti)}</label></div>
+      <h4>Oggetti</h4>${oggetti || '<p class="muto">Nessun oggetto.</p>'}<div class="pf-piede">${aggiungi('oggetti', 'Oggetto')}
+        ${CATALOGO.length ? `<span class="pf-dal-wiki">dal catalogo: <input id="sf-cerca-cat-${id}" list="sf-catalogo-tutto" placeholder="scrivi per cercare (${CATALOGO.length})" class="pf-largo">
+          <button class="btn-piccolo" data-azione="sf-catalogo-cerca" data-id="${id}">Aggiungi</button></span>${elencoCatalogo()}` : ''}
+        <label>Crediti ${num('crediti', d.crediti)}</label></div>
       ${sceltaCatalogo(p, d)}`;
 
     // Progressione
@@ -1121,7 +1144,7 @@ window.creaSF = function creaSF(ctx) {
       const d = dati(p);
       const x = CATALOGO[d.catalogoVoce];
       if (!x || x[0] !== (GRUPPI_CATALOGO.includes(d.catalogoGruppo) ? d.catalogoGruppo : GRUPPI_CATALOGO[0])) { ctx.toast('Scegli prima un oggetto dal catalogo', 'errore'); return; }
-      const [gruppo, nome, livello, prezzo, volume, dettagli] = x;
+      const [gruppo, nome, livello] = x;
       const dest = document.getElementById(`sf-cat-dest-${p.id}`)?.value || '';
       const arm = dest && d.armature.find((a) => a.id === dest);
       const arma = dest && d.armi.find((a) => a.id === dest);
@@ -1131,12 +1154,15 @@ window.creaSF = function creaSF(ctx) {
       } else if (arma) {
         arma.critico = [arma.critico, `${gruppo === "Fusioni d'arma" ? 'fusione' : gruppo === 'Cristalli arma solarian' ? 'cristallo' : 'accessorio'} ${nome}`].filter(Boolean).join(' · ');
         ctx.toast(`⚔ <b>${esc(nome)}</b> su ${esc(arma.nome || 'arma')}${avvisoLivello(p, livello)}`);
-      } else {
-        const v = prezzoNumero(prezzo);
-        d.oggetti.push({ ...NUOVI.oggetti(), nome, ingombro: /^(L|\d+)$/.test(volume) ? volume : '', valore: v,
-          note: [livello && `liv. ${livello}`, v === '' && prezzo ? `prezzo ${prezzo}` : '', /^(L|\d+)$/.test(volume) || !volume ? '' : `volume ${volume}`, dettagli].filter(Boolean).join(' · ') });
-        ctx.toast(`🎒 <b>${esc(nome)}</b> aggiunto agli oggetti${avvisoLivello(p, livello)}`);
-      }
+      } else catalogoNelloZaino(p, d, x);
+      ctx.salva(); ctx.render();
+    },
+    // Ricerca nel catalogo dal piede degli oggetti (scrivi il nome e scegli dall'elenco, come in PF1)
+    'sf-catalogo-cerca'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      const x = voceCatalogo(document.getElementById(`sf-cerca-cat-${el.dataset.id}`)?.value);
+      if (!p || !x) { ctx.toast('Scrivi o scegli un oggetto dall\'elenco del catalogo', 'errore'); return; }
+      catalogoNelloZaino(p, dati(p), x);
       ctx.salva(); ctx.render();
     },
     'sf-arma-wiki'(el) {
