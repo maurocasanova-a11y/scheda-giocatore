@@ -112,6 +112,25 @@ window.creaDND = function creaDND(ctx) {
 
   // ---- Contenuti: incantesimi e oggetti magici dal wiki (src/dnd-contenuti.js), armi e armature del regolamento base ----
   const C = window.DND_CONTENUTI || { incantesimi: [], oggetti: [] };
+  // Scelta dal catalogo dell'equipaggiamento: gruppo → oggetto → aggiungi (con costo, peso e contenuto nelle note)
+  function sceltaCatalogo(p, d) {
+    if (!CATALOGO_DND.length) return '';
+    const id = p.id;
+    const gruppo = GRUPPI_DND.includes(d.catalogoGruppo) ? d.catalogoGruppo : GRUPPI_DND[0];
+    const voci = CATALOGO_DND.map((x, i) => [x, i]).filter(([x]) => x[0] === gruppo);
+    const scelta = CATALOGO_DND[d.catalogoVoce]?.[0] === gruppo ? CATALOGO_DND[d.catalogoVoce] : null;
+    return `<div class="sf-catalogo"><h4>Equipaggiamento dal Manuale <small class="muto">(${CATALOGO_DND.length} oggetti: attrezzatura, strumenti, dotazioni, cavalcature, merci…)</small></h4>
+      <div class="pf-riga">
+        <label>Gruppo <select data-dnd="catalogoGruppo" data-id="${id}" data-ridisegna-dnd>${opz(GRUPPI_DND.map((g) => [g, `${g} (${CATALOGO_DND.filter((x) => x[0] === g).length})`]), gruppo)}</select></label>
+        <label class="pf-largo">Oggetto <select data-dnd="catalogoVoce" data-id="${id}" data-ridisegna-dnd><option value="">— scegli —</option>${voci.map(([x, i]) => `<option value="${i}"${scelta === x ? ' selected' : ''}>${esc(x[1])} · ${esc(x[2] || '—')}${x[3] !== '' ? ` · ${String(x[3]).replace('.', ',')} kg` : ''}</option>`).join('')}</select></label>
+        <button class="btn-piccolo" data-azione="dnd-catalogo-aggiungi" data-id="${id}">Aggiungi</button>
+      </div>
+      ${scelta ? `<div class="muto pf-aiuto">${esc([scelta[2] && `costo ${scelta[2]}`, scelta[3] !== '' && `peso ${String(scelta[3]).replace('.', ',')} kg`, scelta[4]].filter(Boolean).join(' · '))}</div>` : ''}
+    </div>`;
+  }
+  // Equipaggiamento del Manuale del Giocatore (src/dnd-equip.js): [gruppo, nome, costo, peso in kg, dettagli, valore in mo]
+  const CATALOGO_DND = window.DND_EQUIP?.catalogo || [];
+  const GRUPPI_DND = [...new Set(CATALOGO_DND.map((x) => x[0]))];
   const INCANTESIMI = C.incantesimi.map(([nome, livello, scuola, tempo, gittata, componenti, durata, conc, rituale, classi, wiki]) => ({ nome, livello, scuola, tempo, gittata, componenti, durata, conc, rituale, classi: classi.split(','), wiki: wiki === undefined ? nome : wiki }));
   // Pulsante "i": pagina del wiki se c'è, altrimenti solo i dati dell'incantesimo (dal manuale)
   const infoInc = (v, nome) => {
@@ -595,6 +614,7 @@ window.creaDND = function creaDND(ctx) {
       <datalist id="dnd-oggetti-magici">${C.oggetti.map((o) => `<option value="${esc(o[0])}">${esc(`${o[1]}, ${o[2]}${o[3] ? ', sintonia' : ''}`)}</option>`).join('')}</datalist>`;
     const corpoEquip = `<h4>Armature e scudi</h4>${armature || '<p class="muto">Nessuna (CA senza armatura).</p>'}<div class="pf-piede">${aggiungi('armature', 'Armatura o scudo')}${sceltaArmatura}</div>
       <h4>Oggetti <small class="${sintonia > 3 ? 'oltre' : 'muto'}">sintonia ${sintonia}/3</small> <small class="muto">· divisi per luogo</small></h4>${oggetti || '<p class="muto">Nessun oggetto.</p>'}<div class="pf-piede">${aggiungi('oggetti', 'Oggetto')}${sceltaOggetto}</div>
+      ${sceltaCatalogo(p, d)}
       <div class="pf-riga"><label>mp ${num('monete|mp', d.monete.mp, 'class="pf-corto"')}</label><label>mo ${num('monete|mo', d.monete.mo, 'class="pf-corto"')}</label><label>ma ${num('monete|ma', d.monete.ma, 'class="pf-corto"')}</label><label>mr ${num('monete|mr', d.monete.mr, 'class="pf-corto"')}</label></div>`;
 
     // Progressione
@@ -930,6 +950,19 @@ window.creaDND = function creaDND(ctx) {
       if (a[1] !== 'scudo') for (const x of d.armature) if (x.tipo !== 'scudo') x.indossata = false;
       d.armature.push({ ...NUOVI.armature(), nome: a[0], tipo: a[1], ca: a[2], furtivita: !!a[3], ...(a[4] ? { forza: a[4] } : {}) });
       ctx.salva(); ctx.render();
+    },
+    'dnd-catalogo-aggiungi'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      if (!p) return;
+      const d = dati(p);
+      const gruppo = GRUPPI_DND.includes(d.catalogoGruppo) ? d.catalogoGruppo : GRUPPI_DND[0];
+      const x = CATALOGO_DND[d.catalogoVoce];
+      if (!x || x[0] !== gruppo) { ctx.toast('Scegli prima un oggetto dal catalogo', 'errore'); return; }
+      const [, nome, costo, peso, dettagli, valore] = x;
+      d.oggetti.push({ ...NUOVI.oggetti(), nome, valore: valore === '' ? '' : valore,
+        note: [peso !== '' ? `${String(peso).replace('.', ',')} kg` : '', valore === '' && costo ? `costo ${costo}` : '', dettagli].filter(Boolean).join(' · ') });
+      ctx.salva(); ctx.render();
+      ctx.toast(`🎒 <b>${esc(nome)}</b> aggiunto agli oggetti`);
     },
     'dnd-oggetto-magico'(el) {
       const p = ctx.personaggio(el.dataset.id);
