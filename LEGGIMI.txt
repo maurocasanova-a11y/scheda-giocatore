@@ -37,4 +37,4 @@ USARE LA SCHEDA
 3. Manda quel file al master. Se il master te lo rimanda aggiornato, usa "Importa scheda".
 
 Il file della scheda è lo stesso del kit per PC: si può passare da un dispositivo all'altro con "Importa scheda".
-I mostri del Manuale dei Mostri del master non sono inclusi.
+I bestiari e i mostri del Manuale dei Mostri del master non sono inclusi (servono solo al master).
