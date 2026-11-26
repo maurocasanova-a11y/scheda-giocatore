@@ -127,17 +127,15 @@ window.creaPF1 = function creaPF1(ctx) {
   };
   // Classi di prestigio dal wiki (src/pf1-prestigio.js): progressione, dado vita, abilità di classe e tabella
   const PRESTIGIO = window.PF1_PRESTIGIO || {};
-  // Classe personalizzata del master: uguale al Maestro del Sapere, ma ogni suo livello vale come livello effettivo
-  // di Mago per poteri della scuola, incantesimi e talenti (non solo per gli incantesimi al giorno)
+  // Classe personalizzata del master: uguale al Maestro del Sapere (+1 livello di Mago per gli incantesimi: al giorno e
+  // livello dell'incantatore). In più ogni suo livello conta come livello di Mago per l'accesso a talenti (prerequisiti)
+  // e scoperte arcane; NON è un livello effettivo di Mago (poteri della scuola, famiglio, talenti bonus restano del Mago).
   const MS_MOD = 'Maestro del Sapere Mod';
   if (PRESTIGIO['Maestro del Sapere'] && !PRESTIGIO[MS_MOD]) {
     const b = PRESTIGIO['Maestro del Sapere'];
-    const col = b.colonne.findIndex((x) => /^incantesimi al giorno$/i.test(x));
     PRESTIGIO[MS_MOD] = {
       ...b, fonte: 'Personalizzata dal master (variante del Maestro del Sapere)', pagina: 'Maestro_del_Sapere', personalizzata: true,
-      nota: 'Ogni livello vale come un livello effettivo di Mago per poteri della scuola arcana, incantesimi (al giorno, livello dell\'incantatore, libro) e talenti (prerequisiti e talenti bonus del Mago).',
-      colonne: b.colonne.map((x, i) => (i === col ? 'Livello effettivo di Mago' : x)),
-      righe: b.righe.map((r) => r.map((v, j) => (j === 4 + col ? '+1 livello di Mago' : v))),
+      nota: 'Come il Maestro del Sapere: +1 livello di Mago per gli incantesimi (al giorno e livello dell\'incantatore). In più i suoi livelli contano come livelli di Mago per l\'accesso ai talenti (prerequisiti) e alle scoperte arcane; non sono livelli effettivi di Mago (poteri della scuola, famiglio, talenti bonus del Mago no).',
     };
   }
   for (const [nome, v] of Object.entries(PRESTIGIO)) {
@@ -731,7 +729,7 @@ window.creaPF1 = function creaPF1(ctx) {
       case 'liv': return c.liv >= a.v;
       case 'mitico': return n(d.mitico.grado) >= a.v;
       case 'li': return c.incantatori.some((x) => x.cl >= a.v);
-      case 'classe': { const k = nomeClasse(a.nome); return k ? livelloClasse(d, k) >= a.v : null; }
+      case 'classe': { const k = nomeClasse(a.nome); return k ? livelloAccesso(d, k) >= a.v : null; } // con il Maestro del Sapere Mod per il Mago
       // La razza del personaggio, oppure una a cui corrisponde (es. gli Umani Azlanti contano come Umani)
       case 'razza': return d.razza.nome ? d.razza.nome === a.nome || (razzaDi(d)?.contaCome || []).includes(a.nome) : null;
       case 'gradi': {
@@ -1616,9 +1614,11 @@ window.creaPF1 = function creaPF1(ctx) {
   // Pallini cliccabili per gli usi giornalieri (clic sull'ultimo pieno = lo libera)
   const pallini = (tot, usati, attr) => Array.from({ length: Math.max(0, tot) }, (_, i) =>
     `<button class="pallino${i < usati ? ' pieno' : ''}" ${attr} data-indice="${i}" title="Uso ${i + 1}"></button>`).join('');
-  // Classi i cui livelli contano anche come livelli effettivi di un'altra classe
+  // Livelli di una classe. Il Maestro del Sapere Mod conta come Mago solo per l'accesso (prerequisiti di talenti e
+  // classi, scoperte arcane): livelloAccesso; per tutto il resto vale il livello vero (livelloClasse).
   const CONTA_COME = { [MS_MOD]: ['Mago'] };
-  const livelloClasse = (d, k) => d.classi.filter((cl) => { const x = nomeClasse(cl.nome); return x === k || !!CONTA_COME[x]?.includes(k); })
+  const livelloClasse = (d, k) => d.classi.filter((cl) => nomeClasse(cl.nome) === k).reduce((a, cl) => a + n(cl.livello), 0);
+  const livelloAccesso = (d, k) => d.classi.filter((cl) => { const x = nomeClasse(cl.nome); return x === k || !!CONTA_COME[x]?.includes(k); })
     .reduce((a, cl) => a + n(cl.livello), 0);
 
   // ---- Classi di prestigio da incantatore: "+1 livello di classe esistente" ----
@@ -2197,19 +2197,16 @@ window.creaPF1 = function creaPF1(ctx) {
       }
       if (k === 'Mago') incantesimi.push(dopo === 1 ? 'libro degli incantesimi: tutti i trucchetti e 3 + mod. INT incantesimi di 1° livello' : '2 incantesimi gratuiti da aggiungere al libro');
     }
-    // Classi che contano come livelli effettivi di un'altra (Maestro del Sapere Mod → Mago): anche i privilegi
-    // e gli incantesimi del prossimo livello effettivo di quella classe
+    // Maestro del Sapere Mod: gli incantesimi del prossimo livello da incantatore del Mago (non i privilegi del Mago)
     for (const come of CONTA_COME[k] || []) {
-      const pc = livelloClasse(d, come), pd = pc + 1;
-      const tc = (window.PF1_PROGRESSIONE || {})[come];
-      if (tc) for (const f of pezziPrivilegi(tc.righe[pd - 1]?.[4 + colonnaPrivilegi(tc)])) privilegi.push({ nome: `${f} (come ${come} ${pd}°)`, sostituito: false });
+      // Solo gli incantesimi del Mago (+1 livello da incantatore): i privilegi restano quelli del Mago vero
+      const pc = livelloAccesso(d, come), pd = pc + 1;
       if (TABELLE.classi[come]) {
         for (let L = 0; L <= 9; L++) {
           const a = TABELLE.alGiorno(come, pc, L), b = TABELLE.alGiorno(come, pd, L);
           if (b !== '' && a === '') incantesimi.push(`${come}: nuovo livello di incantesimi ${L}°`);
           else if (b !== '' && n(b) > n(a)) incantesimi.push(`${come} ${L}°: ${a} → ${b} al giorno`);
         }
-        if (come === 'Mago') incantesimi.push(`Mago ${pd}° effettivo: 2 incantesimi gratuiti da aggiungere al libro`);
       }
     }
     // Scelte
@@ -4164,7 +4161,7 @@ window.creaPF1 = function creaPF1(ctx) {
   const scopertePrese = (d, nome) => d.capacita.filter((x) => norm(x.scoperta || '') === norm(nome)).length;
   // Opzioni del sottomenu: disponibili (livello e talenti soddisfatti) e non ancora disponibili (disattivate, con il motivo)
   function opzioniScoperteArcane(d) {
-    const mago = livelloClasse(d, 'Mago');
+    const mago = livelloAccesso(d, 'Mago'); // scoperte arcane: conta anche il Maestro del Sapere Mod
     if (!mago || !SCOPERTE_ARCANE.length) return '';
     const voci = SCOPERTE_ARCANE.filter(([nome, , , , piu]) => piu || !scopertePrese(d, nome)).map(([nome, tipo, liv, talenti]) => {
       const manca = [mago < liv ? `mago di ${liv}° livello` : '', ...talenti.filter((t) => !haTalento(d, t))].filter(Boolean);
@@ -4177,7 +4174,7 @@ window.creaPF1 = function creaPF1(ctx) {
     if (!s) return;
     const d = dati(p);
     const [base, tipo, liv, talenti, piu] = s;
-    const mago = livelloClasse(d, 'Mago');
+    const mago = livelloAccesso(d, 'Mago'); // scoperte arcane: conta anche il Maestro del Sapere Mod
     const manca = [mago < liv ? `mago di ${liv}° livello` : '', ...talenti.filter((t) => !haTalento(d, t))].filter(Boolean);
     if (manca.length) { ctx.toast(`Non puoi prendere <b>${esc(base)}</b>: serve ${esc(manca.join(', '))}`, 'errore'); return; }
     const gia = scopertePrese(d, base);
