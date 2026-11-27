@@ -389,7 +389,9 @@ window.creaPF1 = function creaPF1(ctx) {
   function livelloPadrone(d, x) {
     if (x.livello !== '' && x.livello != null) return Math.max(0, Math.min(20, n(x.livello)));
     const L = (k) => livelloClasse(d, k);
-    if (x.tipo === 'compagno') return Math.min(20, Math.max(L('Druido'), L('Cacciatore'), L('Cavaliere'), L('Ranger') - 3, 0));
+    // Paladino con il Legame Divino della cavalcatura (dal 5°): il livello da paladino vale come livello da druido
+    const cavalcatura = d.paladino?.legame === 'cavalcatura' && L('Paladino') >= 5 ? L('Paladino') : 0;
+    if (x.tipo === 'compagno') return Math.min(20, Math.max(L('Druido'), L('Cacciatore'), L('Cavaliere'), L('Ranger') - 3, cavalcatura, 0));
     // Alchimista con la scoperta Famiglio Tumorale: il suo livello vale come livello da mago per il famiglio
     if (x.tipo === 'famiglio') return Math.min(20, L('Mago') + L('Stregone') + L('Fattucchiere') + L('Arcanista') + (haScoperta(d, 'Famiglio Tumorale') ? L('Alchimista') : 0));
     return Math.min(20, L('Convocatore'));
@@ -831,7 +833,8 @@ window.creaPF1 = function creaPF1(ctx) {
   // ---- Elenco degli incantesimi (dati in src/pf1-incantesimi.js) ----
   const INC_DATI = window.PF1_INCANTESIMI_DATI || { liste: {}, voci: [] };
   const INCANTESIMI = new Map(); // nome normalizzato -> { nome, scuola, base, pagina, livelli: { codice lista: livello } }
-  for (const [nome, scuola, pagina, livelli] of INC_DATI.voci) {
+  // Più gli incantesimi delle liste «di Golarion» che mancavano nel catalogo (src/pf1-incantesimi-extra.js)
+  for (const [nome, scuola, pagina, livelli] of [...INC_DATI.voci, ...(window.PF1_INCANTESIMI_EXTRA || [])]) {
     const l = {};
     for (const x of livelli.split(' ')) { const m = x.match(/^([A-Za-z]+)(\d)$/); if (m) l[m[1]] = Number(m[2]); }
     INCANTESIMI.set(norm(nome), { nome, scuola, base: scuola.split(/[ ([]/)[0], pagina: pagina || `Incantesimi/${nome}`, livelli: l });
@@ -1117,6 +1120,7 @@ window.creaPF1 = function creaPF1(ctx) {
     mago: { scuola: '', sotto: '', opposte: ['', ''], usati: {} },
     arcanista: { punti: null, consumati: 0, exploit: [] }, // Scorta Arcana (punti attuali; null = piena per oggi), Consumare Incantesimi, exploit scelti
     stregone: { stirpe: '', tipo: '', abil: '', usati: {} }, // stirpe dello stregone; tipo = drago/elemento scelto
+    paladino: { punireUsati: 0, indulgenze: [], legame: '', legameUsati: 0 }, // Punire il Male usati oggi, indulgenze, Legame Divino
     razza: { nome: '', scelta: '', inclusi: false, alternativi: [] },
   });
 
@@ -1239,10 +1243,12 @@ window.creaPF1 = function creaPF1(ctx) {
     const sorpresa = 10 + Math.min(desCA, 0) + t[1] + cumula(contributi.filter((x) => x.tipo !== 'schivare'));
 
     const ts = {};
+    // Grazia Divina (Paladino) / Resistenza Sacrilega (Antipaladino) dal 2° livello: modificatore di CAR (se positivo) a tutti i TS
+    const grazia = livelloClasse(d, 'Paladino') >= 2 || livelloClasse(d, 'Antipaladino') >= 2 ? Math.max(0, m.CAR) : 0;
     for (const [k, , car] of TS) {
       const b = d.classi.reduce((a, c) => a + baseTs(c[k], n(c.livello), c.prestigio), 0);
       const lista = per('ts', k);
-      const fisso = b + m[car] + n(d.ts[k]?.varie);
+      const fisso = b + m[car] + n(d.ts[k]?.varie) + grazia;
       const bonus = cumula(lista);
       // Bonus situazionali: si cumulano con quelli attivi secondo le stesse regole (es. un +2 morale non si somma a un altro morale)
       const cond = [...condRazza(d), ...(d.tsCond || [])].filter((x) => x.ts === 'tutti' || x.ts === k).map((x) => {
@@ -2782,6 +2788,64 @@ window.creaPF1 = function creaPF1(ctx) {
     </div>`;
   }
 
+  // ---- Paladino: Punire il Male, Indulgenze, Legame Divino, aure e immunità (pagina «Paladino» di Golarion Insider) ----
+  // Indulgenze: [nome, livello da cui si può scegliere, indulgenza richiesta, effetto in breve]
+  const INDULGENZE = [
+    ['Affaticato', 3, '', 'il bersaglio non è più Affaticato'], ['Infermo', 3, '', 'il bersaglio non è più Infermo'], ['Scosso', 3, '', 'il bersaglio non è più Scosso'],
+    ['Ammalato', 6, '', 'funge da Rimuovi Malattia (livello del paladino)'], ['Barcollante', 6, '', 'non è più Barcollante (salvo a 0 PF esatti)'], ['Frastornato', 6, '', 'il bersaglio non è più Frastornato'],
+    ['Avvelenato', 9, '', 'funge da Neutralizza Veleno (livello del paladino)'], ['Esausto', 9, 'Affaticato', 'il bersaglio non è più Esausto'],
+    ['Maledetto', 9, '', 'funge da Rimuovi Maledizione (livello del paladino)'], ['Nauseato', 9, 'Infermo', 'il bersaglio non è più Nauseato'],
+    ['Spaventato', 9, 'Scosso', 'il bersaglio non è più Spaventato'],
+    ['Accecato', 12, '', 'il bersaglio non è più Accecato'], ['Assordato', 12, '', 'il bersaglio non è più Assordato'],
+    ['Paralizzato', 12, '', 'il bersaglio non è più Paralizzato'], ['Stordito', 12, '', 'il bersaglio non è più Stordito'],
+  ];
+  // Capacità per livello: [livello, nome, effetto in breve]
+  const PRIVILEGI_PALADINO = [
+    [1, 'Aura di Bene', 'aura di bene pari al livello da paladino'], [1, 'Individuazione del Male', 'a volontà, come l\'incantesimo'],
+    [3, 'Aura di Coraggio', 'immune alla paura; alleati entro 3 m +4 morale ai TS contro la paura'], [3, 'Salute Divina', 'immune a tutte le malattie'],
+    [8, 'Aura di Fermezza', 'immune allo charme; alleati entro 3 m +4 morale ai TS contro lo charme'],
+    [11, 'Aura di Giustizia', '2 usi di Punire il Male: Punire il Male agli alleati entro 3 m'],
+    [14, 'Aura di Fede', 'armi (sue e degli alleati entro 3 m contro i nemici vicini) allineate al bene contro la RD'],
+    [17, 'Aura di Rettitudine', 'RD 5/male, immune alla compulsione; alleati entro 3 m +4 morale contro la compulsione'],
+    [20, 'Campione Sacro', 'RD 10/male; Punire il Male esilia gli esterni malvagi; incanalare con i dadi al massimo'],
+  ];
+  function paladinoDi(d, c) {
+    const L = livelloClasse(d, 'Paladino');
+    const pa = d.paladino = d.paladino || { punireUsati: 0, indulgenze: [], legame: '', legameUsati: 0 };
+    return {
+      L, pa,
+      punire: Math.min(7, 1 + Math.floor((L - 1) / 3)), // 1°, 4°, 7°… fino a 7 al giorno al 19°
+      nIndulgenze: Math.floor(L / 3), // 3°, 6°, 9°…
+      legameUsi: L >= 5 ? Math.min(4, 1 + Math.floor((L - 5) / 4)) : 0, // 5°, 9°, 13°, 17°
+      legameArma: L >= 5 ? Math.min(6, 1 + Math.floor((L - 5) / 3)) : 0, // +1 al 5°, poi ogni 3 livelli, +6 al 20°
+      car: Math.max(0, c.m.CAR),
+    };
+  }
+  function sezionePaladino(p, d, c) {
+    const id = p.id;
+    const pl = paladinoDi(d, c);
+    const scelte = pl.pa.indulgenze;
+    const disponibili = INDULGENZE.filter(([nome, liv, req]) => !scelte.includes(nome) && pl.L >= liv && (!req || scelte.includes(req)));
+    const mancano = pl.nIndulgenze - scelte.length;
+    const privilegi = PRIVILEGI_PALADINO.map(([liv, nome, eff]) => `<li class="${liv <= pl.L ? '' : 'non-ancora'}"><b>${esc(nome)}</b> <small class="muto">(${liv}°)</small> — ${esc(eff)}</li>`).join('');
+    return `<div class="fede-righe">
+        <div><span class="muto">Punire il Male</span> <span class="pf-pallini">${pallini(pl.punire, n(pl.pa.punireUsati), `data-azione="pf1-punire" data-id="${id}"`)}</span>
+          <small class="muto">${pl.punire} al giorno · azione veloce · contro il bersaglio malvagio: <b>+${pl.car}</b> per colpire, <b>+${pl.L}</b> ai danni
+          (<b>+${2 * pl.L}</b> al primo colpo contro esterni malvagi, draghi malvagi e non morti), <b>+${pl.car}</b> deviazione alla CA contro i suoi attacchi; supera ogni RD</small></div>
+        ${pl.L >= 2 ? `<div><span class="muto">Grazia Divina</span> <b>+${pl.car}</b> a tutti i tiri salvezza <small class="muto">(già nei TS)</small></div>` : ''}
+        ${pl.L >= 3 ? `<div><span class="muto">Indulgenze</span> <b>${scelte.length}</b> / ${pl.nIndulgenze}${mancano > 0 ? ` <span class="oltre">${mancano} da scegliere</span>` : ''}
+          <small class="muto">si aggiungono a ogni Imposizione delle Mani che cura</small></div>` : ''}
+        ${pl.L >= 5 ? `<div><span class="muto">Legame Divino</span> <select data-pf1="paladino|legame" data-id="${id}" data-ridisegna-pf1>${opz([['', '— scegli —'], ['arma', 'Arma (spirito celestiale)'], ['cavalcatura', 'Cavalcatura']], pl.pa.legame || '')}</select>
+          <span class="pf-pallini">${pallini(pl.legameUsi, n(pl.pa.legameUsati), `data-azione="pf1-legame-uso" data-id="${id}"`)}</span>
+          <small class="muto">${pl.legameUsi} al giorno · ${pl.pa.legame === 'arma' ? `l'arma ottiene <b>+${pl.legameArma}</b> (potenziamento o capacità speciali: Affilata, Assiomatica, Difensiva, Distruttiva, Energia Luminosa, Esplosione di Fiamme, Infuocata, Pietosa, Sacra, Velocità) per 1 minuto/livello`
+            : pl.pa.legame === 'cavalcatura' ? `richiamo della cavalcatura (azione di round completo); è un compagno animale con il livello da paladino come livello da druido${pl.L >= 11 ? ' · archetipo Celestiale' : ''}${pl.L >= 15 ? ` · RI ${pl.L + 11}` : ''} — aggiungila nei Compagni`
+              : 'una volta scelto non si cambia'}</small></div>` : ''}
+      </div>
+      ${pl.L >= 3 ? `<div class="sch-chips">${scelte.map((x) => { const v = INDULGENZE.find((y) => y[0] === x); return `<span class="chip" title="${esc(v?.[3] || '')}">${esc(x)}<button class="chip-x" data-azione="pf1-indulgenza-togli" data-id="${id}" data-nome="${esc(x)}" title="Togli">×</button></span>`; }).join('') || '<span class="muto">Nessuna indulgenza scelta.</span>'}</div>
+        ${mancano > 0 && disponibili.length ? `<div class="pf-riga"><select id="pf1-indulgenza-${id}"><option value="">— scegli un'indulgenza —</option>${disponibili.map(([nome, liv, req, eff]) => `<option value="${esc(nome)}">${esc(nome)} (${liv}°) — ${esc(eff)}${req ? ` · richiede ${esc(req)}` : ''}</option>`).join('')}</select>
+          <button class="btn-piccolo" data-azione="pf1-indulgenza" data-id="${id}">+ Prendi</button></div>` : ''}` : ''}
+      <ul class="pf-poteri">${privilegi}</ul>`;
+  }
   // ---- Arcanista: Scorta Arcana, Consumare Incantesimi, Exploit (dati in src/pf1-exploit.js), Supremazia Magica ----
   // [nome, tipo, superiore, livello minimo, exploit richiesti, punti di Scorta Arcana]
   const EXPLOIT = window.PF1_EXPLOIT || [];
@@ -5101,6 +5165,7 @@ window.creaPF1 = function creaPF1(ctx) {
       ${livelloClasse(d, 'Fattucchiere') ? sezione('fattucchiere', 'Fatture del Fattucchiere', sezioneFattucchiere(p, d, c)) : ''}
       ${livMS(d) ? sezione('maestro', 'Maestro del Sapere: segreti e sapienza', sezioneMaestro(p, d, c, r), `<small class="muto">${d.maestro.segreti.length}/${segretiDisponibiliMS(livMS(d))} segreti</small>`) : ''}
       ${livelloClasse(d, 'Mago') ? sezione('mago', 'Scuola arcana', sezioneMago(p, d, c)) : ''}
+      ${livelloClasse(d, 'Paladino') ? sezione('paladino', 'Paladino: punire il male, indulgenze, legame divino', sezionePaladino(p, d, c)) : ''}
       ${livelloClasse(d, 'Arcanista') ? sezione('arcanista', 'Arcanista: Scorta Arcana ed exploit', sezioneArcanista(p, d, c)) : ''}
       ${livelloClasse(d, 'Stregone') ? sezione('stirpe', 'Stirpe dello stregone', sezioneStirpe(p, d, c), stirpeDi(d) ? `<small class="muto">${esc(stirpeDi(d).nome)}${d.stregone.tipo ? ` (${esc(d.stregone.tipo)})` : ''}</small>` : '<small class="oltre">da scegliere</small>') : ''}
       ${risorseDivine(d, c).length ? sezione('energia', 'Poteri divini', sezioneEnergia(p, d, c)) : ''}
@@ -5476,12 +5541,46 @@ window.creaPF1 = function creaPF1(ctx) {
       d.alchimista.bombeUsate = 0;
       // Arcanista: la Scorta Arcana torna a 3 + ½ livello (i punti avanzati si perdono), Consumare Incantesimi si ricarica
       if (d.arcanista) { d.arcanista.punti = null; d.arcanista.consumati = 0; }
+      if (d.paladino) { d.paladino.punireUsati = 0; d.paladino.legameUsati = 0; }
       if (d.chimico) { d.chimico.mutareUsati = 0; d.chimico.soffioUsato = false; }
       if (d.mistificatore) d.mistificatore = { estemporanei: 0, mistificati: 0, invisibile: 0 };
       if (d.stregone) d.stregone.usati = {};
       ctx.salva();
       ctx.render();
       ctx.toast(`🌙 Riposo: ${testoPf}slot di incantesimo, poteri divini e potere mitico recuperati`);
+    },
+    // ---- Paladino ----
+    'pf1-punire'(el) {
+      const d = dati(ctx.personaggio(el.dataset.id));
+      const i = Number(el.dataset.indice);
+      d.paladino.punireUsati = i < n(d.paladino.punireUsati) ? i : i + 1; // clic sull'ultimo pieno = lo libera
+      ctx.salva();
+      ctx.render();
+    },
+    'pf1-legame-uso'(el) {
+      const d = dati(ctx.personaggio(el.dataset.id));
+      const i = Number(el.dataset.indice);
+      d.paladino.legameUsati = i < n(d.paladino.legameUsati) ? i : i + 1;
+      ctx.salva();
+      ctx.render();
+    },
+    'pf1-indulgenza'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      const d = dati(p);
+      const nome = document.getElementById(`pf1-indulgenza-${p.id}`)?.value;
+      if (!nome) { ctx.toast('Scegli prima un\'indulgenza', 'errore'); return; }
+      if (!d.paladino.indulgenze.includes(nome)) d.paladino.indulgenze.push(nome);
+      ctx.salva();
+      ctx.render();
+      ctx.toast(`🙏 Indulgenza <b>${esc(nome)}</b>: si aggiunge a ogni Imposizione delle Mani che cura`);
+    },
+    'pf1-indulgenza-togli'(el) {
+      const d = dati(ctx.personaggio(el.dataset.id));
+      // Togliendone una, via anche quelle che la richiedono (Esausto, Nauseato, Spaventato)
+      const via = new Set([el.dataset.nome, ...INDULGENZE.filter((x) => x[2] === el.dataset.nome).map((x) => x[0])]);
+      d.paladino.indulgenze = d.paladino.indulgenze.filter((x) => !via.has(x));
+      ctx.salva();
+      ctx.render();
     },
     // ---- Eredità della razza (Aasimar) ----
     'pf1-info-eredita'(el) {
