@@ -1120,7 +1120,8 @@ window.creaPF1 = function creaPF1(ctx) {
     mago: { scuola: '', sotto: '', opposte: ['', ''], usati: {} },
     arcanista: { punti: null, consumati: 0, exploit: [] }, // Scorta Arcana (punti attuali; null = piena per oggi), Consumare Incantesimi, exploit scelti
     stregone: { stirpe: '', tipo: '', abil: '', usati: {} }, // stirpe dello stregone; tipo = drago/elemento scelto
-    paladino: { punireUsati: 0, indulgenze: [], legame: '', legameUsati: 0 }, // Punire il Male usati oggi, indulgenze, Legame Divino
+    paladino: { punireUsati: 0, indulgenze: [], legame: '', legameUsati: 0 },
+    pistolero: { grinta: null, armi: [], extra: '' }, // grinta attuale (null = piena per oggi), tipi di arma da fuoco addestrati, grinta extra // Punire il Male usati oggi, indulgenze, Legame Divino
     razza: { nome: '', scelta: '', inclusi: false, alternativi: [] },
   });
 
@@ -1238,6 +1239,9 @@ window.creaPF1 = function creaPF1(ctx) {
       ...per('ca'),
     ];
     if (speciale('maestria')) contributi.push({ tipo: 'schivare', valore: pen, fonte: 'Maestria in Combattimento' });
+    // Pistolero: Leggiadria (schivare, senza armatura o con armatura leggera)
+    const pist = livelloClasse(d, 'Pistolero') ? pistoleroDi(d, m) : null;
+    if (pist?.leggiadria) contributi.push({ tipo: 'schivare', valore: pist.leggiadria, fonte: 'Leggiadria (Pistolero)' });
     const ca = 10 + desCA + t[1] + cumula(contributi);
     const contatto = 10 + desCA + t[1] + cumula(contributi.filter((x) => !['armatura', 'scudo', 'armatura naturale', 'potenziamento arm. naturale'].includes(x.tipo)));
     const sorpresa = 10 + Math.min(desCA, 0) + t[1] + cumula(contributi.filter((x) => x.tipo !== 'schivare'));
@@ -1257,7 +1261,7 @@ window.creaPF1 = function creaPF1(ctx) {
       });
       ts[k] = { base: b, car: m[car], bonus, varie: n(d.ts[k]?.varie), tot: fisso + bonus, cond };
     }
-    const init = m.DES + n(d.iniz.varie) + cumula(per('iniz'));
+    const init = m.DES + n(d.iniz.varie) + cumula(per('iniz')) + (pist?.iniziativa || 0); // Iniziativa del Pistolero con grinta ≥ 1
     const bmc = bab + m.FOR + t[2] + n(d.bmc.varie) + cumula(per('bmc'));
     const dmc = 10 + bab + m.FOR + m.DES + t[2] + cumula(contributi.filter((x) => TIPI_DMC.has(x.tipo))) + n(d.dmc.varie) + cumula(per('dmc'));
 
@@ -1310,7 +1314,9 @@ window.creaPF1 = function creaPF1(ctx) {
       const bonusFor = a.carDanni === 'FOR15' ? (m.FOR > 0 ? Math.floor(m.FOR * 1.5) : m.FOR)
         : a.carDanni === 'FOR05' ? (m.FOR > 0 ? Math.floor(m.FOR / 2) : m.FOR)
           : a.carDanni === 'nessuno' ? 0 : m.FOR;
-      let danniBonus = bonusFor + n(a.bonusDanni) + danni + me.malus + ta.danni;
+      // Addestramento nelle Armi da Fuoco (Pistolero): +DES ai danni con i tipi scelti
+      const addestrata = pist && armaAddestrata(d.pistolero, a) ? m.DES : 0;
+      let danniBonus = bonusFor + n(a.bonusDanni) + danni + me.malus + ta.danni + addestrata;
       if (mischia && speciale('attaccoPoderoso')) { colpo -= pen; danniBonus += a.carDanni === 'FOR15' ? 3 * pen : a.carDanni === 'FOR05' ? pen : 2 * pen; }
       if (!mischia && speciale('tiroMortale')) { colpo -= pen; danniBonus += 2 * pen; }
       if (mischia && speciale('maestria')) colpo -= pen;
@@ -2788,6 +2794,80 @@ window.creaPF1 = function creaPF1(ctx) {
     </div>`;
   }
 
+  // ---- Pistolero: Grinta, Gesta, Leggiadria, Addestramento nelle Armi da Fuoco (pagina «Pistolero» di Golarion Insider) ----
+  // Gesta: [nome, livello, costo in grinta, effetto in breve]
+  const GESTA = [
+    ['Occhio Letale', 1, '1 per incremento oltre il primo', 'oltre il primo incremento di gittata l\'attacco va contro la CA di contatto'],
+    ['Riparazione Rapida', 1, 'almeno 1 (1 per farla come azione di movimento)', 'toglie la condizione Rotto dovuta a un inceppamento (azione standard)'],
+    ['Schivata del Pistolero', 1, '1', 'contro un attacco a distanza: 1,5 m e +2 CA, o prono e +4 CA (solo armatura leggera o media, carico leggero)'],
+    ['Colpo di Calcio', 3, '1', 'attacco in mischia con il calcio dell\'arma (1d6 a una mano, 1d10 a due mani), poi sbilanciare gratis'],
+    ['Colpo di Utilità', 3, 'almeno 1', 'cauterizzare, far saltare serrature, spostare oggetti incustoditi'],
+    ['Iniziativa del Pistolero', 3, 'almeno 1', '+2 all\'Iniziativa (già nella scheda con grinta ≥ 1); con Estrazione Rapida estrae l\'arma da fuoco'],
+    ['Colpo Letale', 7, '1', 'round completo: tutti gli attacchi su un bersaglio, un dado di danni in più per ogni colpo oltre il primo'],
+    ['Bersagliare', 7, '1', 'round completo: ali, braccia (lascia cadere), gambe (prono), testa (confuso 1 round), torso (critico 19-20)'],
+    ['Colpo Sorprendente', 7, 'almeno 1', 'manca apposta il bersaglio, che resta impreparato fino al suo turno'],
+    ['Esperto nella Ricarica', 11, '1', 'un\'arma Rotta che si inceppa non esplode'],
+    ['Ferita Sanguinante', 11, '1 (2 per il sanguinamento di caratteristica)', 'sanguinamento pari al mod. DES, o 1 di FOR/DES/COS'],
+    ['Ricarica Fulminea', 11, 'almeno 1', 'ricarica una canna come azione veloce (gratuita con Ricarica Rapida o cartucce), senza attacchi d\'opportunità'],
+    ['Colpo Minaccioso', 15, '1', 'Paura in un\'esplosione di 9 m (CD 10 + ½ livello + SAG)'],
+    ['Elusivo', 15, 'almeno 1', 'Eludere, Schivare Prodigioso e Schivare Prodigioso Migliorato'],
+    ['Pistolero Fortunato', 15, '2 per un TS, 1 per una prova di abilità', 'ritira e tiene il secondo risultato'],
+    ['Colpo della Morte', 19, '1', 'dopo un critico: Tempra (CD 10 + ½ livello + DES) o muore'],
+    ['Colpo Stordente', 19, '2', 'Tempra (CD 10 + ½ livello + SAG) o stordito 1 round'],
+    ['Truffare la Morte', 19, 'tutta la grinta (minimo 1)', 'a 0 PF o meno resta invece a 1 PF'],
+  ];
+  // Ardimenti (al posto di un talento bonus, si attivano quando la grinta arriva a 0)
+  const ARDIMENTI = [
+    ['Correre Disperatamente', '+3 m di velocità e DES alla CA mentre corre'], ['Eludere Disperatamente', 'Eludere (o tira due volte i TS su Riflessi)'],
+    ['In Cerca di Sangue', 'intervallo di critico +1 con le armi da fuoco'], ['Leggiadria Frenetica', '+2 schivare alla CA'],
+  ];
+  // Categoria di un'armatura indossata dal nome (tabella del wiki): Leggere, Medie, Pesanti; '' se non si riconosce
+  function categoriaArmatura(a) {
+    const nome = norm(a.nome || '');
+    const v = EQUIP.armature.filter((x) => x[1] !== 'Scudi' && nome.includes(norm(x[0]))).sort((x, y) => y[0].length - x[0].length)[0];
+    return v ? v[1] : '';
+  }
+  function pistoleroDi(d, m) {
+    const L = livelloClasse(d, 'Pistolero');
+    const ps = d.pistolero = d.pistolero || { grinta: null, armi: [] };
+    const max = Math.max(1, m.SAG) + n(ps.extra); // grinta massima (talenti come Grinta Extra: «extra»)
+    const grinta = ps.grinta === null || ps.grinta === undefined || ps.grinta === '' ? max : Math.max(0, n(ps.grinta));
+    const armature = d.armature.filter((a) => a.indossata && a.tipo !== 'scudo');
+    const pesante = armature.some((a) => /Medie|Pesanti/.test(categoriaArmatura(a)));
+    return {
+      L, ps, max, grinta,
+      leggiadria: L >= 2 && !pesante ? Math.min(5, 1 + Math.floor((L - 2) / 4)) : 0,
+      leggiadriaPersa: L >= 2 && pesante,
+      iniziativa: L >= 3 && grinta >= 1 ? 2 : 0,
+      nArmi: L >= 5 ? Math.min(4, 1 + Math.floor((L - 5) / 4)) : 0, // 5°, 9°, 13°, 17°
+      nTalenti: Math.floor(L / 4), // 4°, 8°, 12°, 16°, 20°
+    };
+  }
+  // Addestramento nelle Armi da Fuoco: l'arma è di uno dei tipi scelti («Pistola +1» sì, «Pistola a Doppia Canna» no)
+  const armaAddestrata = (ps, a) => (ps?.armi || []).some((t) => t && norm(armaBase(a.nome)) === norm(t)); // nome esatto, senza «+1» o «perfetta»
+  function sezionePistolero(p, d, c) {
+    const id = p.id;
+    const pi = pistoleroDi(d, c.m);
+    const armiFuoco = EQUIP.armi.filter((v) => v[1] === 'Armi da Fuoco').map((v) => v[0]);
+    const gesta = GESTA.map(([nome, liv, costo, eff]) => `<li class="${liv <= pi.L ? '' : 'non-ancora'}"><b>${esc(nome)}</b> <small class="muto">(${liv}° · grinta: ${esc(costo)})</small> — ${esc(eff)}</li>`).join('');
+    const sceltaArmi = Array.from({ length: pi.nArmi }, (_, i) => `<select data-pf1="pistolero|armi|${i}" data-id="${id}" data-ridisegna-pf1><option value="">— tipo di arma da fuoco —</option>${opz(armiFuoco.map((x) => [x, x]), pi.ps.armi[i] || '')}</select>`).join(' ');
+    return `<div class="fede-righe">
+        <div><span class="muto">Grinta</span> <b>${pi.grinta}</b> / ${pi.max}
+          <button class="btn-mini" data-azione="pf1-grinta" data-id="${id}" data-d="-1" title="Spendi 1 punto">−1</button><button class="btn-mini" data-azione="pf1-grinta" data-id="${id}" data-d="1" title="Riguadagna 1 punto (critico o colpo mortale con un'arma da fuoco)">+1</button>
+          <label class="muto" title="Punti in più da talenti (es. Grinta Extra +2) o oggetti">extra ${aiutanti(p, c).num("pistolero|extra", pi.ps.extra ?? "", "class=\"pf-corto\" min=\"0\" data-ridisegna-pf1")}</label>
+          <small class="muto">ogni giorno torna a SAG (minimo 1); si riguadagna con un critico confermato o un colpo mortale con un'arma da fuoco</small></div>
+        ${pi.L >= 2 ? `<div><span class="muto">Leggiadria</span> ${pi.leggiadriaPersa ? '<span class="oltre">persa con l\'armatura media o pesante</span>' : `<b>+${pi.leggiadria}</b> schivare alla CA <small class="muto">(già nella CA; senza armatura o con armatura leggera)</small>`}</div>` : ''}
+        ${pi.L >= 3 ? `<div><span class="muto">Iniziativa del Pistolero</span> ${pi.iniziativa ? '<b>+2</b> <small class="muto">(già nell\'Iniziativa)</small>' : '<span class="muto">serve almeno 1 punto grinta</span>'}</div>` : ''}
+        ${pi.nArmi ? `<div><span class="muto">Addestramento nelle Armi da Fuoco</span> ${sceltaArmi}
+          <small class="muto">con quei tipi: +DES ai danni (già negli attacchi), inceppamento +2 invece di +4</small></div>` : ''}
+        ${pi.nTalenti ? `<div><span class="muto">Talenti bonus</span> ${pi.nTalenti} <small class="muto">(di Combattimento o di Grinta; uno può essere un ardimento)</small></div>` : ''}
+        <div><span class="muto">Armiere</span> arma da fuoco iniziale malconcia (Moschetto, Pistola o Trombone) e il talento Armaiolo</div>
+        ${pi.L >= 20 ? '<div><span class="muto">Vera Grinta</span> due gesta costano 1 punto grinta in meno</div>' : ''}
+      </div>
+      <h4>Gesta</h4><ul class="pf-poteri">${gesta}</ul>
+      <details><summary class="muto">Ardimenti (al posto di un talento bonus, attivi quando la grinta finisce)</summary>
+        <ul class="pf-poteri">${ARDIMENTI.map(([nome, eff]) => `<li><b>${esc(nome)}</b> — ${esc(eff)}</li>`).join('')}</ul></details>`;
+  }
   // ---- Paladino: Punire il Male, Indulgenze, Legame Divino, aure e immunità (pagina «Paladino» di Golarion Insider) ----
   // Indulgenze: [nome, livello da cui si può scegliere, indulgenza richiesta, effetto in breve]
   const INDULGENZE = [
@@ -5165,6 +5245,7 @@ window.creaPF1 = function creaPF1(ctx) {
       ${livelloClasse(d, 'Fattucchiere') ? sezione('fattucchiere', 'Fatture del Fattucchiere', sezioneFattucchiere(p, d, c)) : ''}
       ${livMS(d) ? sezione('maestro', 'Maestro del Sapere: segreti e sapienza', sezioneMaestro(p, d, c, r), `<small class="muto">${d.maestro.segreti.length}/${segretiDisponibiliMS(livMS(d))} segreti</small>`) : ''}
       ${livelloClasse(d, 'Mago') ? sezione('mago', 'Scuola arcana', sezioneMago(p, d, c)) : ''}
+      ${livelloClasse(d, 'Pistolero') ? sezione('pistolero', 'Pistolero: grinta, gesta, leggiadria', sezionePistolero(p, d, c)) : ''}
       ${livelloClasse(d, 'Paladino') ? sezione('paladino', 'Paladino: punire il male, indulgenze, legame divino', sezionePaladino(p, d, c)) : ''}
       ${livelloClasse(d, 'Arcanista') ? sezione('arcanista', 'Arcanista: Scorta Arcana ed exploit', sezioneArcanista(p, d, c)) : ''}
       ${livelloClasse(d, 'Stregone') ? sezione('stirpe', 'Stirpe dello stregone', sezioneStirpe(p, d, c), stirpeDi(d) ? `<small class="muto">${esc(stirpeDi(d).nome)}${d.stregone.tipo ? ` (${esc(d.stregone.tipo)})` : ''}</small>` : '<small class="oltre">da scegliere</small>') : ''}
@@ -5542,12 +5623,23 @@ window.creaPF1 = function creaPF1(ctx) {
       // Arcanista: la Scorta Arcana torna a 3 + ½ livello (i punti avanzati si perdono), Consumare Incantesimi si ricarica
       if (d.arcanista) { d.arcanista.punti = null; d.arcanista.consumati = 0; }
       if (d.paladino) { d.paladino.punireUsati = 0; d.paladino.legameUsati = 0; }
+      if (d.pistolero) d.pistolero.grinta = null; // la grinta torna a SAG (minimo 1)
       if (d.chimico) { d.chimico.mutareUsati = 0; d.chimico.soffioUsato = false; }
       if (d.mistificatore) d.mistificatore = { estemporanei: 0, mistificati: 0, invisibile: 0 };
       if (d.stregone) d.stregone.usati = {};
       ctx.salva();
       ctx.render();
       ctx.toast(`🌙 Riposo: ${testoPf}slot di incantesimo, poteri divini e potere mitico recuperati`);
+    },
+    // ---- Pistolero ----
+    'pf1-grinta'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      const d = dati(p);
+      const pi = pistoleroDi(d, calcola(p, ctx.regDi(p)).m);
+      // La grinta di solito non supera il massimo; il riposo la riporta al massimo
+      d.pistolero.grinta = Math.max(0, Math.min(pi.max, pi.grinta + Number(el.dataset.d)));
+      ctx.salva();
+      ctx.render();
     },
     // ---- Paladino ----
     'pf1-punire'(el) {
