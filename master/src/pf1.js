@@ -204,7 +204,32 @@ window.creaPF1 = function creaPF1(ctx) {
   const CAMPI_CALCOLATI = new Set(['Classe', 'Livello', 'Classe Armatura', 'BAB', 'Tempra', 'Riflessi', 'Volontà', 'Divinità', 'Razza']);
   // ---- Razze (dati in src/pf1-razze.js) ----
   const RAZZE = window.PF1_RAZZE || {};
-  const razzaDi = (d) => RAZZE[d.razza?.nome] || null;
+  // Eredità (sottocategorie di razza) da Golarion Insider: per l'Aasimar le sei discendenze di «Aasimar di Golarion».
+  // Sostituiscono modificatori di caratteristica, le due abilità del tratto Abile e la capacità magica (Luce Diurna).
+  const EREDITA = {
+    Aasimar: [
+      { nome: 'Idilliaci (Sangue di Agathion)', discendenza: 'Agathion', allineamento: 'NB', car: { COS: 2, CAR: 2 }, abil: ['Addestrare Animali', 'Sopravvivenza'], magia: 'Evoca Alleato Naturale II', tratti: ['Guerriero Illuminato', 'Linguaggio delle Terre Selvagge'] },
+      { nome: 'Angelici (Sangue di Angelo)', discendenza: 'Angelo', allineamento: 'qualsiasi buono', car: { FOR: 2, CAR: 2 }, abil: ['Conoscenze (piani)', 'Guarire'], magia: 'Alterare Se Stesso', tratti: ['Segugio Celestiale', 'Visioni del Planetar'] },
+      { nome: 'Legiferi (Sangue di Arconte)', discendenza: 'Arconte', allineamento: 'LB', car: { COS: 2, SAG: 2 }, abil: ['Intimidire', 'Intuizione'], magia: 'Fiamma Perenne', tratti: ['Buona Influenza', 'Spirito Lanterna'] },
+      { nome: 'Toccati dalle Muse (Sangue di Azata)', discendenza: 'Azata', allineamento: 'CB', car: { DES: 2, CAR: 2 }, abil: ['Diplomazia', 'Intrattenere'], magia: 'Polvere Luccicante', tratti: ['Arpeggio del Lillend', 'Passo del Bralani'] },
+      { nome: 'Piumati (Sangue di Garuda)', discendenza: 'Garuda', allineamento: 'CB', car: { DES: 2, SAG: 2 }, abil: ['Acrobazia', 'Volare'], magia: 'Vedere Invisibilità', tratti: ['Avversione ai Serpenti', 'Patito di Tiro con l\'Arco'] },
+      { nome: 'Ardenti (Sangue di Peri)', discendenza: 'Peri', allineamento: 'NB', car: { INT: 2, CAR: 2 }, abil: ['Conoscenze (piani)', 'Sapienza Magica'], magia: 'Pirotecnica', tratti: ['Pelle Bruciata', 'Piromante'] },
+    ],
+  };
+  const PAGINA_EREDITA = { Aasimar: 'Aasimar_di_Golarion' };
+  const ereditaDi = (d) => (EREDITA[d.razza?.nome] || []).find((e) => e.nome === d.razza?.eredita) || null;
+  // Razza della scheda, con l'eredità scelta già applicata
+  const razzaDi = (d) => {
+    const r = RAZZE[d.razza?.nome] || null;
+    const e = r && ereditaDi(d);
+    if (!e) return r;
+    const abile = r.bonus.filter((b) => b.tratto === 'Abile');
+    return {
+      ...r, car: { ...e.car },
+      bonus: [...r.bonus.filter((b) => b.tratto !== 'Abile'), ...e.abil.map((a) => ({ bersaglio: 'abil:' + a, valore: abile[0]?.valore || 2, tipo: 'razziale', tratto: 'Abile' }))],
+      tratti: r.tratti.map((t) => (t === 'Capacità Magiche' ? `Capacità Magiche (${e.magia})` : t)),
+    };
+  };
   // Razze con il tratto Talento Bonus (quanti talenti in più al 1° livello) e razze umane con Esperti (+1 grado per livello)
   const TALENTI_RAZZA = { Umano: 1, 'Umano Azlanti': 2, 'Sangue di Ashardalon': 1, Celestiale: 1 };
   const ESPERTI = new Set(['Umano', 'Umano Azlanti']);
@@ -1990,9 +2015,18 @@ window.creaPF1 = function creaPF1(ctx) {
         <summary>Tratti razziali alternativi <small class="muto">(${scelti.length} scelti su ${r.alternativi.length})</small></summary>
         <div class="riv-griglia">${alternativi}</div>
       </details>` : '';
-    return `<div class="pf-riga">${tendina} ${scelta}
+    // Eredità (sottocategorie): per l'Aasimar le sei discendenze celestiali
+    const eredita = EREDITA[r.nome] || [];
+    const e = ereditaDi(d);
+    const sceltaEredita = eredita.length ? `<label>Eredità <select data-pf1="razza|eredita" data-id="${id}" data-ridisegna-pf1>
+        <option value="">${esc(r.nome)} comune</option>${opz(eredita.map((x) => [x.nome, x.nome]), d.razza.eredita || '')}</select></label>
+        ${e ? `<button class="btn-mini" data-azione="pf1-info-eredita" data-razza="${esc(r.nome)}" data-nome="${esc(e.nome)}" title="Descrizione dal wiki">i</button>` : ''}` : '';
+    const rigaEredita = e ? `<div><span class="muto">Eredità</span> discendenza <b>${esc(e.discendenza)}</b> · allineamento tipico ${esc(e.allineamento)} · capacità magica <b>${esc(e.magia)}</b>
+        <span class="muto">· tratti dell'eredità:</span> ${e.tratti.map((t) => (d.capacita.some((x) => norm(x.nome) === norm(t)) ? `<span class="chip">✓ ${esc(t)}</span>`
+          : `<button class="btn-piccolo" data-azione="pf1-tratto-eredita" data-id="${id}" data-nome="${esc(t)}" title="Aggiungi ai tratti del personaggio">+ ${esc(t)}</button>`)).join(' ')}</div>` : '';
+    return `<div class="pf-riga">${tendina} ${scelta} ${sceltaEredita}
         <button class="btn-piccolo" data-azione="pf1-info-razza" data-nome="${esc(r.nome)}">📖 Tratti razziali</button></div>
-      <div class="fede-righe">
+      <div class="fede-righe">${rigaEredita}
         <div><span class="muto">Caratteristiche</span> ${esc(mods || (r.scelta ? `+${r.scelta} a scelta` : 'nessun modificatore'))}</div>
         <div><span class="muto">Taglia</span> ${esc(r.taglia)} · <span class="muto">Velocità</span> ${metri(velocitaRazza(d))}</div>
         ${bonus ? `<div><span class="muto">Bonus sempre attivi</span> ${bonus}</div>` : ''}
@@ -5448,6 +5482,21 @@ window.creaPF1 = function creaPF1(ctx) {
       ctx.salva();
       ctx.render();
       ctx.toast(`🌙 Riposo: ${testoPf}slot di incantesimo, poteri divini e potere mitico recuperati`);
+    },
+    // ---- Eredità della razza (Aasimar) ----
+    'pf1-info-eredita'(el) {
+      const e = (EREDITA[el.dataset.razza] || []).find((x) => x.nome === el.dataset.nome);
+      if (!e) return;
+      apriInfo(e.nome, `<div class="info-fatti">${fatto('Discendenza', e.discendenza)}${fatto('Allineamento tipico', e.allineamento)}${fatto('Caratteristiche', Object.entries(e.car).map(([k, v]) => `${NOMI_CAR[k]} ${segno(v)}`).join(', '))}${fatto('Abilità (+2)', e.abil.join(', '))}${fatto('Capacità magica', e.magia)}${fatto('Tratti', e.tratti.join(', '))}</div>`,
+        PAGINA_EREDITA[el.dataset.razza] || '', estraiArchetipo(e.nome, 'H3'));
+    },
+    'pf1-tratto-eredita'(el) {
+      const d = dati(ctx.personaggio(el.dataset.id));
+      const nome = el.dataset.nome;
+      if (!d.capacita.some((x) => norm(x.nome) === norm(nome))) d.capacita.push({ id: uid(), nome, tipo: 'Tratto', descrizione: `Tratto dell'eredità ${ereditaDi(d)?.nome || ''}`.trim() });
+      ctx.salva();
+      ctx.render();
+      ctx.toast(`<b>${esc(nome)}</b> aggiunto ai tratti`);
     },
     // ---- Arcanista ----
     'pf1-scorta'(el) {
