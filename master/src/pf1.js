@@ -875,6 +875,8 @@ window.creaPF1 = function creaPF1(ctx) {
     Mago: ['Libro degli incantesimi', 'incantesimi'], Magus: ['Libro degli incantesimi', 'incantesimi'], Arcanista: ['Libro degli incantesimi', 'incantesimi'],
     Alchimista: ['Formulario', 'formule'], Investigatore: ['Formulario', 'formule'], Fattucchiere: ['Famiglio', 'incantesimi custoditi'],
   };
+  // Arcanista: prepara dal libro un numero limitato di incantesimi, che non si consumano: si lancia spendendo slot del livello
+  const ibrido = (inc) => inc.tipo === 'preparati' && nomeClasse(inc.classe) === 'Arcanista';
   const libroDi = (inc) => (inc.tipo === 'preparati' ? LIBRI[nomeClasse(inc.classe)] || null : null);
   // Lettura del Magico si prepara a memoria anche senza averla nel libro (wiki, Mago)
   const nelLibro = (inc, nome) => norm(nome) === 'lettura del magico' || (inc.libro || []).some((s) => norm(s.nome) === norm(nome));
@@ -1088,6 +1090,7 @@ window.creaPF1 = function creaPF1(ctx) {
     alchimista: { scoperte: [], extra: '', bombeUsate: 0, tipoBomba: '', filtro: 'disponibili', mutageno: { tipo: 'mutageno', car: ['FOR', 'DES', 'COS'], attivo: false, bonusId: '' } },
     energia: { tipo: '', usati: {} },
     mago: { scuola: '', sotto: '', opposte: ['', ''], usati: {} },
+    arcanista: { punti: null, consumati: 0, exploit: [] }, // Scorta Arcana (punti attuali; null = piena per oggi), Consumare Incantesimi, exploit scelti
     stregone: { stirpe: '', tipo: '', abil: '', usati: {} }, // stirpe dello stregone; tipo = drago/elemento scelto
     razza: { nome: '', scelta: '', inclusi: false, alternativi: [] },
   });
@@ -1351,7 +1354,8 @@ window.creaPF1 = function creaPF1(ctx) {
         // Per lanciare un incantesimo serve un punteggio di almeno 10 + livello dell'incantesimo
         // (anche per i trucchetti e le orazioni: con meno di 10 non si lancia nulla)
         const troppoAlto = disponibile && punteggioCar < 10 + L;
-        const conosciuti = auto && inc.tipo === 'spontanei' ? TABELLE.conosciuti(classe, livClasse, L) : '';
+        // Arcanista: il limite degli incantesimi preparati è nella stessa tabella (colonna «conosciuti»)
+        const conosciuti = auto && (inc.tipo === 'spontanei' || ibrido(inc)) ? TABELLE.conosciuti(classe, livClasse, L) : '';
         livelli.push({ L, base: b, bonus, dominio, scuola, troppoAlto, conosciuti, noti: noti[L] || 0,
           tot: disponibile && !troppoAlto ? n(b) + bonus + dominio + scuola : 0, cd: 10 + L + mm, usati: n(inc.slot?.[L]?.usati) });
       }
@@ -2744,6 +2748,65 @@ window.creaPF1 = function creaPF1(ctx) {
     </div>`;
   }
 
+  // ---- Arcanista: Scorta Arcana, Consumare Incantesimi, Exploit (dati in src/pf1-exploit.js), Supremazia Magica ----
+  // [nome, tipo, superiore, livello minimo, exploit richiesti, punti di Scorta Arcana]
+  const EXPLOIT = window.PF1_EXPLOIT || [];
+  const exploitDi = (nome) => EXPLOIT.find((x) => norm(x[0]) === norm(nome)) || null;
+  function arcanistaDi(d, c) {
+    const L = livelloClasse(d, 'Arcanista');
+    const a = d.arcanista = d.arcanista || { punti: null, consumati: 0, exploit: [] };
+    const max = 3 + L;
+    const giornaliera = Math.min(max, 3 + Math.floor(L / 2));
+    const punti = a.punti === null || a.punti === undefined || a.punti === '' ? giornaliera : Math.max(0, Math.min(max, n(a.punti)));
+    return {
+      L, a, max, giornaliera, punti,
+      consumare: Math.max(1, c.m.CAR), // usi al giorno di Consumare Incantesimi
+      nExploit: L >= 1 ? 1 + Math.floor((L - 1) / 2) : 0, // 1°, 3°, 5°… 19°
+      cd: 10 + Math.floor(L / 2) + c.m.CAR,
+    };
+  }
+  // Exploit che si possono scegliere adesso: livello, superiori dall'11°, exploit richiesti già presi
+  function exploitDisponibili(d, ar) {
+    return EXPLOIT.filter(([nome, , sup, liv, req]) => !ar.a.exploit.includes(nome) && ar.L >= liv && (!sup || ar.L >= 11) && req.every((r) => ar.a.exploit.some((x) => norm(x) === norm(r))));
+  }
+  function sezioneArcanista(p, d, c) {
+    const id = p.id;
+    const ar = arcanistaDi(d, c);
+    const inc = d.incantatori.find((x) => nomeClasse(x.classe) === 'Arcanista');
+    const ci = inc ? c.incantatori.find((x) => x.id === inc.id) : null;
+    // Slot da consumare: livelli con almeno uno slot libero (i trucchetti no)
+    const liberi = ci ? ci.livelli.filter((l) => l.L > 0 && l.tot > l.usati) : [];
+    const presi = ar.a.exploit.map((nome) => {
+      const x = exploitDi(nome);
+      return `<span class="chip">${esc(nome)}${x?.[1] ? ` <small>(${x[1]})</small>` : ''}${x?.[5] ? ` <small class="muto">${x[5]} pt</small>` : ''}${x?.[2] ? ' <small class="muto">superiore</small>' : ''}
+        <button class="btn-mini" data-azione="pf1-exploit-info" data-nome="${esc(nome)}" title="Descrizione dal wiki">i</button>
+        <button class="chip-x" data-azione="pf1-exploit-togli" data-id="${id}" data-nome="${esc(nome)}" title="Togli">×</button></span>`;
+    }).join('');
+    const disp = exploitDisponibili(d, ar);
+    const opzioni = (sup) => disp.filter((x) => !!x[2] === sup).map((x) => `<option value="${esc(x[0])}">${esc(x[0])}${x[1] ? ` (${x[1]})` : ''}${x[5] ? ` · ${x[5]} pt` : ''}${x[4].length ? ` · richiede ${esc(x[4].join(', '))}` : ''}</option>`).join('');
+    const mancano = ar.nExploit - ar.a.exploit.length;
+    return `<div class="fede-righe">
+        <div><span class="muto">Scorta Arcana</span> <b>${ar.punti}</b> / ${ar.max} punti
+          <button class="btn-mini" data-azione="pf1-scorta" data-id="${id}" data-d="-1" title="Spendi 1 punto">−1</button><button class="btn-mini" data-azione="pf1-scorta" data-id="${id}" data-d="1" title="Aggiungi 1 punto">+1</button>
+          <small class="muto">ogni giorno torna a ${ar.giornaliera} (3 + ½ livello); i punti avanzati si perdono. 1 punto quando lanci: +1 al livello dell'incantatore o +1 alla CD</small></div>
+        <div><span class="muto">Consumare Incantesimi</span> <span class="pf-pallini">${pallini(ar.consumare, n(ar.a.consumati), `data-azione="pf1-consumare-uso" data-id="${id}"`)}</span>
+          ${liberi.length && n(ar.a.consumati) < ar.consumare ? `<select id="pf1-consuma-${id}">${liberi.map((l) => `<option value="${l.L}">slot di ${l.L}° livello (+${l.L} punt${l.L > 1 ? 'i' : 'o'})</option>`).join('')}</select>
+            <button class="btn-piccolo" data-azione="pf1-consuma" data-id="${id}" title="Azione di movimento: lo slot è perso per oggi">Consuma</button>` : ''}
+          <small class="muto">${ar.consumare} volte al giorno (mod. CAR, minimo 1)</small></div>
+        <div><span class="muto">Exploit</span> <b>${ar.a.exploit.length}</b> / ${ar.nExploit} <small class="muto">· CD ${ar.cd} (10 + ½ livello + CAR)</small>${mancano > 0 ? ` <span class="oltre">${mancano} da scegliere</span>` : ''}</div>
+        ${ar.L >= 20 ? '<div><span class="muto">Supremazia Magica</span> può lanciare incantesimi spendendo punti della Scorta Arcana al posto degli slot (vedi wiki)</div>' : ''}
+      </div>
+      <div class="sch-chips">${presi || '<span class="muto">Nessun exploit scelto.</span>'}</div>
+      ${mancano > 0 && disp.length ? `<div class="pf-riga"><select id="pf1-exploit-${id}"><option value="">— scegli un exploit —</option>
+          <optgroup label="Exploit dell'Arcanista">${opzioni(false)}</optgroup>${ar.L >= 11 ? `<optgroup label="Exploit Superiori (al posto di un exploit)">${opzioni(true)}</optgroup>` : ''}</select>
+        <button class="btn-piccolo" data-azione="pf1-exploit" data-id="${id}">+ Prendi</button>
+        <button class="btn-mini" data-azione="pf1-exploit-info" data-campo="pf1-exploit-${id}" title="Descrizione dal wiki">i</button></div>` : ''}`;
+  }
+  // Descrizione di un exploit: la riga del wiki che comincia con il suo nome in grassetto
+  const estraiExploit = (nome) => (doc) => {
+    const dd = [...doc.querySelectorAll('#mw-content-text dd')].find((x) => norm(x.querySelector('b')?.textContent || '').startsWith(norm(nome)));
+    return dd ? dd.textContent.replace(/\s+/g, ' ').trim() : '';
+  };
   function sezioneAlchimista(p, d, c) {
     const id = p.id;
     const a = datiAlchimista(d);
@@ -4763,7 +4826,7 @@ window.creaPF1 = function creaPF1(ctx) {
     // Incantesimi
     const incantatori = d.incantatori.map((inc) => {
       const ci = c.incantatori.find((x) => x.id === inc.id);
-      const spontaneo = inc.tipo === 'spontanei';
+      const spontaneo = inc.tipo === 'spontanei' || ibrido(inc); // l'arcanista lancia come lo stregone
       const incantesimi = inc.incantesimi || [];
       const ultimo = Math.max(0, ...ci.livelli.filter((l) => l.base !== '').map((l) => l.L), ...incantesimi.map((s) => n(s.livello)));
       const haTabella = !!TABELLE.classi[nomeClasse(inc.classe)];
@@ -4778,7 +4841,7 @@ window.creaPF1 = function creaPF1(ctx) {
           <b title="Totale al giorno">${k(`inc:${inc.id}:tot:${l.L}`)}</b>
           <span title="CD">CD ${k(`inc:${inc.id}:cd:${l.L}`)}</span>
           <span class="pf-pallini">${l.troppoAlto ? `<span class="oltre">serve ${esc(inc.car)} ${10 + l.L}</span>` : usoSlot(p, inc, ci, l)}
-            ${mostraConosciuti && l.conosciuti !== '' ? `<span class="${l.noti > l.conosciuti ? 'oltre' : 'muto'}" title="Incantesimi conosciuti: nell'elenco / massimo">conosciuti ${l.noti}/${l.conosciuti}</span>` : ''}</span>
+            ${mostraConosciuti && l.conosciuti !== '' ? `<span class="${l.noti > l.conosciuti ? 'oltre' : 'muto'}" title="${ibrido(inc) ? 'Incantesimi preparati oggi (dal libro): nell\'elenco / massimo. Non si consumano: lanciarli usa gli slot' : 'Incantesimi conosciuti: nell\'elenco / massimo'}">${ibrido(inc) ? 'preparati' : 'conosciuti'} ${l.noti}/${l.conosciuti}</span>` : ''}</span>
         </div>`).join('');
       const perLivello = [...new Set(incantesimi.map((s) => n(s.livello)))].sort((a, b) => a - b).map((L) => `<h4>Livello ${L}</h4>` +
         incantesimi.filter((s) => n(s.livello) === L).map((s) => {
@@ -5004,6 +5067,7 @@ window.creaPF1 = function creaPF1(ctx) {
       ${livelloClasse(d, 'Fattucchiere') ? sezione('fattucchiere', 'Fatture del Fattucchiere', sezioneFattucchiere(p, d, c)) : ''}
       ${livMS(d) ? sezione('maestro', 'Maestro del Sapere: segreti e sapienza', sezioneMaestro(p, d, c, r), `<small class="muto">${d.maestro.segreti.length}/${segretiDisponibiliMS(livMS(d))} segreti</small>`) : ''}
       ${livelloClasse(d, 'Mago') ? sezione('mago', 'Scuola arcana', sezioneMago(p, d, c)) : ''}
+      ${livelloClasse(d, 'Arcanista') ? sezione('arcanista', 'Arcanista: Scorta Arcana ed exploit', sezioneArcanista(p, d, c)) : ''}
       ${livelloClasse(d, 'Stregone') ? sezione('stirpe', 'Stirpe dello stregone', sezioneStirpe(p, d, c), stirpeDi(d) ? `<small class="muto">${esc(stirpeDi(d).nome)}${d.stregone.tipo ? ` (${esc(d.stregone.tipo)})` : ''}</small>` : '<small class="oltre">da scegliere</small>') : ''}
       ${risorseDivine(d, c).length ? sezione('energia', 'Poteri divini', sezioneEnergia(p, d, c)) : ''}
       ${sezione('bonus', 'Bonus e condizioni', corpoBonus + corpoBonusPiede + tabellaCumulo)}
@@ -5026,7 +5090,7 @@ window.creaPF1 = function creaPF1(ctx) {
 
   // Pallini degli slot (spontanei) o conteggio dei preparati
   function usoSlot(p, inc, ci, l) {
-    const spontaneo = inc.tipo === 'spontanei';
+    const spontaneo = inc.tipo === 'spontanei' || ibrido(inc);
     if (l.L === 0 && l.base !== '') return '<span class="muto">a volontà</span>';
     if (spontaneo && l.tot > 0) {
       return Array.from({ length: l.tot }, (_, i) => `<button class="pallino${i < l.usati ? ' pieno' : ''}" data-azione="pf1-slot" data-id="${p.id}" data-inc="${inc.id}" data-livello="${l.L}" data-indice="${i}" title="Slot ${i + 1}"></button>`).join('');
@@ -5376,12 +5440,73 @@ window.creaPF1 = function creaPF1(ctx) {
       d.fede.usiBenedizioni = 0;
       d.mago.usati = {};
       d.alchimista.bombeUsate = 0;
+      // Arcanista: la Scorta Arcana torna a 3 + ½ livello (i punti avanzati si perdono), Consumare Incantesimi si ricarica
+      if (d.arcanista) { d.arcanista.punti = null; d.arcanista.consumati = 0; }
       if (d.chimico) { d.chimico.mutareUsati = 0; d.chimico.soffioUsato = false; }
       if (d.mistificatore) d.mistificatore = { estemporanei: 0, mistificati: 0, invisibile: 0 };
       if (d.stregone) d.stregone.usati = {};
       ctx.salva();
       ctx.render();
       ctx.toast(`🌙 Riposo: ${testoPf}slot di incantesimo, poteri divini e potere mitico recuperati`);
+    },
+    // ---- Arcanista ----
+    'pf1-scorta'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      const d = dati(p);
+      const ar = arcanistaDi(d, calcola(p, ctx.regDi(p)));
+      d.arcanista.punti = Math.max(0, Math.min(ar.max, ar.punti + Number(el.dataset.d)));
+      ctx.salva();
+      ctx.render();
+    },
+    'pf1-consumare-uso'(el) {
+      const d = dati(ctx.personaggio(el.dataset.id));
+      const i = Number(el.dataset.indice);
+      d.arcanista.consumati = i < n(d.arcanista.consumati) ? i : i + 1; // clic sull'ultimo pieno = lo libera
+      ctx.salva();
+      ctx.render();
+    },
+    // Consumare Incantesimi: uno slot libero diventa punti della Scorta Arcana (pari al suo livello)
+    'pf1-consuma'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      const d = dati(p);
+      const c = calcola(p, ctx.regDi(p));
+      const ar = arcanistaDi(d, c);
+      const L = Number(document.getElementById(`pf1-consuma-${p.id}`)?.value);
+      const inc = d.incantatori.find((x) => nomeClasse(x.classe) === 'Arcanista');
+      const l = inc && c.incantatori.find((x) => x.id === inc.id)?.livelli.find((x) => x.L === L);
+      if (!l || l.tot <= l.usati || n(d.arcanista.consumati) >= ar.consumare) { ctx.toast('Nessuno slot libero da consumare, o usi di oggi finiti', 'errore'); return; }
+      inc.slot = inc.slot || {};
+      inc.slot[L] = inc.slot[L] || { base: '', usati: 0 };
+      inc.slot[L].usati = n(inc.slot[L].usati) + 1;
+      d.arcanista.consumati = n(d.arcanista.consumati) + 1;
+      const prima = ar.punti;
+      d.arcanista.punti = Math.min(ar.max, prima + L);
+      ctx.salva();
+      ctx.render();
+      ctx.toast(`✨ Slot di ${L}° livello consumato: Scorta Arcana ${prima} → <b>${d.arcanista.punti}</b>${prima + L > ar.max ? ` (massimo ${ar.max}: ${prima + L - ar.max} punti persi)` : ''}`);
+    },
+    'pf1-exploit'(el) {
+      const p = ctx.personaggio(el.dataset.id);
+      const d = dati(p);
+      const nome = document.getElementById(`pf1-exploit-${p.id}`)?.value;
+      if (!nome) { ctx.toast('Scegli prima un exploit', 'errore'); return; }
+      d.arcanista.exploit.push(nome);
+      ctx.salva();
+      ctx.render();
+      const x = exploitDi(nome);
+      ctx.toast(`🔮 Exploit <b>${esc(nome)}</b> preso${x?.[5] ? ` · costa ${x[5]} punt${x[5] > 1 ? 'i' : 'o'} di Scorta Arcana` : ''}`);
+    },
+    'pf1-exploit-togli'(el) {
+      const d = dati(ctx.personaggio(el.dataset.id));
+      d.arcanista.exploit = d.arcanista.exploit.filter((x) => x !== el.dataset.nome);
+      ctx.salva();
+      ctx.render();
+    },
+    'pf1-exploit-info'(el) {
+      const x = exploitDi(el.dataset.nome || document.getElementById(el.dataset.campo)?.value || '');
+      if (!x) { ctx.toast('Scegli prima un exploit', 'errore'); return; }
+      apriInfo(x[0], `<div class="info-fatti">${fatto('Tipo', [x[1], x[2] ? 'Exploit Superiore (dall\'11° livello, al posto di un exploit)' : 'Exploit dell\'Arcanista'].filter(Boolean).join(' · '))}${fatto('Richiede', x[4].join(', '))}${fatto('Scorta Arcana', x[5] ? `${x[5]} punt${x[5] > 1 ? 'i' : 'o'}` : '')}</div>`,
+        'Arcanista', estraiExploit(x[0]));
     },
     'pf1-pf'(el) {
       const p = ctx.personaggio(el.dataset.id);
