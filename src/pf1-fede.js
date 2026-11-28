@@ -74,11 +74,13 @@
   const pulisci = (s) => String(s).replace(/;$/, '').trim();
 
   const divinita = {};
-  for (const [nome, v] of Object.entries(DIVINITA)) {
+  // Più le divinità morte (src/pf1-divinita-morte.js, stesso formato): nell'elenco hanno un sottomenu a parte
+  const MORTE = window.PF1_DIVINITA_MORTE || {};
+  for (const [nome, v] of Object.entries({ ...DIVINITA, ...MORTE })) {
     divinita[nome] = {
       nome, pagina: v[0], rango: v[1], allineamento: v[2], titoli: separa(v[3]), sfere: v[4], adoratori: v[5],
       chierici: v[6] ? v[6].split(' ') : [], domini: lista(v[7]), sottodomini: lista(v[8]), arma: v[9],
-      simbolo: v[10], animale: v[11], colori: v[12], dimora: v[13], principale: PRINCIPALI.includes(nome),
+      simbolo: v[10], animale: v[11], colori: v[12], dimora: v[13], principale: PRINCIPALI.includes(nome), morta: !!MORTE[nome],
     };
   }
   const domini = {};

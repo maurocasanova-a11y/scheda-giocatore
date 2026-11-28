@@ -1574,12 +1574,13 @@ window.creaPF1 = function creaPF1(ctx) {
   function sezioneFede(p, d, c) {
     const dio = divinitaDi(d);
     const id = p.id;
-    const voci = (principale) => Object.values(FEDE.divinita).filter((x) => x.principale === principale)
+    const voci = (principale, morta = false) => Object.values(FEDE.divinita).filter((x) => x.principale === principale && !!x.morta === morta)
       .sort((a, b) => a.nome.localeCompare(b.nome, 'it')).map((x) => [x.nome, `${x.nome} (${x.allineamento})`]);
     const scelta = `<label>Divinità <select data-pf1="fede|divinita" data-id="${id}" data-ridisegna-pf1>
         <option value="">— nessuna —</option>
         <optgroup label="Divinità principali">${opz(voci(true), d.fede.divinita)}</optgroup>
         <optgroup label="Altre divinità del Mare Interno">${opz(voci(false), d.fede.divinita)}</optgroup>
+        <optgroup label="Divinità morte">${opz(voci(false, true), d.fede.divinita)}</optgroup>
       </select></label>`;
     const slots = slotFede(d);
     const classiPg = d.classi.map((cl) => nomeClasse(cl.nome)).filter(Boolean);
