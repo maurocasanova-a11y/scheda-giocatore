@@ -7631,39 +7631,53 @@ window.creaPF1 = function creaPF1(ctx) {
       // In Starfinder l'impreparato ha −2 alla CA invece di perdere la DES
       const caImpr = impr ? (i.scheda === 'pf1' ? i.c.sorpresa : i.scheda === 'sf' ? `${i.ca - 2}/${i.cac - 2}` : mo && cb.sistema !== 'sf' ? mo[10] : '') : '';
       const stati = `${sorpreso ? '<span class="badge badge-sorpreso" title="Non agisce nel round di sorpresa">sorpreso</span>' : ''}${impr ? `<span class="badge badge-impreparato" title="Non ha ancora agito: niente bonus di DES alla CA${caImpr !== '' ? ` (CA ${caImpr})` : ''}">impreparato${caImpr !== '' ? ` · CA ${caImpr}` : ''}</span>` : ''}`;
-      return `<div class="comb${cb.id === inc.attivo ? ' attivo' : ''}${stato ? ' a-terra' : ''}${sorpreso ? ' sorpreso' : ''}" data-cb="${cb.id}">
+      const attivoOra = cb.id === inc.attivo;
+      const aperto = attivoOra ? !dettagliChiusi.has(cb.id) : dettagliAperti.has(cb.id);
+      // Effetti a durata che hanno questo combattente tra i bersagli
+      const suoiEffetti = (inc.effetti || []).filter((ef) => ef.bersagli.includes(cb.id)).map((ef) => {
+        const r = ef.rimanenti === '' || ef.rimanenti == null ? null : n(ef.rimanenti);
+        const inRound = ef.inRound !== false;
+        return `<span class="chip chip-effetto chip-piccolo${inRound && r === 1 ? ' in-scadenza' : ''}" title="${esc(ef.nota || 'Effetto a durata')}">✨ ${esc(ef.nome)}${r == null ? '' : ` <b>${inRound ? `${r} r` : r >= 600 ? `~${Math.ceil(r / 600)} h` : `~${Math.ceil(r / 10)} min`}</b>`}</span>`;
+      }).join('');
+      const caCella = modificabile ? `<input type="number" class="mini" value="${esc(cb.ca ?? '')}" data-inc="combattenti#${cb.id}|ca" ${attr} data-tipo="numero" aria-label="CA">`
+        : i.scheda === 'sf' ? `<b>${i.ca}</b><small class="muto">/${i.cac}</small>` : `<b>${i.ca}</b>`;
+      return `<div class="comb plancia${attivoOra ? ' attivo' : ''}${stato ? ' a-terra' : ''}${sorpreso ? ' sorpreso' : ''}${aperto ? ' aperta' : ''}" data-cb="${cb.id}">
         <input class="comb-iniz" type="number" value="${esc(cb.iniz ?? '')}" data-inc="combattenti#${cb.id}|iniz" ${attr} data-tipo="numero" title="Iniziativa" placeholder="—">
         <div class="comb-nome">
-          ${i.pg ? `${i.p?.immagine && ctx.ritratto ? `<span class="ritratto ritratto-mini">${ctx.ritratto(i.p)}</span>` : ''}<a href="#/personaggio/${cb.pgId}${i.scheda === 'pf1' ? '/tavolo' : ''}">${esc(i.nome)}</a> <span class="badge ${i.tipo === 'PG' ? 'badge-pg' : ''}">${i.tipo}</span>`
+          ${i.pg ? `<div class="comb-nome-riga">${i.p?.immagine && ctx.ritratto ? `<span class="ritratto ritratto-mini">${ctx.ritratto(i.p)}</span>` : ''}<a href="#/personaggio/${cb.pgId}${i.scheda === 'pf1' ? '/tavolo' : ''}">${esc(i.nome)}</a> <span class="badge ${i.tipo === 'PG' ? 'badge-pg' : ''}">${i.tipo}</span></div>`
             : `<div class="comb-nome-riga">${cb.mostro ? `<span class="ritratto ritratto-mostro" data-img-mostro="${esc(cb.mostro)}">${cb.immagine && /^data:image\//.test(cb.immagine) ? `<img src="${cb.immagine}" alt="">` : '<span class="ritratto-iniziali">👹</span>'}</span>` : ''}<input value="${esc(cb.nome)}" data-inc="combattenti#${cb.id}|nome" ${attr} class="comb-nome-in"> <span class="badge badge-mostro">${cb.mostro ? 'Mostro' : 'PNG'}</span></div>`}
-          <div class="comb-sotto">Iniz ${modificabile ? `<input type="number" class="mini" value="${esc(cb.modIniz ?? '')}" data-inc="combattenti#${cb.id}|modIniz" ${attr} data-tipo="numero">` : segno(i.modIniz)}
-            · CA ${modificabile ? `<input type="number" class="mini" value="${esc(cb.ca ?? '')}" data-inc="combattenti#${cb.id}|ca" ${attr} data-tipo="numero">` : i.scheda === 'sf' ? `<b>${i.ca}</b>/<b>${i.cac}</b> <small class="muto">CAE/CAC</small>` : `<b>${i.ca}</b>`}
-            ${modificabile ? `· PF max <input type="number" class="mini" value="${esc(cb.pfMax ?? '')}" data-inc="combattenti#${cb.id}|pfMax" ${attr} data-tipo="numero">` : ''} ${stati}
+          <div class="comb-sotto">${stati}
             <span class="comb-schermo">
               <button class="btn-mini${cb.nascosto ? ' acceso' : ''}" data-azione="inc-nascondi" ${attr} data-cb="${cb.id}" title="${cb.nascosto ? 'Nascosto: non compare sullo schermo dei giocatori. Clicca per rivelarlo' : 'Nascondilo dallo schermo dei giocatori (imboscata, invisibile)'}">${cb.nascosto ? '🙈 nascosto' : '👁'}</button>
               ${i.pg ? '' : `<button class="btn-mini${cb.ignoto ? ' acceso' : ''}" data-azione="inc-ignoto" ${attr} data-cb="${cb.id}" title="${cb.ignoto ? 'Sullo schermo compare come «Creatura misteriosa». Clicca quando i personaggi lo identificano' : 'Mostralo come «Creatura misteriosa» finché non viene identificato'}">${cb.ignoto ? '❓ sconosciuto' : '❓'}</button>`}
             </span></div>
         </div>
+        <div class="comb-ca" title="${impr && caImpr !== '' ? `Impreparato: CA ${caImpr}` : 'Classe Armatura'}">${caCella}</div>
         <div class="comb-pf">
           <div class="barra-pf"><span style="width:${perc}%"></span></div>
           ${i.psMax > 0 ? `<div class="muto">PS <b>${i.ps}</b> / ${i.psMax}</div>` : ''}<div>${i.psMax > 0 ? 'PF ' : ''}<b>${i.pf}</b> / ${i.pfMax || '?'} ${stato ? `<b class="stato-pf">${stato}</b>` : ''}</div>
         </div>
+        <div class="comb-effetti">${condizioni}${suoiEffetti}${!aperto && cb.volo ? chipVolo(cb, inc) : ''}${condizioni || suoiEffetti || (!aperto && cb.volo) ? '' : '<span class="muto comb-vuoto">—</span>'}</div>
         <div class="comb-azioni">
           <input type="number" class="inc-quanti mini" min="0" placeholder="0" aria-label="Quantità">
-          <button data-azione="inc-pf" data-segno="-1" ${attr} data-cb="${cb.id}">Danno</button>
-          <button data-azione="inc-pf" data-segno="1" ${attr} data-cb="${cb.id}">Cura</button>
+          <button data-azione="inc-pf" data-segno="-1" ${attr} data-cb="${cb.id}" title="Danno: toglie i PF scritti a sinistra">− Danno</button>
+          <button data-azione="inc-pf" data-segno="1" ${attr} data-cb="${cb.id}" title="Cura: aggiunge i PF scritti a sinistra">+ Cura</button>
         </div>
-        ${i.scheda === 'pf1' ? schedaInCombattimento(i) : i.scheda === 'sf' ? schedaSfCombattimento(i) : i.scheda === 'dnd' ? schedaDndCombattimento(i) : i.scheda === 'pf2' ? schedaPf2Combattimento(i) : cb.mostro && mostroDi(cb.mostro, cb.sistema) ? schedaMostro(cb, mostroDi(cb.mostro, cb.sistema), attr) : ''}
-        ${inc.fase ? pulsantiAzioni(inc, cb, attr) : ''}
-        ${voloTracker(cb, inc, attr)}
-        <div class="comb-cond">${condizioni}
-          <select class="inc-cond-sel" title="Condizione dal wiki"><option value="">+ condizione…</option>${(inc.sistema === 'dnd' ? CONDIZIONI_DND : inc.sistema === 'pf2' ? CONDIZIONI_PF2 : CONDIZIONI).map((x) => `<option value="${esc(x)}" title="${esc(effettiCond(x))}">${esc(x)}</option>`).join('')}</select>
-          <input class="inc-cond-nome" list="pf1-condizioni" placeholder="o scrivi">
-          <input class="inc-cond-durata mini" type="number" min="1" placeholder="round">
-          <button class="btn-piccolo" data-azione="inc-cond" ${attr} data-cb="${cb.id}">+</button>
-          ${(cb.condizioni || []).map((x) => effettiCond(x.nome) ? `<div class="cond-effetto"><b>${esc(x.nome)}</b>: ${esc(effettiCond(x.nome))}</div>` : '').join('')}
-        </div>
+        <button class="btn-mini comb-apri" data-azione="inc-dettagli" ${attr} data-cb="${cb.id}" aria-expanded="${aperto}" title="${aperto ? 'Chiudi i dettagli' : 'Tiri, azioni, volo e condizioni'}">${aperto ? '▴' : '▾'}</button>
         <button class="btn-x" data-azione="inc-rimuovi" ${attr} data-cb="${cb.id}" title="Togli dal combattimento">×</button>
+        ${aperto ? `<div class="comb-dettagli">
+          ${modificabile ? `<div class="comb-sotto">Mod. iniziativa <input type="number" class="mini" value="${esc(cb.modIniz ?? '')}" data-inc="combattenti#${cb.id}|modIniz" ${attr} data-tipo="numero"> · PF max <input type="number" class="mini" value="${esc(cb.pfMax ?? '')}" data-inc="combattenti#${cb.id}|pfMax" ${attr} data-tipo="numero"></div>` : `<div class="comb-sotto">Mod. iniziativa <b>${segno(i.modIniz)}</b>${i.scheda === 'sf' ? ` · CAE <b>${i.ca}</b> / CAC <b>${i.cac}</b>` : ''}</div>`}
+          ${i.scheda === 'pf1' ? schedaInCombattimento(i) : i.scheda === 'sf' ? schedaSfCombattimento(i) : i.scheda === 'dnd' ? schedaDndCombattimento(i) : i.scheda === 'pf2' ? schedaPf2Combattimento(i) : cb.mostro && mostroDi(cb.mostro, cb.sistema) ? schedaMostro(cb, mostroDi(cb.mostro, cb.sistema), attr) : ''}
+          ${inc.fase ? pulsantiAzioni(inc, cb, attr) : ''}
+          ${voloTracker(cb, inc, attr)}
+          <div class="comb-cond">
+            <select class="inc-cond-sel" title="Condizione dal wiki"><option value="">+ condizione…</option>${(inc.sistema === 'dnd' ? CONDIZIONI_DND : inc.sistema === 'pf2' ? CONDIZIONI_PF2 : CONDIZIONI).map((x) => `<option value="${esc(x)}" title="${esc(effettiCond(x))}">${esc(x)}</option>`).join('')}</select>
+            <input class="inc-cond-nome" list="pf1-condizioni" placeholder="o scrivi">
+            <input class="inc-cond-durata mini" type="number" min="1" placeholder="round">
+            <button class="btn-piccolo" data-azione="inc-cond" ${attr} data-cb="${cb.id}">+</button>
+            ${(cb.condizioni || []).map((x) => effettiCond(x.nome) ? `<div class="cond-effetto"><b>${esc(x.nome)}</b>: ${esc(effettiCond(x.nome))}</div>` : '').join('')}
+          </div>
+        </div>` : ''}
       </div>`;
     }).join('');
     const attivo = inc.combattenti.find((x) => x.id === inc.attivo);
@@ -7712,7 +7726,7 @@ window.creaPF1 = function creaPF1(ctx) {
         return pe ? `<p class="muto inc-pe">PE dei mostri in combattimento: <b>${pe.toLocaleString('it-IT')}</b>${pg ? ` · a testa (${pg} PG): <b>${Math.floor(pe / pg).toLocaleString('it-IT')}</b>` : ''}</p>` : '';
       })()}
       ${sistemaDi(c) ? `<datalist id="pf1-bestiario">${bestiario(sistemaDi(c)).map((m) => `<option value="${esc(m[0])}">${sistemaDi(c) === 'pf2' ? 'Liv' : 'GS'} ${esc(m[1])} · ${esc(m[3])}</option>`).join('')}</datalist>` : ''}
-      <div class="lista-comb">${righe || '<p class="vuoto">Nessuno in combattimento. Aggiungi i PG e i mostri, poi tira l\'iniziativa.</p>'}</div>
+      <div class="lista-comb">${righe ? `<div class="comb-testa" aria-hidden="true"><span>Iniz</span><span>Nome</span><span>CA</span><span>Punti ferita</span><span>Condizioni ed effetti</span><span>Danno / cura</span><span></span><span></span></div>` : ''}${righe ||'<p class="vuoto">Nessuno in combattimento. Aggiungi i PG e i mostri, poi tira l\'iniziativa.</p>'}</div>
       <datalist id="pf1-condizioni">${(inc.sistema === 'dnd' ? CONDIZIONI_DND : inc.sistema === 'pf2' ? CONDIZIONI_PF2 : CONDIZIONI).map((x) => `<option value="${x}">`).join('')}</datalist>`;
   }
 
@@ -7737,6 +7751,9 @@ window.creaPF1 = function creaPF1(ctx) {
 
   // ---- Motore dello scontro: sorpresa, round, turni, effetti a durata, registro ----
   let preparaScontro = null; // id della campagna con il pannello "Inizia lo scontro" aperto
+  // Plancia del tracker: dettagli (tiri, azioni, volo, condizioni) aperti a mano; quello di turno è aperto se non lo chiudi
+  const dettagliAperti = new Set();
+  const dettagliChiusi = new Set();
   const nomeCb = (cb) => info(cb).nome;
   function annota(inc, testo) {
     inc.registro = inc.registro || [];
@@ -8510,6 +8527,14 @@ window.creaPF1 = function creaPF1(ctx) {
       const pf2 = el.dataset.sistema === 'pf2';
       const breve = pf2 ? '' : EFFETTI_CONDIZIONI[norm(String(nome).replace(/\s+\d+$/, ''))] || '';
       apriInfo(nome, breve ? `<div class="info-fatti">${fatto('In breve', breve)}</div>` : '', paginaWiki(pf2 ? String(nome).replace(/\s+\d+$/, '') : paginaCondizione(nome)), estraiIncantesimo, pf2 ? 'pf2' : 'pf1');
+    },
+    'inc-dettagli'(el) {
+      const inc = incontroDi(ctx.campagna(el.dataset.camp));
+      const id = el.dataset.cb;
+      const aperto = el.getAttribute('aria-expanded') === 'true';
+      if (id === inc.attivo) { if (aperto) dettagliChiusi.add(id); else dettagliChiusi.delete(id); }
+      if (aperto) dettagliAperti.delete(id); else dettagliAperti.add(id);
+      ctx.render();
     },
     'inc-cond-x'(el) {
       const { cb } = cbDa(el);
