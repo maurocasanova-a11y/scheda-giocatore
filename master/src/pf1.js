@@ -77,6 +77,8 @@ window.creaPF1 = function creaPF1(ctx) {
     Occultista: ['3/4', 'TV', 8, 4, 'Artigianato;Camuffare;Conoscenze (arcane);Conoscenze (ingegneria);Conoscenze (piani);Conoscenze (religioni);Conoscenze (storia);Diplomazia;Disattivare Congegni;Intuizione;Linguistica;Percezione;Professione;Rapidità di Mano;Sapienza Magica;Utilizzare Congegni Magici;Valutare;Volare'],
     Parapsichico: ['1/2', 'V', 6, 2, '*K;Artigianato;Diplomazia;Intimidire;Intuizione;Linguistica;Percezione;Professione;Raggirare;Sapienza Magica;Volare'],
     Spiritista: ['3/4', 'TV', 8, 4, '*K;Artigianato;Guarire;Intimidire;Intuizione;Linguistica;Professione;Raggirare;Sapienza Magica;Utilizzare Congegni Magici;Volare'],
+    // Classi del Master (personalizzate): base del Chierico con capacità proprie
+    'Cavaliere Benedetto di Aroden': ['3/4', 'TV', 8, 2, 'Artigianato;Cavalcare;Conoscenze (arcane);Conoscenze (nobiltà);Conoscenze (piani);Conoscenze (geografia);Conoscenze (locali);Conoscenze (religioni);Conoscenze (storia);Diplomazia;Guarire;Intimidire;Intrattenere;Intuizione;Linguistica;Nuotare;Percezione;Professione;Sapienza Magica;Valutare'],
     // Classi di prestigio
     'Arciere Arcano': ['pieno', 'TR', 10, 4, 'Cavalcare;Furtività;Percezione;Sopravvivenza', 1],
     'Guerriero Arcano': ['pieno', 'T', 10, 2, 'Cavalcare;Conoscenze (arcane);Conoscenze (nobiltà);Intuizione;Linguistica;Nuotare;Sapienza Magica;Scalare', 1],
@@ -84,6 +86,7 @@ window.creaPF1 = function creaPF1(ctx) {
   };
   // Incantatori ([caratteristica, tipo di lancio]) e nomi alternativi riconosciuti (inglesi o usati prima)
   const EXTRA_CLASSI = {
+    'Cavaliere Benedetto di Aroden': { inc: ['SAG', 'preparati'], master: true },
     Alchimista: { inc: ['INT', 'preparati'], alias: ['alchemist'] },
     Antipaladino: { inc: ['CAR', 'preparati'], alias: ['antipaladin'] },
     Arcanista: { inc: ['INT', 'preparati'], alias: ['arcanist'] },
@@ -733,7 +736,7 @@ window.creaPF1 = function creaPF1(ctx) {
   // ---- Talenti (dati in src/pf1-talenti-dati.js, lettura dei prerequisiti in src/pf1-talenti.js) ----
   const TALENTI = window.PF1_TALENTI || { voci: [], requisiti: () => [], tipi: [], manuali: [], talento: () => null, norm };
   const CLASSI_ARCANE = new Set(['Mago', 'Stregone', 'Arcanista', 'Bardo', 'Scaldo', 'Magus', 'Fattucchiere', 'Convocatore', 'Iracondo di Stirpe']);
-  const CLASSI_DIVINE = new Set(['Chierico', 'Oracolo', 'Druido', 'Ranger', 'Paladino', 'Antipaladino', 'Inquisitore', 'Sacerdote Guerriero', 'Cacciatore', 'Sciamano']);
+  const CLASSI_DIVINE = new Set(['Cavaliere Benedetto di Aroden', 'Chierico', 'Oracolo', 'Druido', 'Ranger', 'Paladino', 'Antipaladino', 'Inquisitore', 'Sacerdote Guerriero', 'Cacciatore', 'Sciamano']);
   // Nome del talento senza la scelta tra parentesi: "Arma Focalizzata (spada lunga)" -> "arma focalizzata"
   // (anche con una parentesi dentro la scelta: "Abilità Focalizzata (Conoscenze (arcane))" -> "abilita focalizzata")
   const baseTalento = (s) => norm(String(s).replace(/\s*\((?!mitico\))[^()]*(?:\([^()]*\))?[^()]*\)\s*$/i, ''));
@@ -844,7 +847,7 @@ window.creaPF1 = function creaPF1(ctx) {
     Mago: 'M', Stregone: 'M', Arcanista: 'M', Bardo: 'B', Scaldo: 'B', Cacciatore: 'Cc', Chierico: 'C', Oracolo: 'C',
     'Sacerdote Guerriero': 'C', Convocatore: 'Cv', Druido: 'D', Fattucchiere: 'F', Inquisitore: 'I', 'Iracondo di Stirpe': 'Is',
     Magus: 'Mg', Medium: 'Md', Mesmerista: 'Ms', Occultista: 'O', Paladino: 'P', Parapsichico: 'Ps', Ranger: 'R',
-    Sciamano: 'Sc', Spiritista: 'Sp', Antipaladino: 'A',
+    Sciamano: 'Sc', Spiritista: 'Sp', Antipaladino: 'A', 'Cavaliere Benedetto di Aroden': 'C',
   };
   // Lista usata da una classe da incantatore (il Convocatore rivisitato ha una lista sua)
   const listaDi = (inc) => {
@@ -895,7 +898,18 @@ window.creaPF1 = function creaPF1(ctx) {
   };
 
   // ---- Tabelle degli incantesimi (dati in src/pf1-tabelle.js) ----
-  const TABELLE = window.PF1_TABELLE || { classi: {}, alGiorno: () => '', conosciuti: () => '', bonus: (mod, L) => (L > 0 && mod >= L ? 1 + Math.floor((mod - L) / 4) : 0) };
+  const TABELLE_BASE = window.PF1_TABELLE || { classi: {}, alGiorno: () => '', conosciuti: () => '', bonus: (mod, L) => (L > 0 && mod >= L ? 1 + Math.floor((mod - L) / 4) : 0) };
+  const TABELLE = TABELLE_BASE;
+  // Cavaliere Benedetto di Aroden (classe del master): gli incantesimi al giorno del chierico con uno in meno per livello;
+  // dove arriva a 0 lancia solo con gli incantesimi bonus di Saggezza e con lo slot di dominio
+  if (TABELLE.classi.Chierico && !TABELLE.classi['Cavaliere Benedetto di Aroden']) {
+    const ch = TABELLE.classi.Chierico;
+    TABELLE.classi['Cavaliere Benedetto di Aroden'] = {
+      // (le orazioni, livello 0, restano come quelle del chierico: si lanciano a volontà)
+      g: [ch.g[0], ch.g[1].map((riga) => riga.split('/').map((v, j) => (v === '-' || ch.g[0][j] === 0 ? v : String(Math.max(0, Number(v) - 1)))).join('/'))],
+      k: null,
+    };
+  }
   // Classi il cui livello incantatore è il livello di classe − 3
   const CL_MENO_3 = new Set(['Paladino', 'Ranger', 'Antipaladino', 'Iracondo di Stirpe']);
   // Classi che preparano da un libro (wiki: libro degli incantesimi, formulario, famiglio): [nome, cosa contiene]
@@ -919,9 +933,11 @@ window.creaPF1 = function creaPF1(ctx) {
     Druido: { n: 1, tipo: 'dominio', incantesimi: true, natura: true },
     Inquisitore: { n: 1, tipo: 'dominio', incantesimi: false },
     'Sacerdote Guerriero': { n: 2, tipo: 'benedizione', incantesimi: false },
+    // Classe del master: domini fissi con il loro sottodominio
+    'Cavaliere Benedetto di Aroden': { n: 2, tipo: 'dominio', incantesimi: true, fissi: [['Legge', 'Lealtà'], ['Protezione', 'Purezza']] },
   };
   // Classi per cui l'allineamento deve essere vicino a quello della divinità
-  const CLASSI_ALLINEAMENTO = new Set(['Chierico', 'Inquisitore', 'Sacerdote Guerriero']);
+  const CLASSI_ALLINEAMENTO = new Set(['Chierico', 'Inquisitore', 'Sacerdote Guerriero', 'Cavaliere Benedetto di Aroden']);
   const ALLINEAMENTI = { 'legale buono': 'LB', 'neutrale buono': 'NB', 'caotico buono': 'CB', 'legale neutrale': 'LN', 'neutrale': 'N', 'neutrale puro': 'N', 'caotico neutrale': 'CN', 'legale malvagio': 'LM', 'neutrale malvagio': 'NM', 'caotico malvagio': 'CM' };
   const siglaAllineamento = (s) => {
     const t = norm(String(s || '').trim());
@@ -1474,9 +1490,11 @@ window.creaPF1 = function creaPF1(ctx) {
     for (const cl of d.classi) {
       const k = nomeClasse(cl.nome);
       const def = CLASSI_DOMINI[k];
-      if (def) for (let i = 0; i < def.n; i++) spec.push({ classe: k, livello: n(cl.livello), ...def });
+      if (def) for (let i = 0; i < def.n; i++) spec.push({ classe: k, livello: n(cl.livello), ...def, fisso: def.fissi?.[i] || null });
     }
     while (d.fede.slot.length < spec.length) d.fede.slot.push({ dominio: '', sotto: '' });
+    // Domini fissi della classe (Cavaliere Benedetto di Aroden): sempre quelli, con il loro sottodominio
+    spec.forEach((s, i) => { if (s.fisso) d.fede.slot[i] = { dominio: s.fisso[0], sotto: s.fisso[1] }; });
     return spec.map((s, i) => ({ ...s, i, scelta: d.fede.slot[i] }));
   }
   // Ha uno slot di dominio in più per livello? (chierico/druido con un dominio scelto)
@@ -1610,8 +1628,8 @@ window.creaPF1 = function creaPF1(ctx) {
       const sottos = sc.tipo === 'dominio' && sc.scelta.dominio ? sottodominiAmmessi(sc.scelta.dominio, dio) : [];
       const testa = `<div class="pf-riga">
           <span class="fede-etich">${sc.tipo === 'benedizione' ? 'Benedizione' : 'Dominio'} · ${esc(sc.classe)} ${sc.livello}</span>
-          <select data-pf1="${base}|dominio" data-id="${id}" data-ridisegna-pf1>${opzDom}</select>
-          ${sottos.length ? `<label>Sottodominio <select data-pf1="${base}|sotto" data-id="${id}" data-ridisegna-pf1><option value="">— nessuno —</option>${opz(sottos.map((x) => [x, x]), sc.scelta.sotto)}</select></label>` : ''}
+          ${sc.fisso ? `<b>${esc(sc.fisso[0])}</b> <span class="muto">sottodominio</span> <b>${esc(sc.fisso[1])}</b> <small class="muto">(fissi per la classe)</small>` : `<select data-pf1="${base}|dominio" data-id="${id}" data-ridisegna-pf1>${opzDom}</select>`}
+          ${sottos.length && !sc.fisso ? `<label>Sottodominio <select data-pf1="${base}|sotto" data-id="${id}" data-ridisegna-pf1><option value="">— nessuno —</option>${opz(sottos.map((x) => [x, x]), sc.scelta.sotto)}</select></label>` : ''}
           ${sc.scelta.dominio && sc.tipo === 'dominio' ? `<button class="btn-piccolo" data-azione="pf1-info-dominio" data-nome="${esc(sc.scelta.dominio)}" data-sotto="${esc(sc.scelta.sotto || '')}">📖 Testo dei poteri</button>` : ''}
           ${sc.scelta.dominio && sc.tipo === 'benedizione' ? `<button class="btn-piccolo" data-azione="pf1-info-benedizione" data-nome="${esc(sc.scelta.dominio)}">📖 Testo dei poteri</button>` : ''}
         </div>`;
@@ -2795,6 +2813,38 @@ window.creaPF1 = function creaPF1(ctx) {
     </div>`;
   }
 
+  // ---- Classe del master: Cavaliere Benedetto di Aroden (base del Chierico, testo del master) ----
+  const CBA = 'Cavaliere Benedetto di Aroden';
+  const LIVELLI_TALENTI_CBA = [1, 4, 7, 10, 13, 16, 20];
+  function arodenDi(d) {
+    const L = livelloClasse(d, CBA);
+    const u = d.aroden = d.aroden || { sguardo: 0, onniscienza: 0, condottiero: 0, aura: 0 };
+    return {
+      L, u,
+      talenti: LIVELLI_TALENTI_CBA.filter((x) => x <= L).length,
+      sguardo: Math.floor(L / 4), // una volta al giorno ogni 4 livelli
+      condottiero: L >= 1 ? 1 + Math.floor((L - 1) / 2) : 0, // al 1° e poi ogni 2 livelli
+      aura: L >= 16 ? 2 * L : L >= 6 ? L : 0, // round al giorno
+      auraEffetto: L >= 16 ? 'Eroismo Superiore Massimizzato, 64 m' : L >= 10 ? 'Eroismo Superiore Massimizzato, 36 m' : 'Eroismo, 18 m',
+      baluardo: L >= 20 ? 128 : L >= 15 ? 64 : L >= 10 ? 36 : L >= 5 ? 18 : 9,
+    };
+  }
+  function sezioneAroden(p, d) {
+    const id = p.id;
+    const a = arodenDi(d);
+    const riga = (nome, tot, chiave, testo) => `<div><span class="muto">${nome}</span>${tot ? ` <span class="pf-pallini">${pallini(tot, n(a.u[chiave]), `data-azione="pf1-aroden-uso" data-id="${id}" data-chiave="${chiave}"`)}</span>` : ''} <small class="muto">${testo}</small></div>`;
+    return `<div class="fede-righe">
+        <div><span class="muto">Domini</span> <b>Legge</b> (Lealtà) e <b>Protezione</b> (Purezza), fissi — vedi Fede e domini</div>
+        <div><span class="muto">Incantesimi</span> come il chierico, con uno in meno per livello (a 0: solo incantesimi bonus di Saggezza e di dominio)</div>
+        <div><span class="muto">Talenti bonus</span> <b>${a.talenti}</b> <small class="muto">(1°, 4°, 7°, 10°, 13°, 16°, 20°: di Combattimento o di Squadra, come un guerriero di pari livello)</small></div>
+        ${riga('Sguardo di Aroden', a.sguardo, 'sguardo', `${a.sguardo || 'dal 4° livello'} al giorno · +20 a una prova di abilità o di caratteristica (non Conoscenze), dichiarato con l'azione`)}
+        ${riga('Onniscienza di Aroden', 1, 'onniscienza', '1 al giorno · azione standard: sa cosa è giusto fare (interpretazione obbligatoria)')}
+        ${riga('Condottiero Benedetto', a.condottiero, 'condottiero', `${a.condottiero} al giorno · reazione: conferma una minaccia fallita o trasforma un critico subito in attacco normale (se vede e comunica)${a.L >= 9 ? '; con 3 usi una minaccia su un attacco che colpisce' : ''}`)}
+        ${a.aura ? riga('Aura di Gloria', a.aura, 'aura', `${a.aura} round al giorno · azione veloce: alleati come sotto ${a.auraEffetto}`) : '<div><span class="muto">Aura di Gloria</span> <small class="muto">dal 6° livello</small></div>'}
+        <div><span class="muto">Baluardo Eroico</span> <small class="muto">reazione: subisce al posto di una creatura entro <b>${a.baluardo} m</b> un attacco che può vedere</small></div>
+        <div><span class="muto">Competenze</span> <small class="muto">armi semplici, armature leggere, medie e pesanti, scudi (anche torre), arma preferita della divinità</small></div>
+      </div>`;
+  }
   // ---- Pistolero: Grinta, Gesta, Leggiadria, Addestramento nelle Armi da Fuoco (pagina «Pistolero» di Golarion Insider) ----
   // Gesta: [nome, livello, costo in grinta, effetto in breve]
   const GESTA = [
@@ -3977,7 +4027,7 @@ window.creaPF1 = function creaPF1(ctx) {
   // ---- Energia divina e capacità a usi giornalieri ----
   function risorseDivine(d, c) {
     const out = [];
-    const ch = livelloClasse(d, 'Chierico');
+    const ch = livelloClasse(d, 'Chierico') + livelloClasse(d, 'Cavaliere Benedetto di Aroden'); // il Cavaliere Benedetto di Aroden incanala come il chierico
     if (ch > 0) out.push({ chiave: 'incanalare', nome: 'Incanalare Energia', usi: 3 + c.m.CAR, dadi: Math.ceil(ch / 2), cd: 10 + Math.floor(ch / 2) + c.m.CAR, incanala: true, pagina: 'Chierico' });
     const pal = livelloClasse(d, 'Paladino');
     if (pal >= 2) out.push({ chiave: 'mani', nome: 'Imposizione delle Mani', usi: Math.floor(pal / 2) + c.m.CAR, dadi: Math.floor(pal / 2), pagina: 'Paladino',
@@ -4163,7 +4213,8 @@ window.creaPF1 = function creaPF1(ctx) {
     const gruppo = (titolo, lista) => `<optgroup label="${titolo}">${lista.map((x) => `<option value="${esc(x)}"${x === k ? ' selected' : ''}>${esc(x)}</option>`).join('')}</optgroup>`;
     return `<select class="pf-largo" data-pf1="classi#${cl.id}|nome" data-id="${id}">
         <option value=""${k ? '' : ' selected'}>— scegli la classe —</option>
-        ${gruppo('Classi', nomi.filter((x) => !CLASSI[x].prestigio))}
+        ${gruppo('Classi', nomi.filter((x) => !CLASSI[x].prestigio && !CLASSI[x].master))}
+        ${gruppo('Classi del Master', nomi.filter((x) => CLASSI[x].master))}
         ${gruppo('Classi di prestigio', nomi.filter((x) => CLASSI[x].prestigio))}
         <option value="Classe personalizzata">✎ Altra classe (personalizzata)…</option>
       </select>`;
@@ -5246,6 +5297,7 @@ window.creaPF1 = function creaPF1(ctx) {
       ${livelloClasse(d, 'Fattucchiere') ? sezione('fattucchiere', 'Fatture del Fattucchiere', sezioneFattucchiere(p, d, c)) : ''}
       ${livMS(d) ? sezione('maestro', 'Maestro del Sapere: segreti e sapienza', sezioneMaestro(p, d, c, r), `<small class="muto">${d.maestro.segreti.length}/${segretiDisponibiliMS(livMS(d))} segreti</small>`) : ''}
       ${livelloClasse(d, 'Mago') ? sezione('mago', 'Scuola arcana', sezioneMago(p, d, c)) : ''}
+      ${livelloClasse(d, CBA) ? sezione('aroden', 'Cavaliere Benedetto di Aroden', sezioneAroden(p, d)) : ''}
       ${livelloClasse(d, 'Pistolero') ? sezione('pistolero', 'Pistolero: grinta, gesta, leggiadria', sezionePistolero(p, d, c)) : ''}
       ${livelloClasse(d, 'Paladino') ? sezione('paladino', 'Paladino: punire il male, indulgenze, legame divino', sezionePaladino(p, d, c)) : ''}
       ${livelloClasse(d, 'Arcanista') ? sezione('arcanista', 'Arcanista: Scorta Arcana ed exploit', sezioneArcanista(p, d, c)) : ''}
@@ -5625,12 +5677,23 @@ window.creaPF1 = function creaPF1(ctx) {
       if (d.arcanista) { d.arcanista.punti = null; d.arcanista.consumati = 0; }
       if (d.paladino) { d.paladino.punireUsati = 0; d.paladino.legameUsati = 0; }
       if (d.pistolero) d.pistolero.grinta = null; // la grinta torna a SAG (minimo 1)
+      if (d.aroden) d.aroden = { sguardo: 0, onniscienza: 0, condottiero: 0, aura: 0 };
       if (d.chimico) { d.chimico.mutareUsati = 0; d.chimico.soffioUsato = false; }
       if (d.mistificatore) d.mistificatore = { estemporanei: 0, mistificati: 0, invisibile: 0 };
       if (d.stregone) d.stregone.usati = {};
       ctx.salva();
       ctx.render();
       ctx.toast(`🌙 Riposo: ${testoPf}slot di incantesimo, poteri divini e potere mitico recuperati`);
+    },
+    // ---- Cavaliere Benedetto di Aroden ----
+    'pf1-aroden-uso'(el) {
+      const d = dati(ctx.personaggio(el.dataset.id));
+      arodenDi(d);
+      const k = el.dataset.chiave;
+      const i = Number(el.dataset.indice);
+      d.aroden[k] = i < n(d.aroden[k]) ? i : i + 1; // clic sull'ultimo pieno = lo libera
+      ctx.salva();
+      ctx.render();
     },
     // ---- Pistolero ----
     'pf1-grinta'(el) {
