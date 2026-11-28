@@ -5637,17 +5637,20 @@ window.creaPF1 = function creaPF1(ctx) {
       const ci = calcola(p, ctx.regDi(p)).incantatori.find((x) => x.id === inc.id);
       const cd = ci.livelli[L]?.cd ?? '';
       const nome = esc(sp.nome || 'Incantesimo');
-      if (L === 0) { ctx.toast(`✨ <b>${nome}</b> lanciato (a volontà) · CD ${cd}`); return; }
+      // Durata in round (dal catalogo delle durate): dal vivo l'effetto arriva nel tracker del master
+      const effetto = effettoInRound(sp.nome, ci.cl);
+      const dur = effetto ? ` · ⏱ ${effetto.round} round` : '';
+      if (L === 0) { ctx.toast(`✨ <b>${nome}</b> lanciato (a volontà) · CD ${cd}${dur}`, '', { effetto }); return; }
       if (inc.tipo === 'spontanei') {
         const tot = ci.livelli[L]?.tot || 0;
         inc.slot[L] = inc.slot[L] || { base: '' };
         if (n(inc.slot[L].usati) >= tot) { ctx.toast(`Nessuno slot di ${L}° livello rimasto`, 'errore'); return; }
         inc.slot[L].usati = n(inc.slot[L].usati) + 1;
-        ctx.toast(`✨ <b>${nome}</b> lanciato · CD ${cd} · slot di ${L}° rimasti: ${tot - inc.slot[L].usati}`);
+        ctx.toast(`✨ <b>${nome}</b> lanciato · CD ${cd} · slot di ${L}° rimasti: ${tot - inc.slot[L].usati}${dur}`, '', { effetto });
       } else {
         if (n(sp.lanciati) >= n(sp.preparati)) { ctx.toast(`<b>${nome}</b>: nessuna copia preparata rimasta`, 'errore'); return; }
         sp.lanciati = n(sp.lanciati) + 1;
-        ctx.toast(`✨ <b>${nome}</b> lanciato · CD ${cd} · copie rimaste: ${n(sp.preparati) - sp.lanciati}`);
+        ctx.toast(`✨ <b>${nome}</b> lanciato · CD ${cd} · copie rimaste: ${n(sp.preparati) - sp.lanciati}${dur}`, '', { effetto });
       }
       ctx.salva();
       ctx.render();
@@ -7914,6 +7917,37 @@ window.creaPF1 = function creaPF1(ctx) {
     if ((m = t.match(/(\d+)\s*or[ae]\b/))) return r(n(m[1]), 'ore');
     return { round: '', nota: testo };
   }
+  // Incantesimo con durata in round (src/pf1-incantesimi-durata.js), calcolata con il livello dell'incantatore; null se dura
+  // in minuti, ore, è istantaneo o non è nel catalogo
+  const DURATE_INC = new Map(Object.entries(window.PF1_INCANTESIMI_DURATA || {}).map(([k, v]) => [norm(k), v]));
+  function effettoInRound(nomeInc, li) {
+    const v = incantesimoDi(nomeInc);
+    const [durata, raggio] = DURATE_INC.get(norm(v ? v.nome : String(nomeInc || '').trim())) || [];
+    if (!durata) return null;
+    const r = roundDaDurata(durata, Math.max(1, n(li)));
+    if (r.unita !== 'round' || !(r.round > 0)) return null;
+    return { nome: v ? v.nome : String(nomeInc).trim(), round: r.round, durata, raggio: raggio || '' };
+  }
+  // Dal vivo: un giocatore ha lanciato dalla sua scheda un incantesimo in round → effetto nel tracker, lanciato dal suo PG
+  function effettoDalVivo(c, pgId, e) {
+    const inc = c?.incontro;
+    if (!inc?.fase || !e || typeof e !== 'object') return false;
+    const nome = String(e.nome || '').trim().slice(0, 80);
+    const round = Math.round(Number(e.round));
+    if (!nome || !(round >= 1 && round <= 1000)) return false;
+    const cb = (inc.combattenti || []).find((x) => x.pgId && x.pgId === pgId);
+    if (!cb) return false;
+    const raggio = String(e.raggio || '').slice(0, 120);
+    const durata = String(e.durata || '').slice(0, 120);
+    const ef = { id: uid(), nome, lanciatoreId: cb.id, bersagli: /^personale/i.test(raggio) ? [cb.id] : [], rimanenti: round, inRound: true, bonus: {},
+      nota: `Dalla scheda del giocatore · durata ${durata}${raggio ? ` · raggio ${raggio}` : ''}` };
+    inc.effetti = inc.effetti || [];
+    inc.effetti.push(ef);
+    if (ef.rimanenti === 1) avvisaEffetto(inc, ef, 'ultimo');
+    collegaEffetto(inc, ef);
+    annota(inc, `✨ ${nomeCb(cb)}: ${nome} nel tracker per ${round} round`);
+    return true;
+  }
   // Livello dell'incantatore di un combattente: dalla scheda per i PG (la classe che conosce l'incantesimo, se c'è)
   function liDi(cb, nomeInc) {
     const p = cb?.pgId ? ctx.personaggio(cb.pgId) : null;
@@ -8799,6 +8833,7 @@ window.creaPF1 = function creaPF1(ctx) {
     datiSchermo, renderSchermo, tiroSulloSchermo,
     // Sessione dal vivo (app.js): PF del personaggio come li vede il tracker, e una riga nel registro dello scontro in corso
     pfDalVivo: (pgId) => { try { const i = info({ pgId }); return { pf: i.pf, pfMax: i.pfMax, ps: i.ps, psMax: i.psMax }; } catch { return null; } },
+    effettoDalVivo, effettoInRound,
     annotaDalVivo: (c, testo) => { const inc = c.incontro; if (inc?.fase) annota(inc, testo); },
     vistaGrimorio,
     vistaBreviario,

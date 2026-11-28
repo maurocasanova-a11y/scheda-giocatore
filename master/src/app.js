@@ -1674,7 +1674,7 @@
     esc, uid, norm, numero,
     salva: () => salva(),
     render: () => render(),
-    toast: (h, t) => toast(h, t),
+    toast: (h, t, extra) => toast(h, t, extra),
     eseguiTiro: (e, et, o) => eseguiTiro(e, et, o),
     personaggio: (id) => personaggio(id),
     ritratto: (p) => ritratto(p),
@@ -1743,7 +1743,7 @@
     esc, uid, norm,
     salva: () => salva(),
     render: () => render(),
-    toast: (h, t) => toast(h, t),
+    toast: (h, t, extra) => toast(h, t, extra),
     eseguiTiro: (e, et, o) => eseguiTiro(e, et, o),
     personaggio: (id) => personaggio(id),
     // Archivio olografico (libro degli incantesimi) e descrizioni dal wiki
@@ -1764,7 +1764,7 @@
     esc, uid,
     salva: () => salva(),
     render: () => render(),
-    toast: (h, t) => toast(h, t),
+    toast: (h, t, extra) => toast(h, t, extra),
     nave,
     personaggiDi: (cid) => { const v = S.astronavi.find((x) => x.campagnaId === cid && x._personaggi?.length); return v ? v._personaggi : personaggiDi(cid); },
     sfCalcola: (p) => sf.calcola(p),
@@ -1775,7 +1775,7 @@
     esc, uid,
     salva: () => salva(),
     render: () => render(),
-    toast: (h, t) => toast(h, t),
+    toast: (h, t, extra) => toast(h, t, extra),
     campagna: (id) => campagna(id),
     nave,
     navi: (cid) => S.astronavi.filter((x) => x.campagnaId === cid),
@@ -1791,7 +1791,7 @@
     esc, uid, norm,
     salva: () => salva(),
     render: () => render(),
-    toast: (h, t) => toast(h, t),
+    toast: (h, t, extra) => toast(h, t, extra),
     eseguiTiro: (e, et, o) => eseguiTiro(e, et, o),
     personaggio: (id) => personaggio(id),
   });
@@ -1801,7 +1801,7 @@
     esc, uid, norm,
     salva: () => salva(),
     render: () => render(),
-    toast: (h, t) => toast(h, t),
+    toast: (h, t, extra) => toast(h, t, extra),
     eseguiTiro: (e, et, o) => eseguiTiro(e, et, o),
     personaggio: (id) => personaggio(id),
   });
@@ -2945,7 +2945,9 @@
       dvM.eventiVisti.add(k);
       const chi = dvM.giocatori[ev.uid]?.nome || copia.pg?.[ev.uid]?.nome || 'Un giocatore';
       pf1.annotaDalVivo(c, `${chi}: ${ev.testo}`);
-      toast(`📡 <b>${esc(chi)}</b>: ${esc(ev.testo)}`);
+      const pgId = dvM.giocatori[ev.uid]?.pgId;
+      if (ev.effetto && pgId && pf1.effettoDalVivo(c, pgId, ev.effetto)) toast(`📡 <b>${esc(chi)}</b>: <b>${esc(String(ev.effetto.nome))}</b> nel tracker per ${esc(String(ev.effetto.round))} round`);
+      else toast(`📡 <b>${esc(chi)}</b>: ${esc(ev.testo)}`);
       DV.cancella(`sessioni/${dvM.codice}/eventi/${k}`).catch(() => {});
       cambiato = true;
     }
@@ -2975,12 +2977,15 @@
 
   // ================= Notifiche =================
   let timerToast = null;
-  function toast(html, tipo = '') {
+  function toast(html, tipo = '', extra = {}) {
     // Scheda collegata dal vivo: gli incantesimi lanciati e i riposi arrivano anche al master (nel registro dello scontro)
     if (GIOCATORE && dvG.codice && tipo !== 'errore' && dvAttivo()
       && ((/^\s*✨/.test(html) && /lanciat|con uno slot|slot del patto/i.test(html)) || /^\s*🌙/.test(html))) {
       const testo = testoSemplice(html).slice(0, 480);
-      DV.mioUid().then((io) => DV.aggiungi(`sessioni/${dvG.codice}/eventi`, { uid: io, testo, t: DV.ORA })).catch(() => {});
+      const ef = extra?.effetto;
+      // Incantesimo con durata in round: arriva anche come effetto nel tracker del master
+      const effetto = ef ? { nome: String(ef.nome).slice(0, 80), round: ef.round, durata: String(ef.durata || '').slice(0, 120), raggio: String(ef.raggio || '').slice(0, 120) } : null;
+      DV.mioUid().then((io) => DV.aggiungi(`sessioni/${dvG.codice}/eventi`, { uid: io, testo, t: DV.ORA, ...(effetto ? { effetto } : {}) })).catch(() => {});
     }
     const t = $('#toast');
     t.innerHTML = `<div class="toast ${tipo}">${html}</div>`;
