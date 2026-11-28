@@ -7293,14 +7293,10 @@ window.creaPF1 = function creaPF1(ctx) {
     const carte = (s.carte || []).map((x) => `<div class="sch-carta${x.attivo ? ' attivo' : ''}${x.aTerra ? ' a-terra' : ''}${x.sorpreso ? ' sorpreso' : ''}${mioPg && x.pgId === mioPg ? ' mio' : ''}">
         <div class="sch-iniz">${x.iniz === '' ? '—' : esc(x.iniz)}</div>
         <span class="ritratto sch-img">${ritratto(x)}</span>
-        <div class="sch-corpo">
-          <div class="sch-nome">${esc(x.nome)} <span class="badge ${x.pgId ? (x.badgePg ? 'badge-pg' : '') : 'badge-mostro'}">${esc(x.badge)}</span>
-            ${x.sorpreso ? '<span class="badge badge-sorpreso">sorpreso</span>' : ''}${x.impreparato ? '<span class="badge badge-impreparato">impreparato</span>' : ''}</div>
-          ${fidato && x.voloHtml ? `<div class="sch-chips sch-volo">${x.voloHtml}</div>` : ''}
-          ${x.condizioni?.length ? `<div class="sch-chips sch-condizioni">${x.condizioni.map((k) => `<span class="chip sch-cond" title="${esc(k.titolo)}">${esc(k.nome)}${k.durata ? ` <b>${esc(k.durata)} r</b>` : ''}</span>`).join('')}</div>` : ''}
-          ${x.vita ? `${x.vita.ps != null ? `<div class="sch-vita sch-vita-ps" title="Stamina"><span style="width:${Number(x.vita.ps) || 0}%"></span></div>` : ''}<div class="sch-vita sch-vita-${['verde', 'gialla', 'rossa', 'nera'].includes(x.vita.colore) ? x.vita.colore : 'verde'}" title="${esc(x.vita.titolo)}"><span style="width:${Number(x.vita.perc) || 0}%"></span></div>` : ''}
-          ${x.effetti?.length ? `<div class="sch-chips">${x.effetti.map((ef) => `<span class="chip chip-effetto">✨ ${esc(ef.nome)}${ef.rimanenti ? ` <b>${esc(ef.rimanenti)} r</b>` : ''}</span>`).join('')}</div>` : ''}
-        </div>
+        <div class="sch-nome"><span class="sch-nome-testo">${esc(x.nome)}</span> <span class="badge ${x.pgId ? (x.badgePg ? 'badge-pg' : '') : 'badge-mostro'}">${esc(x.badge)}</span>
+          ${x.sorpreso ? '<span class="badge badge-sorpreso">sorpreso</span>' : ''}${x.impreparato ? '<span class="badge badge-impreparato">impreparato</span>' : ''}</div>
+        <div class="sch-col-vita">${x.vita ? `${x.vita.ps != null ? `<div class="sch-vita sch-vita-ps" title="Stamina"><span style="width:${Number(x.vita.ps) || 0}%"></span></div>` : ''}<div class="sch-vita sch-vita-${['verde', 'gialla', 'rossa', 'nera'].includes(x.vita.colore) ? x.vita.colore : 'verde'}" title="${esc(x.vita.titolo)}"><span style="width:${Number(x.vita.perc) || 0}%"></span></div>` : ''}</div>
+        <div class="sch-col-stato sch-chips">${fidato && x.voloHtml ? `<span class="sch-volo">${x.voloHtml}</span>` : ''}${(x.condizioni || []).map((k) => `<span class="chip sch-cond" title="${esc(k.titolo)}">${esc(k.nome)}${k.durata ? ` <b>${esc(k.durata)} r</b>` : ''}</span>`).join('')}${(x.effetti || []).map((ef) => `<span class="chip chip-effetto">✨ ${esc(ef.nome)}${ef.rimanenti ? ` <b>${esc(ef.rimanenti)} r</b>` : ''}</span>`).join('')}</div>
       </div>`).join('');
     const a = s.attivo;
     const tiri = (s.tiri || []).length ? `<aside class="sch-tiri"><h3>🎲 Tiri</h3>${s.tiri.map((t) => `<div class="sch-tiro"><span>${esc(t.etichetta || t.espr)}</span><b>${esc(t.totale)}</b></div>`).join('')}</aside>` : '';
@@ -7315,7 +7311,7 @@ window.creaPF1 = function creaPF1(ctx) {
     }
     turnoAnnunciato = chiave ?? turnoAnnunciato ?? '';
     setTimeout(() => document.querySelector('.sch-carta.attivo')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
-    return `<div class="schermo${scenaGrande ? ' modo-scena' : ''}" style="--sch-scala:${scalaSchermo()}">
+    return `<div class="schermo tabellone${scenaGrande ? ' modo-scena' : ''}" style="--sch-scala:${scalaSchermo()}">
       <header class="sch-testa">
         <div class="sch-round">${s.fase === 'sorpresa' ? 'Round di sorpresa' : inScontro ? `Round ${s.round}` : scenaGrande ? esc(s.campagna) : 'In attesa dello scontro'}</div>
         ${inScontro && a ? `<div class="sch-turno"><span class="ritratto sch-img-grande">${ritratto(a)}</span>
@@ -7327,7 +7323,7 @@ window.creaPF1 = function creaPF1(ctx) {
       </header>
       ${s.messaggio ? `<div class="sch-messaggio">📢 ${esc(s.messaggio)}</div>` : ''}
       ${imgScena ? `<div class="sch-scena${scenaGrande ? ' grande' : ''}"><img src="${imgScena}" alt="Scena"></div>` : ''}
-      ${scenaGrande ? '' : `<div class="sch-corpo-lista"><div class="sch-lista">${carte || '<p class="vuoto">Nessuno in combattimento.</p>'}</div>${tiri}</div>`}
+      ${scenaGrande ? '' : `<div class="sch-corpo-lista"><div class="sch-lista">${carte ? '<div class="sch-intest" aria-hidden="true"><span>Iniz</span><span></span><span>Nome</span><span>Salute</span><span>Stato</span></div>' : ''}${carte || '<p class="vuoto">Nessuno in combattimento.</p>'}</div>${tiri}</div>`}
     </div>`;
   }
   // Grandezza del testo dello schermo (per la TV): resta in questo dispositivo
