@@ -1537,11 +1537,11 @@
   // Kit: mappa del combattimento ricevuta dalla sessione dal vivo (in sola lettura; toccando una nave si vedono archi e bersagli)
   const mappaDalVivo = { battaglia: null };
   // Schermo dei giocatori ricevuto dalla sessione dal vivo (iniziativa, turno, messaggi, tiri, scena)
-  const schermoDalVivo = { dati: null, scena: '' };
+  const schermoDalVivo = { dati: null, scena: '', sfondo: '' };
   const linkSchermo = () => (GIOCATORE && schermoDalVivo.dati ? '<a class="btn-piccolo primario" href="#/schermo-vivo">📺 Schermo del tavolo</a>' : '');
   function vistaSchermoGiocatore() {
     return `<div class="barra-azioni"><a class="bottone" href="#/giocatore">← I miei personaggi</a>${dvG.pgId ? `<a class="bottone" href="#/personaggio/${dvG.pgId}">La mia scheda</a>` : ''}</div>
-      ${pf1.renderSchermo(schermoDalVivo.dati, { fidato: false, scena: schermoDalVivo.scena, mioPg: dvG.pgId })}`;
+      ${pf1.renderSchermo(schermoDalVivo.dati, { fidato: false, scena: schermoDalVivo.scena, sfondo: schermoDalVivo.sfondo, mioPg: dvG.pgId })}`;
   }
   const linkMappa = () => (GIOCATORE && mappaDalVivo.battaglia ? '<a class="btn-piccolo primario" href="#/mappa">🗺 Mappa del combattimento</a>' : '');
   function vistaMappaGiocatore() {
@@ -2633,6 +2633,7 @@
     dvG.stopScena = DV.ascolta(`sessioni/${codice}/scena`, (copia) => {
       if (dvG.codice !== codice) return;
       schermoDalVivo.scena = typeof copia?.img === 'string' ? copia.img : '';
+      schermoDalVivo.sfondo = typeof copia?.sfondo === 'string' ? copia.sfondo : '';
       if (location.hash.startsWith('#/schermo-vivo')) dvRidisegna();
     }, () => {});
     dvG.stop = DV.ascolta(`sessioni/${codice}/perGiocatore/${io}`, (copia) => {
@@ -2683,6 +2684,7 @@
     dvG.stopScena = null;
     schermoDalVivo.dati = null;
     schermoDalVivo.scena = '';
+    schermoDalVivo.sfondo = '';
     // Le astronavi ricevute restano com'erano, ma non si aggiornano più
     for (const v of S.astronavi) if (v.dalVivo) v.dalVivo = false;
     dvG.codice = ''; dvG.pgId = ''; dvG.ultimo = ''; dvG.stato = ''; dvG.ultimoComando = null; dvG.statoMaster = null; dvG.stop = null;
@@ -2803,10 +2805,14 @@
       DV.scrivi(`sessioni/${codice}/schermo`, { testo, t: DV.ORA }).catch(() => { dvM.schermoInviato = null; });
     }
     // Immagine di scena: solo se non è troppo grande per i telefoni
-    const sc = c.incontro?.scena && /^data:image\//.test(c.incontro.scena) && c.incontro.scena.length < 900000 ? c.incontro.scena : '';
-    if (dvM.scenaInviata !== sc) {
-      dvM.scenaInviata = sc;
-      (sc ? DV.scrivi(`sessioni/${codice}/scena`, { img: sc, t: DV.ORA }) : DV.cancella(`sessioni/${codice}/scena`)).catch(() => { dvM.scenaInviata = null; });
+    // Immagine di sfondo: viaggia insieme alla scena (un solo ascolto in più per i telefoni)
+    const piccola = (x) => (x && /^data:image\//.test(x) && x.length < 900000 ? x : '');
+    const sc = piccola(c.incontro?.scena);
+    const sf = piccola(c.incontro?.sfondo);
+    const chiave = `${sc.length}:${sc.slice(-64)}|${sf.length}:${sf.slice(-64)}`;
+    if (dvM.scenaInviata !== chiave) {
+      dvM.scenaInviata = chiave;
+      (sc || sf ? DV.scrivi(`sessioni/${codice}/scena`, { img: sc, sfondo: sf, t: DV.ORA }) : DV.cancella(`sessioni/${codice}/scena`)).catch(() => { dvM.scenaInviata = null; });
     }
   }
   function dvMInvia() {

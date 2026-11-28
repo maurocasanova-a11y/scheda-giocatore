@@ -7278,6 +7278,7 @@ window.creaPF1 = function creaPF1(ctx) {
         iniziali: carte.find((x) => x.id === attivo.id)?.iniziali || '?', azioni } : null,
       prossimo: prossimo && prossimo !== attivo ? nomeVisto(prossimo, info(prossimo)) : '',
       scena: immagini && inc.scena && /^data:image\//.test(inc.scena) ? inc.scena : '',
+      sfondo: immagini ? sfondoDi(inc) : '',
       messaggio: String(inc.messaggio || ''),
       tiri: inc.tiriPubblici ? (inc.tiriSchermo || []).slice(0, 5) : [],
       carte,
@@ -7286,9 +7287,10 @@ window.creaPF1 = function creaPF1(ctx) {
   // Disegno dello schermo. fidato = dati prodotti da questa finestra (immagini e HTML del volo ammessi);
   // dai telefoni dei giocatori arrivano dalla sessione dal vivo e si usano solo come testo.
   let turnoAnnunciato = null;
-  function renderSchermo(s, { fidato = true, scena = '', mioPg = '' } = {}) {
+  function renderSchermo(s, { fidato = true, scena = '', sfondo = '', mioPg = '' } = {}) {
     if (!s) return '<div class="schermo"><p class="vuoto">In attesa del master…</p></div>';
-    const imgScena = fidato ? s.scena : scena && /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(scena) ? scena : '';
+    const imgScena = fidato ? s.scena : scena && RE_IMMAGINE.test(scena) ? scena : '';
+    const imgSfondo = fidato ? (s.sfondo && RE_IMMAGINE.test(s.sfondo) ? s.sfondo : '') : sfondo && RE_IMMAGINE.test(sfondo) ? sfondo : '';
     const ritratto = (x) => (fidato && x.img ? x.img : `<span class="ritratto-iniziali">${esc(x.iniziali || '?')}</span>`);
     const carte = (s.carte || []).map((x) => `<div class="sch-carta${x.attivo ? ' attivo' : ''}${x.aTerra ? ' a-terra' : ''}${x.sorpreso ? ' sorpreso' : ''}${mioPg && x.pgId === mioPg ? ' mio' : ''}">
         <div class="sch-iniz">${x.iniz === '' ? '—' : esc(x.iniz)}</div>
@@ -7311,7 +7313,7 @@ window.creaPF1 = function creaPF1(ctx) {
     }
     turnoAnnunciato = chiave ?? turnoAnnunciato ?? '';
     setTimeout(() => document.querySelector('.sch-carta.attivo')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
-    return `<div class="schermo tabellone${scenaGrande ? ' modo-scena' : ''}" style="--sch-scala:${scalaSchermo()}">
+    return `<div class="schermo tabellone${scenaGrande ? ' modo-scena' : ''}${imgSfondo ? ' con-sfondo' : ''}" style="--sch-scala:${scalaSchermo()}${imgSfondo ? `;--sfondo:url('${imgSfondo}')` : ''}">
       <header class="sch-testa">
         <div class="sch-round">${s.fase === 'sorpresa' ? 'Round di sorpresa' : inScontro ? `Round ${s.round}` : scenaGrande ? esc(s.campagna) : 'In attesa dello scontro'}</div>
         ${inScontro && a ? `<div class="sch-turno"><span class="ritratto sch-img-grande">${ritratto(a)}</span>
@@ -7607,7 +7609,15 @@ window.creaPF1 = function creaPF1(ctx) {
     inc.combattenti.sort((a, b) => valIniz(b) - valIniz(a) || info(b).modIniz - info(a).modIniz || info(a).nome.localeCompare(info(b).nome));
   }
 
+  // Immagine di sfondo dello scontro (dietro il tracker e lo schermo dei giocatori): solo immagini come data URL
+  const RE_IMMAGINE = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
+  const sfondoDi = (inc) => (inc?.sfondo && RE_IMMAGINE.test(inc.sfondo) ? inc.sfondo : '');
   function vistaIncontro(c) {
+    const sfondo = sfondoDi(incontroDi(c));
+    const html = corpoIncontro(c);
+    return sfondo ? `<div class="con-sfondo inc-con-sfondo" style="--sfondo:url('${sfondo}')">${html}</div>` : html;
+  }
+  function corpoIncontro(c) {
     const inc = incontroDi(c);
     setTimeout(() => caricaImmaginiMostri(c), 0);
     const presenti = new Set(inc.combattenti.map((x) => x.pgId).filter(Boolean));
@@ -7685,6 +7695,8 @@ window.creaPF1 = function creaPF1(ctx) {
         <button data-azione="inc-schermo" ${attr} title="Apre il tracker in una seconda finestra da spostare su un altro monitor per i giocatori">🖥 Schermo giocatori</button>
         <button data-azione="inc-scena" ${attr} title="Immagine o mappa mostrata sullo schermo dei giocatori sopra l'ordine di iniziativa">🖼 ${inc.scena ? 'Cambia scena' : 'Immagine di scena'}</button>
         ${inc.scena ? `<button class="btn-piccolo" data-azione="inc-scena-x" ${attr} title="Togli l'immagine di scena">× scena</button>` : ''}
+        <button data-azione="inc-sfondo" ${attr} title="Immagine di sfondo dietro il tracker e lo schermo dei giocatori (scurita per leggere bene)">🌄 ${inc.sfondo ? 'Cambia sfondo' : 'Immagine di sfondo'}</button>
+        ${inc.sfondo ? `<button class="btn-piccolo" data-azione="inc-sfondo-x" ${attr} title="Togli l'immagine di sfondo">× sfondo</button>` : ''}
       </div>
       <div class="inc-barra inc-schermo-extra">
         <span class="muto">Schermo giocatori:</span>
@@ -8149,6 +8161,23 @@ window.creaPF1 = function creaPF1(ctx) {
     'inc-scena-x'(el) {
       const inc = incontroDi(ctx.campagna(el.dataset.camp));
       delete inc.scena;
+      ctx.salva();
+      ctx.render();
+    },
+    async 'inc-sfondo'(el) {
+      const inc = incontroDi(ctx.campagna(el.dataset.camp));
+      try {
+        const url = await ctx.scegliImmagine(1600);
+        if (!url) return;
+        inc.sfondo = url;
+        ctx.salva();
+        ctx.render();
+        ctx.toast('🌄 Immagine di sfondo messa dietro il tracker e lo schermo dei giocatori');
+      } catch (e) { ctx.toast(esc(e.message), 'errore'); }
+    },
+    'inc-sfondo-x'(el) {
+      const inc = incontroDi(ctx.campagna(el.dataset.camp));
+      delete inc.sfondo;
       ctx.salva();
       ctx.render();
     },

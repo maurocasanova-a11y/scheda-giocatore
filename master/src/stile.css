@@ -1622,3 +1622,10 @@ body.modo-schermo #contenuto > .schermo.tabellone { max-width: none; }
   .tabellone .sch-tiro { font-size: 15px; }
   .tabellone .sch-tiro b, .tabellone .sch-tiro:first-of-type b { font-size: 22px; }
 }
+/* Immagine di sfondo dello scontro: dietro il tracker e lo schermo dei giocatori, scurita per leggere bene */
+.con-sfondo { background-image: linear-gradient(rgba(10, 8, 6, .45), rgba(10, 8, 6, .6)), var(--sfondo); background-size: cover; background-position: center; background-attachment: fixed; border-radius: 12px; }
+.inc-con-sfondo { padding: 14px; }
+.schermo.con-sfondo { padding: 16px 20px; min-height: calc(100vh - 36px); }
+body .con-sfondo.con-sfondo :is(.comb, .sch-carta, .pannello, .inc-musica, .inc-barra, .dv-master, .inc-effetti, .inc-pg, .sch-tiri, .sch-turno) { background: rgba(16, 12, 9, .7); backdrop-filter: blur(3px); }
+body .con-sfondo.con-sfondo :is(.comb, .sch-carta).attivo { background: rgba(48, 38, 20, .78); }
+@media (max-width: 700px) { .con-sfondo { background-attachment: scroll; } .schermo.con-sfondo { padding: 10px; } }
